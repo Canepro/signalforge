@@ -39,7 +39,7 @@ export const AuditReportSchema = z.object({
   findings: z.array(FindingSchema),
   environment_context: EnvironmentContextSchema,
   noise_or_expected: z.array(NoiseItemSchema),
-  top_actions_now: z.array(z.string()).min(1).max(5),
+  top_actions_now: z.array(z.string()).length(3),
 });
 export type AuditReport = z.infer<typeof AuditReportSchema>;
 
@@ -152,7 +152,9 @@ export function auditReportJsonSchema(): Record<string, unknown> {
         top_actions_now: {
           type: "array",
           items: { type: "string" },
-          description: "Exactly 3 prioritized actions",
+          minItems: 3,
+          maxItems: 3,
+          description: "Exactly 3 prioritized actions, ordered by impact",
         },
       },
       required: [

@@ -44,4 +44,21 @@ describe("classifyNoise", () => {
     );
     expect(nonRootNoise.length).toBeGreaterThan(0);
   });
+
+  it("classifies empty root crontab as general noise when present", () => {
+    const { noise: rootNoise } = loadNoise("wsl-nov2025-full.log");
+    const crontabNoise = rootNoise.filter((n) =>
+      n.observation.includes("No crontab for root")
+    );
+    expect(crontabNoise.length).toBe(1);
+    expect(crontabNoise[0].related_environment).toBe("general");
+  });
+
+  it("does not classify crontab noise when the message is about a non-root user", () => {
+    const { noise } = loadNoise("wsl-mar2026-full.log");
+    const crontabNoise = noise.filter((n) =>
+      n.observation.includes("No crontab for root")
+    );
+    expect(crontabNoise.length).toBe(0);
+  });
 });

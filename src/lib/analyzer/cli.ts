@@ -4,7 +4,8 @@ import { analyzeArtifact } from "./index.js";
 async function main() {
   const filePath = process.argv[2];
   if (!filePath) {
-    console.error("Usage: bun run src/lib/analyzer/cli.ts <path-to-audit-log>");
+    console.error("Usage: bun run analyze <path-to-audit-log>");
+    console.error("\nSignalForge — Infrastructure Diagnostics");
     process.exit(1);
   }
 

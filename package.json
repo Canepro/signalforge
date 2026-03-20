@@ -1,5 +1,5 @@
 {
-  "name": "surfacer",
+  "name": "signalforge",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/analyzer",
-    "analyze": "bun run src/lib/analyzer/cli.ts"
+    "analyze": "bun src/lib/analyzer/cli.ts"
   },
   "dependencies": {
     "next": "^15.3.2",

@@ -130,11 +130,12 @@ const RULES: NoiseRule[] = [
     condition: (env) => !env.ran_as_root,
   },
   {
-    id: "nonroot-crontab",
+    id: "crontab-empty",
     pattern: /no crontab for root/i,
     observation: "No crontab for root",
-    reason: "Root crontab is empty or not accessible; expected in many environments",
-    environment: "non-root",
+    reason:
+      "Root crontab is empty; this is normal for systems that use /etc/cron.d or systemd timers instead",
+    environment: "general",
     condition: () => true,
   },
 ];

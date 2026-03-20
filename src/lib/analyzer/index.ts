@@ -15,6 +15,8 @@ export interface AnalyzeOptions {
   apiKey?: string;
   model?: string;
   artifactType?: string;
+  /** @internal test-only: inject an OpenAI client to bypass real API calls */
+  _openaiClient?: OpenAI;
 }
 
 export async function analyzeArtifact(
@@ -40,13 +42,17 @@ export async function analyzeArtifact(
   }
 
   try {
-    const report = await callLlm(apiKey, model, env, noise, preFindings, sections, incomplete, reason);
+    const { report: llmReport, tokensUsed } = await callLlm(apiKey, model, env, noise, preFindings, sections, incomplete, reason, options._openaiClient);
     const duration = Date.now() - startMs;
 
+    const reconciledFindings = reconcileSeverity(llmReport.findings, preFindings);
+
     const mergedReport: AuditReport = {
-      ...report,
+      summary: llmReport.summary,
+      findings: reconciledFindings,
       environment_context: env,
       noise_or_expected: noise,
+      top_actions_now: llmReport.top_actions_now,
     };
 
     return {
@@ -58,7 +64,7 @@ export async function analyzeArtifact(
       incomplete_reason: reason,
       meta: {
         model_used: model,
-        tokens_used: 0,
+        tokens_used: tokensUsed,
         duration_ms: duration,
         llm_succeeded: true,
       },
@@ -99,15 +105,15 @@ function buildFallbackResult(
     summary.push(`WARNING: ${incompleteReason}`);
   }
 
+  const topActions = buildFallbackActions(fallbackFindings, env);
+
   return {
     report: {
       summary,
       findings: fallbackFindings,
       environment_context: env,
       noise_or_expected: noise,
-      top_actions_now: fallbackFindings
-        .slice(0, 3)
-        .map((f) => f.title),
+      top_actions_now: topActions,
     },
     environment: env,
     noise,
@@ -124,6 +130,50 @@ function buildFallbackResult(
   };
 }
 
+import type { Finding } from "./schema.js";
+
+function reconcileSeverity(
+  llmFindings: Finding[],
+  preFindings: PreFinding[]
+): Finding[] {
+  return llmFindings.map((f) => {
+    const matchByTitle = preFindings.find(
+      (pf) =>
+        f.title.toLowerCase().includes(pf.title.toLowerCase()) ||
+        pf.title.toLowerCase().includes(f.title.toLowerCase())
+    );
+    const matchById = preFindings[parseInt(f.id.replace(/\D/g, ""), 10) - 1];
+    const match = matchByTitle ?? matchById;
+
+    if (match) {
+      return { ...f, severity: match.severity_hint };
+    }
+    return f;
+  });
+}
+
+const FILLER_ACTIONS = [
+  "Review the full findings table and address items by severity",
+  "Rerun the audit with elevated privileges if visibility was limited",
+  "Collect a fresh full audit to establish a current baseline",
+];
+
+function buildFallbackActions(
+  findings: Array<{ title: string }>,
+  _env: EnvironmentContext
+): [string, string, string] {
+  const fromFindings = findings.slice(0, 3).map((f) => f.title);
+  while (fromFindings.length < 3) {
+    fromFindings.push(FILLER_ACTIONS[fromFindings.length]!);
+  }
+  return fromFindings as [string, string, string];
+}
+
+interface LlmResult {
+  report: AuditReport;
+  tokensUsed: number;
+}
+
 async function callLlm(
   apiKey: string,
   model: string,
@@ -132,9 +182,10 @@ async function callLlm(
   preFindings: PreFinding[],
   sections: Record<string, string>,
   incomplete: boolean,
-  incompleteReason?: string
-): Promise<AuditReport> {
-  const client = new OpenAI({ apiKey });
+  incompleteReason?: string,
+  injectedClient?: OpenAI
+): Promise<LlmResult> {
+  const client = injectedClient ?? new OpenAI({ apiKey });
 
   const response = await client.responses.create({
     model,
@@ -148,7 +199,18 @@ async function callLlm(
     },
   });
 
+  let tokensUsed = 0;
+  const usage = (response as Record<string, unknown>).usage as
+    | Record<string, number>
+    | undefined;
+  if (usage) {
+    tokensUsed =
+      (usage.total_tokens ?? 0) ||
+      (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
+  }
+
   const text = response.output_text;
   const parsed = JSON.parse(text);
-  return AuditReportSchema.parse(parsed);
+  const report = AuditReportSchema.parse(parsed);
+  return { report, tokensUsed };
 }

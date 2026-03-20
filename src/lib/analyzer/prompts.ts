@@ -6,23 +6,16 @@ export function buildSystemPrompt(): string {
 1. Explain why each pre-identified finding matters in context.
 2. Write 3-5 bullet-point summary of the overall security posture.
 3. Prioritize exactly 3 actions the operator should take, ordered by impact.
-4. Optionally adjust severity if environment context changes the meaning (with justification).
-
-## Severity Rubric
-
-- critical: Active compromise indicators (unauthorized users, unexpected public-facing services, tampered binaries, rootkit signatures).
-- high: Exposed services with failed auth spikes, unpatched critical CVEs, missing firewall on public-facing ports, unauthorized SSH keys.
-- medium: Misconfigurations, risky defaults (PermitRootLogin yes), stale users with shell access, disk usage above 85%, outdated packages.
-- low: Expected limitations, informational items, non-root visibility gaps, minor housekeeping.
 
 ## Rules
 
 - Every finding MUST include verbatim evidence from the source log in the evidence field.
 - Do NOT invent findings that are not in the pre_findings list.
+- Do NOT change the severity of any finding. Severity is set by the deterministic pipeline and is not yours to adjust.
 - Do NOT override noise classifications. Noise items are already determined by deterministic rules and must appear in noise_or_expected as-is.
 - For each finding, provide a concrete why_it_matters and recommended_action.
-- Finding IDs should be sequential: F001, F002, etc.
-- top_actions_now must have exactly 3 items.`;
+- Finding IDs must match the pre_findings list (F001, F002, etc. in order).
+- top_actions_now must have exactly 3 items. No more, no fewer.`;
 }
 
 export function buildUserPrompt(

@@ -128,9 +128,90 @@ describe("LLM fallback", () => {
       if (result.report) {
         const parsed = AuditReportSchema.safeParse(result.report);
         expect(parsed.success).toBe(true);
+        expect(result.report.top_actions_now).toHaveLength(3);
       }
     } finally {
       if (oldKey) process.env.OPENAI_API_KEY = oldKey;
     }
+  });
+
+  it("fallback always returns exactly 3 top_actions_now even with few findings", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-nov2025-truncated.log"), "utf-8");
+
+    const result = await analyzeArtifact(raw, { apiKey: undefined });
+    expect(result.report).not.toBeNull();
+    expect(result.report!.top_actions_now).toHaveLength(3);
+  });
+});
+
+describe("LLM success path (mocked)", () => {
+  it("preserves deterministic severity, merges env/noise, reports tokens", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-mar2026-full.log"), "utf-8");
+    const adapter = new LinuxAuditLogAdapter();
+
+    const clean = adapter.stripNoise(raw);
+    const sections = adapter.parseSections(clean);
+    const env = adapter.detectEnvironment(sections);
+    const noise = adapter.classifyNoise(sections, env);
+    const preFindings = adapter.extractPreFindings(sections, env);
+
+    const fakeLlmFindings = preFindings.map((pf, i) => ({
+      id: `F${String(i + 1).padStart(3, "0")}`,
+      title: pf.title,
+      severity: "critical" as const,
+      category: pf.category,
+      section_source: pf.section_source,
+      evidence: pf.evidence,
+      why_it_matters: "Mocked explanation for " + pf.title,
+      recommended_action: "Mocked action for " + pf.title,
+    }));
+
+    const fakeLlmReport = {
+      summary: ["Mocked summary bullet 1", "Mocked summary bullet 2", "Mocked summary bullet 3"],
+      findings: fakeLlmFindings,
+      environment_context: env,
+      noise_or_expected: noise,
+      top_actions_now: ["Action A", "Action B", "Action C"],
+    };
+
+    const mockClient = {
+      responses: {
+        create: async () => ({
+          output_text: JSON.stringify(fakeLlmReport),
+          usage: { input_tokens: 1200, output_tokens: 800, total_tokens: 2000 },
+        }),
+      },
+    } as never;
+
+    const result = await analyzeArtifact(raw, {
+      apiKey: "sk-test-fake",
+      _openaiClient: mockClient,
+    });
+
+    expect(result.meta.llm_succeeded).toBe(true);
+    expect(result.meta.tokens_used).toBe(2000);
+
+    expect(result.report).not.toBeNull();
+    const report = result.report!;
+
+    expect(report.top_actions_now).toHaveLength(3);
+
+    expect(report.environment_context.is_wsl).toBe(true);
+    expect(report.environment_context).toEqual(env);
+
+    expect(report.noise_or_expected.length).toBe(noise.length);
+
+    for (let i = 0; i < report.findings.length; i++) {
+      const finding = report.findings[i];
+      const preFinding = preFindings[i];
+      if (preFinding) {
+        expect(finding.severity).toBe(preFinding.severity_hint);
+        expect(finding.severity).not.toBe("critical");
+      }
+    }
+
+    expect(report.findings[0]?.why_it_matters).toContain("Mocked explanation");
   });
 });
