@@ -5,3 +5,6 @@ out/
 .env.local
 *.tsbuildinfo
 bun.lock
+*.db
+*.db-wal
+*.db-shm
