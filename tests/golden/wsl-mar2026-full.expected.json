@@ -1,0 +1,19 @@
+{
+  "environment": {
+    "is_wsl": true,
+    "ran_as_root": false,
+    "os_contains": "Ubuntu"
+  },
+  "must_be_noise": [
+    "SSH service not found",
+    "AppArmor not present"
+  ],
+  "must_not_be_findings": [
+    "SSH service not found",
+    "AppArmor not present"
+  ],
+  "must_be_findings": [],
+  "is_incomplete": false,
+  "min_findings": 0,
+  "max_findings": 25
+}

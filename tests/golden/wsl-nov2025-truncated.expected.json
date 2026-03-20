@@ -1,0 +1,13 @@
+{
+  "environment": {
+    "is_wsl": true,
+    "ran_as_root": true,
+    "os_contains": "Ubuntu"
+  },
+  "must_be_noise": [],
+  "must_not_be_findings": [],
+  "must_be_findings": [],
+  "is_incomplete": true,
+  "min_findings": 0,
+  "max_findings": 5
+}

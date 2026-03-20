@@ -1,0 +1,52 @@
+╔════════════════════════════════════════════════════════════════╗
+║              SERVER AUDIT REPORT                               ║
+║              2025-11-02 23:10:19 UTC                          ║
+╚════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[SYSTEM IDENTITY]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;32m→[0m Hostname
+MogahPC
+
+[0;32m→[0m Operating System
+PRETTY_NAME="Ubuntu 24.04.3 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.3 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+
+[0;32m→[0m Kernel Version
+5.15.153.1-microsoft-standard-WSL2
+
+[0;32m→[0m System Uptime
+up 5 hours, 31 minutes
+
+[0;32m→[0m Current Date/Time
+Sun Nov  2 23:10:19 GMT 2025
+
+[0;32m→[0m Timezone
+               Local time: Sun 2025-11-02 23:10:19 GMT
+           Universal time: Sun 2025-11-02 23:10:19 UTC
+                 RTC time: Sun 2025-11-02 23:10:18
+                Time zone: Europe/London (GMT, +0000)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[NETWORK CONFIGURATION]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;32m→[0m Network Interfaces
+lo               UNKNOWN        127.0.0.1/8 10.255.255.254/32 ::1/128 
+eth0             UP             172.20.97.77/20 fe80::215:5dff:fecc:4f1/64 
+

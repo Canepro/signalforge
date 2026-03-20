@@ -1,0 +1,33 @@
+{
+  "name": "surfacer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run tests/analyzer",
+    "analyze": "bun run src/lib/analyzer/cli.ts"
+  },
+  "dependencies": {
+    "next": "^15.3.2",
+    "openai": "^5.8.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.23"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.1",
+    "tailwindcss": "^4.1.7",
+    "@tailwindcss/postcss": "^4.1.7"
+  }
+}
