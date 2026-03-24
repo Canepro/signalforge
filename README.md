@@ -54,7 +54,7 @@ SignalForge is deployed on Vercel with a Neon Postgres backend.
 The live site uses:
 
 - `DATABASE_DRIVER=postgres`
-- Neon-managed Postgres (connection pooling via Neon's serverless driver endpoint)
+- Neon-hosted Postgres: set `DATABASE_URL` to the connection string from Neon (direct or pooled hostname). The app uses the [`pg`](https://node-postgres.com/) driver with a connection pool (`src/lib/storage/postgres.ts`); there is no Neon-specific JavaScript driver in this repo.
 - Vercel serverless functions for all API routes
 
 Local development defaults to SQLite. The production deployment uses Postgres exclusively.
@@ -314,6 +314,7 @@ GitHub Actions runs on every push to `main` and on pull requests:
 
 - **Checks job:** `bun run typecheck`, `bun run test`, `bun run build`
 - **Postgres parity job:** starts `postgres:16-alpine`, applies migrations, runs `bun run test:parity`
+- **Bun version:** pinned in the workflow (currently `1.3.11`) so CI does not depend on `latest`
 
 See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
