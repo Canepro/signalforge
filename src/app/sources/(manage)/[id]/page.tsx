@@ -2,9 +2,11 @@ import Link from "next/link";
 import { AgentEnrollClient } from "./agent-enroll-client";
 import { RequestJobForm } from "./request-job-form";
 import { CancelJobButton } from "./cancel-job-button";
+import { DeleteSourceButton } from "./delete-source-button";
 import { SourceSettingsForm } from "./source-settings-form";
 import { SourceHealthDot } from "@/components/source-health-dot";
 import { JobStatusBadge, jobBorderClass } from "@/components/job-status-badge";
+import { CopyTextButton } from "@/components/copy-text-button";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +38,7 @@ export default async function SourceDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ job?: string; error?: string; cancel_error?: string }>;
+  searchParams: Promise<{ job?: string; error?: string; cancel_error?: string; delete_error?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -54,6 +56,7 @@ export default async function SourceDetailPage({
     return tx.jobs.listForSource(id);
   });
   const registration = await storage.agents.getRegistrationBySourceId(id);
+  const blockingDeleteJobs = jobs.filter((job) => ["claimed", "running"].includes(job.status));
 
   return (
     <div className="space-y-8">
@@ -106,6 +109,11 @@ export default async function SourceDetailPage({
           Could not cancel job ({sp.cancel_error}).
         </p>
       )}
+      {sp.delete_error === "active_jobs" && (
+        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+          Delete is blocked while this source has a claimed or running collection job.
+        </p>
+      )}
 
       {/* Collect Fresh Evidence */}
       <section className="relative rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm space-y-4 overflow-hidden">
@@ -141,6 +149,17 @@ export default async function SourceDetailPage({
             <p className="text-[10px] text-on-surface-variant">
               One registration per source in v1. Token rotation is deferred.
             </p>
+            <div className="flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant">
+              <span className="font-bold uppercase tracking-widest">Agent id</span>
+              <code className="rounded bg-surface-container px-1.5 py-0.5 font-mono text-on-surface">
+                {registration.id}
+              </code>
+              <CopyTextButton
+                value={registration.id}
+                idleLabel="Copy agent id"
+                className="rounded-md border border-outline-variant/20 bg-surface-container-low px-2 py-1 font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container"
+              />
+            </div>
           </div>
         ) : (
           <>
@@ -241,6 +260,24 @@ export default async function SourceDetailPage({
           collectorVersion={source.default_collector_version ?? null}
           enabled={source.enabled}
         />
+        <div className="border-t border-outline-variant/15 pt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-on-surface">Danger zone</h3>
+              <p className="text-xs leading-relaxed text-on-surface-variant">
+                Deleting a source removes its agent registration and source-scoped collection jobs.
+                Linked runs remain available.
+                {jobs.length > 0 ? ` This source currently has ${jobs.length} stored job${jobs.length === 1 ? "" : "s"}.` : ""}
+              </p>
+              {blockingDeleteJobs.length > 0 && (
+                <p className="text-xs text-severity-critical">
+                  Delete is blocked until {blockingDeleteJobs.length} claimed or running job{blockingDeleteJobs.length === 1 ? "" : "s"} finish.
+                </p>
+              )}
+            </div>
+            <DeleteSourceButton sourceId={id} blocked={blockingDeleteJobs.length > 0} />
+          </div>
+        </div>
       </section>
     </div>
   );

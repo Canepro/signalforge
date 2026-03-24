@@ -257,6 +257,38 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
   return getSourceById(db, id);
 }
 
+export type DeleteSourceResult =
+  | { ok: true }
+  | { ok: false; code: "not_found" | "active_jobs" };
+
+export function deleteSource(db: Database, id: string): DeleteSourceResult {
+  const row = getSourceById(db, id);
+  if (!row) return { ok: false, code: "not_found" };
+
+  const blockingJob = getOne<{ id: string }>(
+    db,
+    `SELECT id FROM collection_jobs
+     WHERE source_id = ? AND status IN ('claimed', 'running')
+     LIMIT 1`,
+    [id]
+  );
+  if (blockingJob) {
+    return { ok: false, code: "active_jobs" };
+  }
+
+  db.run("DELETE FROM agent_registrations WHERE source_id = ?", [id]);
+  db.run("DELETE FROM collection_jobs WHERE source_id = ?", [id]);
+  db.run("DELETE FROM sources WHERE id = ?", [id]);
+
+  emitDomainEvent("source.deleted", {
+    source_id: row.id,
+    target_identifier: row.target_identifier,
+    occurred_at: new Date().toISOString(),
+  });
+
+  return { ok: true };
+}
+
 export interface CreateCollectionJobInput {
   request_reason?: string | null;
   priority?: number;

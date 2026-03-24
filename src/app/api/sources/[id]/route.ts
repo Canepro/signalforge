@@ -85,3 +85,32 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = requireAdminBearer(request);
+  if (denied) return denied;
+
+  try {
+    const { id } = await params;
+    const storage = await getStorage();
+    const result = await storage.withTransaction((tx) => tx.sources.delete(id));
+    if (!result.ok) {
+      if (result.code === "not_found") {
+        return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
+      }
+      if (result.code === "active_jobs") {
+        return NextResponse.json(
+          { error: "Source has claimed or running jobs", code: "active_jobs" },
+          { status: 409 }
+        );
+      }
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

@@ -130,11 +130,16 @@ export interface CreateCollectionJobInput {
   idempotency_key?: string | null;
 }
 
+export type DeleteSourceResult =
+  | { ok: true }
+  | { ok: false; code: "not_found" | "active_jobs" };
+
 export interface SourcesStore {
   list(opts?: { enabled?: boolean }): Promise<SourceView[]>;
   getById(id: string): Promise<SourceView | null>;
   create(input: CreateSourceInput): Promise<SourceView>;
   update(id: string, patch: PatchSourceInput): Promise<SourceView | null>;
+  delete(id: string): Promise<DeleteSourceResult>;
 }
 
 export interface JobsStore {

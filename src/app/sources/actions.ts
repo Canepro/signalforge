@@ -161,6 +161,27 @@ export async function updateSourceAction(formData: FormData): Promise<void> {
   revalidatePath("/sources");
 }
 
+export async function deleteSourceAction(formData: FormData): Promise<void> {
+  await assertAdminSession();
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!sourceId) redirect("/sources");
+
+  const storage = await getStorage();
+  const result = await storage.withTransaction((tx) => tx.sources.delete(sourceId));
+  if (!result.ok) {
+    if (result.code === "not_found") {
+      redirect("/sources");
+    }
+    if (result.code === "active_jobs") {
+      redirect(`/sources/${sourceId}?delete_error=${result.code}`);
+    }
+  }
+
+  revalidatePath(`/sources/${sourceId}`);
+  revalidatePath("/sources");
+  redirect("/sources?deleted=1");
+}
+
 export type RegisterAgentState =
   | { ok: false; error?: string }
   | { ok: true; token: string; token_prefix: string; agent_id: string };

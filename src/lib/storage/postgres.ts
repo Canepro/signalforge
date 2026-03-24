@@ -636,6 +636,36 @@ class PostgresSourcesStore implements SourcesStore {
     );
     return (await this.getById(id))!;
   }
+
+  async delete(id: string) {
+    const row = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [id]);
+    if (!row) {
+      return { ok: false as const, code: "not_found" as const };
+    }
+
+    const blockingJob = await one<{ id: string }>(
+      this.q,
+      `SELECT id FROM collection_jobs
+       WHERE source_id = $1 AND status IN ('claimed', 'running')
+       LIMIT 1`,
+      [id]
+    );
+    if (blockingJob) {
+      return { ok: false as const, code: "active_jobs" as const };
+    }
+
+    await this.q.query("DELETE FROM agent_registrations WHERE source_id = $1", [id]);
+    await this.q.query("DELETE FROM collection_jobs WHERE source_id = $1", [id]);
+    await this.q.query("DELETE FROM sources WHERE id = $1", [id]);
+
+    emitDomainEvent("source.deleted", {
+      source_id: row.id,
+      target_identifier: row.target_identifier,
+      occurred_at: new Date().toISOString(),
+    });
+
+    return { ok: true as const };
+  }
 }
 
 class PostgresJobsStore implements JobsStore {

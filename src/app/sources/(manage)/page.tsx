@@ -17,12 +17,22 @@ function relativeTime(iso: string | null): string {
   return `${d}d ago`;
 }
 
-export default async function SourcesListPage() {
+export default async function SourcesListPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ deleted?: string }>;
+}) {
+  const sp = searchParams ? await searchParams : undefined;
   const storage = await getStorage();
   const sources = await storage.sources.list();
 
   return (
     <div className="space-y-6">
+      {sp?.deleted === "1" && (
+        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
+          Source deleted.
+        </p>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="font-headline text-2xl font-bold text-on-surface tracking-tight">Evidence sources</h1>

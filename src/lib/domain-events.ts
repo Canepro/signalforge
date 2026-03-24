@@ -5,6 +5,7 @@
 
 export type DomainEventName =
   | "source.registered"
+  | "source.deleted"
   | "source.health_changed"
   | "collection_job.requested"
   | "collection_job.claimed"

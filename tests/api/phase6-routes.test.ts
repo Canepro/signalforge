@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST as POST_SOURCES, GET as GET_SOURCES } from "@/app/api/sources/route";
-import { GET as GET_SOURCE, PATCH as PATCH_SOURCE } from "@/app/api/sources/[id]/route";
+import { GET as GET_SOURCE, PATCH as PATCH_SOURCE, DELETE as DELETE_SOURCE } from "@/app/api/sources/[id]/route";
 import {
   GET as GET_SOURCE_JOBS,
   POST as POST_SOURCE_JOBS,
@@ -12,6 +12,7 @@ import { POST as POST_AGENT_REG } from "@/app/api/agent/registrations/route";
 import * as dbClient from "@/lib/db/client";
 import { getTestDb } from "@/lib/db/client";
 import type { Database } from "sql.js";
+import { getStorage } from "@/lib/storage";
 
 const ADMIN = "test-admin-token-phase6";
 
@@ -208,5 +209,83 @@ describe("Phase 6 API routes", () => {
     expect(cancel.status).toBe(200);
     const j = await cancel.json();
     expect(j.status).toBe("cancelled");
+  });
+
+  it("DELETE /api/sources/:id removes a source and returns 404 afterward", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Delete Me",
+          target_identifier: "tid-delete",
+          source_type: "linux_host",
+        }),
+      })
+    );
+    const { id } = await post.json();
+
+    const del = await DELETE_SOURCE(
+      new NextRequest(`http://localhost/api/sources/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      }),
+      { params: Promise.resolve({ id }) }
+    );
+    expect(del.status).toBe(200);
+
+    const get = await GET_SOURCE(
+      new NextRequest(`http://localhost/api/sources/${id}`, { headers: authHeaders() }),
+      { params: Promise.resolve({ id }) }
+    );
+    expect(get.status).toBe(404);
+  });
+
+  it("DELETE /api/sources/:id returns 409 when a job is claimed", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Claimed Source",
+          target_identifier: "tid-delete-claimed",
+          source_type: "wsl",
+        }),
+      })
+    );
+    const { id: sourceId } = await post.json();
+
+    const storage = await getStorage();
+    const { row: reg } = await storage.withTransaction((tx) =>
+      tx.agents.createRegistration(sourceId, "api-delete-agent")
+    );
+    await storage.withTransaction((tx) =>
+      tx.agents.applyHeartbeat({
+        sourceId,
+        registrationId: reg.id,
+        capabilities: ["collect:linux-audit-log"],
+        attributes: {},
+        agentVersion: "0.1.0",
+        activeJobId: null,
+        instanceId: null,
+      })
+    );
+    const { row: job } = await storage.withTransaction((tx) =>
+      tx.jobs.queueForSource(sourceId, { request_reason: "delete route block" })
+    );
+    await storage.withTransaction((tx) =>
+      tx.jobs.claimForAgent(job.id, sourceId, reg.id, "api-delete-inst", 300)
+    );
+
+    const del = await DELETE_SOURCE(
+      new NextRequest(`http://localhost/api/sources/${sourceId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    expect(del.status).toBe(409);
+    const body = await del.json();
+    expect(body.code).toBe("active_jobs");
   });
 });

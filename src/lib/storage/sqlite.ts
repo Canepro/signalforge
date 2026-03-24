@@ -30,6 +30,7 @@ import {
   cancelCollectionJob,
   collectionJobToJson,
   createAgentRegistration,
+  deleteSource,
   failCollectionJobForAgent,
   getAgentRegistrationBySourceId,
   getAgentRegistrationByTokenHash,
@@ -163,6 +164,10 @@ class SqliteSourcesStore implements SourcesStore {
   async update(id: string, patch: Parameters<typeof updateSource>[2]) {
     const row = updateSource(this.db, id, patch);
     return row ? sourceToJson(row) : null;
+  }
+
+  async delete(id: string) {
+    return deleteSource(this.db, id);
   }
 }
 

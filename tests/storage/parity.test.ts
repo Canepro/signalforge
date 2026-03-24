@@ -422,6 +422,62 @@ for (const backend of backends) {
       expect(result).toBeNull();
     });
 
+    it("delete source removes registration and source-scoped jobs", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Delete Host",
+          target_identifier: "parity-delete-host",
+          source_type: "linux_host",
+        })
+      );
+      await storage.withTransaction((tx) => tx.agents.createRegistration(src.id, "delete-agent"));
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, { request_reason: "cleanup test" })
+      );
+
+      const deleted = await storage.withTransaction((tx) => tx.sources.delete(src.id));
+      expect(deleted).toEqual({ ok: true });
+      expect(await storage.sources.getById(src.id)).toBeNull();
+      expect(await storage.agents.getRegistrationBySourceId(src.id)).toBeNull();
+      expect(await storage.jobs.getById(job.id)).toBeNull();
+      expect(await storage.jobs.listForSource(src.id)).toHaveLength(0);
+    });
+
+    it("delete source rejects claimed or running jobs", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Blocked Delete Host",
+          target_identifier: "parity-delete-blocked",
+          source_type: "wsl",
+        })
+      );
+      const { row: reg } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(src.id, "blocked-delete-agent")
+      );
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId: src.id,
+          registrationId: reg.id,
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, { request_reason: "active delete block" })
+      );
+      await storage.withTransaction((tx) =>
+        tx.jobs.claimForAgent(job.id, src.id, reg.id, "inst-delete", 300)
+      );
+
+      const deleted = await storage.withTransaction((tx) => tx.sources.delete(src.id));
+      expect(deleted).toEqual({ ok: false, code: "active_jobs" });
+      expect(await storage.sources.getById(src.id)).not.toBeNull();
+      expect(await storage.jobs.getById(job.id)).not.toBeNull();
+    });
+
     // --- JOBS ---
 
     it("queue and list collection jobs", async () => {
