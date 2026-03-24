@@ -1,5 +1,5 @@
-import type { ArtifactAdapter } from "./types.js";
-import { LinuxAuditLogAdapter } from "./linux-audit-log/index.js";
+import type { ArtifactAdapter } from "./types";
+import { LinuxAuditLogAdapter } from "./linux-audit-log/index";
 
 const adapters: Record<string, ArtifactAdapter> = {
   "linux-audit-log": new LinuxAuditLogAdapter(),

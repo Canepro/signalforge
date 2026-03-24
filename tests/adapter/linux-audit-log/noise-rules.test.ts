@@ -30,6 +30,12 @@ describe("classifyNoise", () => {
     expect(envTypes).toContain("WSL");
   });
 
+  it("classifies apport autoreport condition skips as WSL noise", () => {
+    const { noise } = loadNoise("wsl-mar2026-full.log");
+    const observations = noise.map((n) => n.observation);
+    expect(observations).toContain("Apport autoreport condition checks skipped");
+  });
+
   it("produces no WSL noise for sample prod server", () => {
     const { noise } = loadNoise("sample-prod-server.log");
     const wslNoise = noise.filter((n) => n.related_environment === "WSL");

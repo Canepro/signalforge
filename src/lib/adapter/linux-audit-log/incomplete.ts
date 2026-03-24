@@ -1,4 +1,4 @@
-import { KNOWN_SECTIONS } from "./sections.js";
+import { KNOWN_SECTIONS } from "./sections";
 
 export function detectIncomplete(sections: Record<string, string>): {
   incomplete: boolean;

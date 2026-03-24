@@ -1,4 +1,4 @@
-import type { EnvironmentContext, NoiseItem } from "../../analyzer/schema.js";
+import type { EnvironmentContext, NoiseItem } from "../../analyzer/schema";
 
 interface NoiseRule {
   id: string;
@@ -66,6 +66,16 @@ const RULES: NoiseRule[] = [
     observation: "wsl-pro-service I/O error",
     reason:
       "Ubuntu Pro Windows agent not reachable; expected when Pro is not configured",
+    environment: "WSL",
+    condition: (env) => env.is_wsl,
+  },
+  {
+    id: "wsl-apport-autoreport",
+    pattern:
+      /apport-autoreport\.(path|timer).*(ConditionPathExists=\/var\/lib\/apport\/autoreport|skipped because of an unmet condition check)/i,
+    observation: "Apport autoreport condition checks skipped",
+    reason:
+      "Ubuntu's apport autoreport units are conditionally skipped when autoreporting is disabled; this is expected and not an incident",
     environment: "WSL",
     condition: (env) => env.is_wsl,
   },

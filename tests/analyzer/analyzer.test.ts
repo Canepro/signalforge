@@ -114,6 +114,8 @@ describe("LLM fallback", () => {
     const raw = readFileSync(join(FIXTURES, "wsl-nov2025-full.log"), "utf-8");
 
     const oldKey = process.env.OPENAI_API_KEY;
+    const oldProvider = process.env.LLM_PROVIDER;
+    process.env.LLM_PROVIDER = "openai";
     delete process.env.OPENAI_API_KEY;
 
     try {
@@ -132,6 +134,32 @@ describe("LLM fallback", () => {
       }
     } finally {
       if (oldKey) process.env.OPENAI_API_KEY = oldKey;
+      else delete process.env.OPENAI_API_KEY;
+      if (oldProvider !== undefined) process.env.LLM_PROVIDER = oldProvider;
+      else delete process.env.LLM_PROVIDER;
+    }
+  });
+
+  it("falls back when LLM_PROVIDER=azure but Azure env is incomplete", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-nov2025-full.log"), "utf-8");
+
+    const envSnap = { ...process.env };
+    try {
+      process.env.LLM_PROVIDER = "azure";
+      process.env.AZURE_OPENAI_ENDPOINT = "https://example.cognitiveservices.azure.com";
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const result = await analyzeArtifact(raw);
+      expect(result.meta.llm_succeeded).toBe(false);
+      expect(result.analysis_error).toMatch(/incomplete|Azure/i);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
     }
   });
 
@@ -142,6 +170,117 @@ describe("LLM fallback", () => {
     const result = await analyzeArtifact(raw, { apiKey: undefined });
     expect(result.report).not.toBeNull();
     expect(result.report!.top_actions_now).toHaveLength(3);
+  });
+
+  it("fallback summary highlights incomplete audits with limited visibility", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-nov2025-truncated.log"), "utf-8");
+    const envSnap = { ...process.env };
+    try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.LLM_PROVIDER;
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_ENDPOINT;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const result = await analyzeArtifact(raw, { apiKey: undefined });
+      expect(result.is_incomplete).toBe(true);
+      expect(result.report!.summary.some((s) => s.includes("Limited visibility"))).toBe(true);
+      expect(result.report!.summary.some((s) => s.includes(result.incomplete_reason ?? ""))).toBe(true);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
+    }
+  });
+
+  it("fallback actions are concrete for package and observability findings", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-nov2025-full.log"), "utf-8");
+    const envSnap = { ...process.env };
+
+    try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.LLM_PROVIDER;
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_ENDPOINT;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const result = await analyzeArtifact(raw, { apiKey: undefined });
+      expect(result.report).not.toBeNull();
+      expect(
+        result.report!.top_actions_now.some((a) =>
+          a.includes("sudo apt update && sudo apt upgrade")
+        )
+      ).toBe(true);
+      expect(
+        result.report!.top_actions_now.some((a) => a.includes("allowlist"))
+      ).toBe(true);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
+    }
+  });
+
+  it("fallback summary surfaces the highest-signal findings", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-mar2026-full.log"), "utf-8");
+    const envSnap = { ...process.env };
+
+    try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.LLM_PROVIDER;
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_ENDPOINT;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const result = await analyzeArtifact(raw, { apiKey: undefined });
+      expect(result.report).not.toBeNull();
+      expect(result.report!.summary.some((s) => s.includes("Disk usage critical"))).toBe(
+        true
+      );
+      expect(result.report!.summary.some((s) => s.includes("packages"))).toBe(true);
+      expect(
+        result.report!.summary.some((s) => s.includes("non-trivial errors in recent logs"))
+      ).toBe(false);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
+    }
+  });
+
+  it("fallback top actions rank disk ahead of same-severity non-disk findings", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const raw = readFileSync(join(FIXTURES, "wsl-nov2025-full.log"), "utf-8");
+    const envSnap = { ...process.env };
+
+    try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.LLM_PROVIDER;
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_ENDPOINT;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const result = await analyzeArtifact(raw, { apiKey: undefined });
+      expect(result.report).not.toBeNull();
+      const pre = result.pre_findings.filter((f) => f.severity_hint === "medium");
+      expect(pre.length).toBeGreaterThanOrEqual(2);
+      expect(result.report!.top_actions_now[0]).toMatch(/Free space|volume/i);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
+    }
   });
 });
 

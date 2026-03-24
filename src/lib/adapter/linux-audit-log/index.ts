@@ -1,11 +1,11 @@
-import type { ArtifactAdapter } from "../types.js";
-import type { EnvironmentContext, NoiseItem, PreFinding } from "../../analyzer/schema.js";
-import { stripAnsi } from "./strip-ansi.js";
-import { parseSections } from "./sections.js";
-import { detectEnvironment } from "./environment.js";
-import { classifyNoise } from "./noise-rules.js";
-import { extractPreFindings } from "./finding-rules.js";
-import { detectIncomplete } from "./incomplete.js";
+import type { ArtifactAdapter } from "../types";
+import type { EnvironmentContext, NoiseItem, PreFinding } from "../../analyzer/schema";
+import { stripAnsi } from "./strip-ansi";
+import { parseSections } from "./sections";
+import { detectEnvironment } from "./environment";
+import { classifyNoise } from "./noise-rules";
+import { extractPreFindings } from "./finding-rules";
+import { detectIncomplete } from "./incomplete";
 
 export class LinuxAuditLogAdapter implements ArtifactAdapter {
   readonly type = "linux-audit-log";

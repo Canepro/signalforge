@@ -1,4 +1,4 @@
-import type { EnvironmentContext, NoiseItem, PreFinding } from "../analyzer/schema.js";
+import type { EnvironmentContext, NoiseItem, PreFinding } from "../analyzer/schema";
 
 export interface ArtifactAdapter {
   readonly type: string;

@@ -1,4 +1,4 @@
-import type { EnvironmentContext, PreFinding } from "../../analyzer/schema.js";
+import type { EnvironmentContext, PreFinding } from "../../analyzer/schema";
 
 let findingCounter = 0;
 function nextId(): string {
@@ -22,7 +22,7 @@ export function extractPreFindings(
   findings.push(...extractListeningServices(sections, env));
   findings.push(...extractSshFindings(sections));
   findings.push(...extractAuthFindings(sections));
-  findings.push(...extractErrorFindings(sections));
+  findings.push(...extractErrorFindings(sections, env));
 
   return findings;
 }
@@ -78,7 +78,7 @@ function extractPackageFindings(
   );
   if (upgradableMatch) {
     results.push({
-      title: `${upgradableMatch[1]} packages can be upgraded`,
+      title: `${upgradableMatch[1]} packages pending upgrade`,
       severity_hint: "medium",
       category: "packages",
       section_source: "INSTALLED PACKAGES",
@@ -95,7 +95,7 @@ function extractPackageFindings(
   );
   if (aptListLines.length > 0 && !upgradableMatch) {
     results.push({
-      title: `${aptListLines.length} packages available for upgrade`,
+      title: `${aptListLines.length} packages pending upgrade`,
       severity_hint: "medium",
       category: "packages",
       section_source: "INSTALLED PACKAGES",
@@ -107,37 +107,184 @@ function extractPackageFindings(
   return results;
 }
 
+interface ParsedSocket {
+  protocol: string;
+  localAddr: string;
+  port: number;
+  rawLine: string;
+  processName: string | null;
+}
+
+/**
+ * Parse the Local Address:Port from an ss/netstat line.
+ *
+ * Handles two row layouts produced by `ss`:
+ *   Full (Active Connections):  Netid State Recv-Q Send-Q Local:Port Peer:Port ...
+ *   Short (Listening Services): State Recv-Q Send-Q Local:Port Peer:Port ...
+ */
+function parseSocketLine(line: string): ParsedSocket | null {
+  const fields = line.trim().split(/\s+/);
+  if (fields.length < 5) return null;
+
+  let localField: string | undefined;
+  let protocol: string;
+
+  if (fields[0] === "LISTEN") {
+    localField = fields[3];
+    protocol = "tcp";
+  } else if (fields[1] === "LISTEN") {
+    localField = fields[4];
+    protocol = fields[0] ?? "tcp";
+  } else {
+    return null;
+  }
+
+  if (!localField) return null;
+
+  const lastColon = localField.lastIndexOf(":");
+  if (lastColon < 0) return null;
+
+  const portStr = localField.substring(lastColon + 1);
+  const port = parseInt(portStr, 10);
+  if (isNaN(port) || port <= 0) return null;
+
+  const localAddr = localField.substring(0, lastColon);
+  const processMatch = line.match(/users:\(\("([^"]+)"/);
+  return {
+    protocol,
+    localAddr,
+    port,
+    rawLine: line,
+    processName: processMatch?.[1] ?? null,
+  };
+}
+
+function deduplicateSockets(sockets: ParsedSocket[]): ParsedSocket[] {
+  const map = new Map<string, ParsedSocket>();
+  for (const s of sockets) {
+    const normAddr = s.localAddr.replace(/%\w+$/, "");
+    const key = `${s.protocol}|${normAddr}|${s.port}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, s);
+      continue;
+    }
+    // Active Connections and Listening Services often repeat the same socket; prefer
+    // the row that includes `users:(("name",...))` for process identity.
+    if (!existing.processName && s.processName) {
+      map.set(key, s);
+    }
+  }
+  return [...map.values()];
+}
+
+const WELL_KNOWN_SAFE_PORTS = new Set([22, 53]);
+const OBSERVABILITY_PORTS = new Set([9090, 9100]);
+
+type BindScope = "loopback" | "wildcard" | "specific";
+
+function classifyBindScope(localAddr: string): BindScope {
+  const addr = localAddr.replace(/^\[|\]$/g, "").replace(/%\w+$/, "").trim();
+  if (
+    addr === "*" ||
+    addr === "0.0.0.0" ||
+    addr === "::" ||
+    addr === ":::" ||
+    addr === "[::]"
+  ) {
+    return "wildcard";
+  }
+  if (addr === "127.0.0.1" || addr === "::1" || addr.startsWith("127.")) {
+    return "loopback";
+  }
+  return "specific";
+}
+
+function isNodeProcess(processLower: string | undefined): boolean {
+  return processLower === "node" || processLower === "nodejs";
+}
+
+/**
+ * Human-readable service identity from bind address, port, and ss `users:(("name",...))` when present.
+ * Stays conservative when process or role cannot be inferred.
+ */
+function serviceLabel(sock: ParsedSocket, bindScope: BindScope): string {
+  const process = sock.processName?.toLowerCase() ?? "";
+  const proc = process || undefined;
+
+  if (proc?.includes("prometheus-node") || sock.port === 9100) {
+    return "Prometheus node_exporter";
+  }
+  if ((proc?.includes("prometheus") && !proc.includes("prometheus-node")) || sock.port === 9090) {
+    return "Prometheus server";
+  }
+
+  if (proc?.includes("nginx")) return "Nginx";
+  if (proc?.includes("httpd") || proc?.includes("apache")) return "Apache httpd";
+  if (proc?.includes("redis")) return "Redis";
+  if (proc?.includes("postgres") || proc === "postmaster") return "PostgreSQL";
+  if (proc?.includes("mongod")) return "MongoDB";
+
+  if (isNodeProcess(proc)) {
+    if (bindScope === "loopback") {
+      return "Node.js (local-only; likely dev or tooling)";
+    }
+    return "Node.js";
+  }
+
+  if (sock.port === 80) return "HTTP listener (web)";
+  if (sock.port === 443) return "HTTPS listener (TLS)";
+
+  if (proc) {
+    return `${proc} listener`;
+  }
+  return "Unidentified listener";
+}
+
+function buildListenerTitle(sock: ParsedSocket): string {
+  const bindScope = classifyBindScope(sock.localAddr);
+  const label = serviceLabel(sock, bindScope);
+  if (bindScope === "loopback") {
+    return `${label} listening on loopback only — not reachable remotely (port ${sock.port})`;
+  }
+  if (bindScope === "wildcard") {
+    return `${label} reachable on all network interfaces (port ${sock.port})`;
+  }
+  return `${label} bound to ${sock.localAddr} (port ${sock.port})`;
+}
+
+function listenerSeverity(sock: ParsedSocket, env: EnvironmentContext): "medium" | "low" {
+  const bindScope = classifyBindScope(sock.localAddr);
+  if (bindScope === "loopback") return "low";
+  if (env.is_wsl && OBSERVABILITY_PORTS.has(sock.port)) return "low";
+  if (env.is_wsl) return "low";
+  return "medium";
+}
+
 function extractListeningServices(
   sections: Record<string, string>,
   env: EnvironmentContext
 ): PreFinding[] {
   const network = sections["NETWORK CONFIGURATION"] ?? "";
+  const lines = network.split("\n").filter((l) => l.includes("LISTEN"));
+
+  const parsed = lines
+    .map(parseSocketLine)
+    .filter((s): s is ParsedSocket => s !== null);
+
+  const unique = deduplicateSockets(parsed);
   const results: PreFinding[] = [];
 
-  const listenLines = network
-    .split("\n")
-    .filter(
-      (l) =>
-        l.includes("LISTEN") ||
-        (l.includes("0.0.0.0:") && !l.includes("127."))
-    );
+  for (const sock of unique) {
+    if (WELL_KNOWN_SAFE_PORTS.has(sock.port)) continue;
 
-  const portPattern = /[:\s](\d{2,5})\s/;
-  const wellKnownSafe = new Set(["53", "22"]);
-
-  for (const line of listenLines) {
-    const portMatch = line.match(portPattern);
-    if (!portMatch) continue;
-    const port = portMatch[1];
-    if (wellKnownSafe.has(port)) continue;
-
-    const severity = env.is_wsl ? "low" : "medium";
+    const severity = listenerSeverity(sock, env);
     results.push({
-      title: `Service listening on port ${port}`,
+      title: buildListenerTitle(sock),
       severity_hint: severity,
       category: "network",
       section_source: "NETWORK CONFIGURATION",
-      evidence: line.trim(),
+      evidence: sock.rawLine.trim(),
       rule_id: "listening-service",
     });
   }
@@ -201,7 +348,10 @@ function extractAuthFindings(sections: Record<string, string>): PreFinding[] {
   return results;
 }
 
-function extractErrorFindings(sections: Record<string, string>): PreFinding[] {
+function extractErrorFindings(
+  sections: Record<string, string>,
+  env: EnvironmentContext
+): PreFinding[] {
   const errors = sections["RECENT ERRORS & LOGS"] ?? "";
   const results: PreFinding[] = [];
 
@@ -217,7 +367,10 @@ function extractErrorFindings(sections: Record<string, string>): PreFinding[] {
         !l.includes("nvmf-autoconnect") &&
         !l.includes("openipmi") &&
         !l.includes("systemd-tmpfiles") &&
-        !l.includes("pam_lastlog")
+        !l.includes("pam_lastlog") &&
+        !l.includes("Process error reports when automatic reporting is enabled") &&
+        !l.includes("ConditionPathExists=/var/lib/apport/autoreport") &&
+        !(env.is_wsl && l.includes("skipped because of an unmet condition check"))
     );
 
   if (errorLines.length > 10) {

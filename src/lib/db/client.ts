@@ -7,9 +7,28 @@ export type { Database } from "sql.js";
 let _db: Database | null = null;
 let _dbPath: string | null = null;
 
+/** When set, `getDb()` returns this instance (tests only). */
+let _dbOverride: Database | null = null;
+
+export function setDbOverride(db: Database | null): void {
+  _dbOverride = db;
+}
+
+function sqlJsInitOptions(): { locateFile: (file: string) => string } {
+  const distDir = join(process.cwd(), "node_modules", "sql.js", "dist");
+  return {
+    locateFile: (file: string) => join(distDir, file),
+  };
+}
+
+export async function initSqlJsForApp(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
+  return initSqlJs(sqlJsInitOptions());
+}
+
 export async function getDb(): Promise<Database> {
+  if (_dbOverride) return _dbOverride;
   if (_db) return _db;
-  const SQL = await initSqlJs();
+  const SQL = await initSqlJs(sqlJsInitOptions());
   const dbPath = process.env.DATABASE_PATH ?? join(process.cwd(), "signalforge.db");
   _dbPath = dbPath;
 
@@ -25,6 +44,7 @@ export async function getDb(): Promise<Database> {
 }
 
 export function saveDb(): void {
+  if (_dbOverride) return;
   if (_db && _dbPath) {
     const data = _db.export();
     writeFileSync(_dbPath, Buffer.from(data));
@@ -40,15 +60,23 @@ export function resetDb(): void {
 }
 
 export async function getTestDb(): Promise<Database> {
-  const SQL = await initSqlJs();
+  const SQL = await initSqlJs(sqlJsInitOptions());
   const db = new SQL.Database();
   migrate(db);
   return db;
 }
 
+function tableColumnNames(db: Database, table: string): string[] {
+  const result = db.exec(`PRAGMA table_info(${table})`);
+  if (!result.length || !result[0].values.length) return [];
+  const cols = result[0].columns;
+  const nameIdx = cols.indexOf("name");
+  if (nameIdx < 0) return [];
+  return (result[0].values as unknown[][]).map((row) => String(row[nameIdx]));
+}
+
 function migrate(db: Database): void {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS artifacts (
+  db.run(`CREATE TABLE IF NOT EXISTS artifacts (
       id TEXT PRIMARY KEY,
       created_at TEXT NOT NULL,
       artifact_type TEXT NOT NULL DEFAULT 'linux-audit-log',
@@ -56,9 +84,9 @@ function migrate(db: Database): void {
       filename TEXT NOT NULL,
       content_hash TEXT NOT NULL UNIQUE,
       content TEXT NOT NULL
-    );
+    )`);
 
-    CREATE TABLE IF NOT EXISTS runs (
+  db.run(`CREATE TABLE IF NOT EXISTS runs (
       id TEXT PRIMARY KEY,
       artifact_id TEXT NOT NULL REFERENCES artifacts(id),
       parent_run_id TEXT REFERENCES runs(id),
@@ -73,7 +101,112 @@ function migrate(db: Database): void {
       analysis_error TEXT,
       model_used TEXT,
       tokens_used INTEGER DEFAULT 0,
-      duration_ms INTEGER DEFAULT 0
+      duration_ms INTEGER DEFAULT 0,
+      filename TEXT NOT NULL DEFAULT 'untitled.log',
+      source_type TEXT NOT NULL DEFAULT 'api'
+    )`);
+
+  const runCols = tableColumnNames(db, "runs");
+  if (!runCols.includes("filename")) {
+    db.run(`ALTER TABLE runs ADD COLUMN filename TEXT NOT NULL DEFAULT 'untitled.log'`);
+  }
+  if (!runCols.includes("source_type")) {
+    db.run(`ALTER TABLE runs ADD COLUMN source_type TEXT NOT NULL DEFAULT 'api'`);
+  }
+
+  const runColsAfterBase = tableColumnNames(db, "runs");
+  const ingestionCols = [
+    "target_identifier",
+    "source_label",
+    "collector_type",
+    "collector_version",
+    "collected_at",
+  ] as const;
+  for (const col of ingestionCols) {
+    if (!runColsAfterBase.includes(col)) {
+      db.run(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
+    }
+  }
+
+  db.run(`CREATE TABLE IF NOT EXISTS sources (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    target_identifier TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    expected_artifact_type TEXT NOT NULL,
+    default_collector_type TEXT NOT NULL,
+    default_collector_version TEXT,
+    capabilities_json TEXT NOT NULL DEFAULT '[]',
+    attributes_json TEXT NOT NULL DEFAULT '{}',
+    labels_json TEXT NOT NULL DEFAULT '{}',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_seen_at TEXT,
+    health_status TEXT NOT NULL DEFAULT 'unknown',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`);
+
+  db.run(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_target_enabled ON sources(target_identifier) WHERE enabled = 1`
+  );
+
+  db.run(`CREATE TABLE IF NOT EXISTS collection_jobs (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES sources(id),
+    artifact_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    request_reason TEXT,
+    priority INTEGER NOT NULL DEFAULT 0,
+    idempotency_key TEXT,
+    lease_owner_id TEXT,
+    lease_owner_instance_id TEXT,
+    lease_expires_at TEXT,
+    last_heartbeat_at TEXT,
+    result_artifact_id TEXT,
+    result_run_id TEXT,
+    error_code TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    queued_at TEXT,
+    claimed_at TEXT,
+    started_at TEXT,
+    submitted_at TEXT,
+    finished_at TEXT
+  )`);
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_collection_jobs_source ON collection_jobs(source_id)`);
+  db.run(
+    `CREATE INDEX IF NOT EXISTS idx_collection_jobs_idempotency ON collection_jobs(source_id, idempotency_key)`
+  );
+
+  const jobCols = tableColumnNames(db, "collection_jobs");
+  if (!jobCols.includes("result_analysis_status")) {
+    db.run(`ALTER TABLE collection_jobs ADD COLUMN result_analysis_status TEXT`);
+  }
+
+  db.run(`CREATE TABLE IF NOT EXISTS agent_registrations (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL UNIQUE REFERENCES sources(id),
+    token_hash TEXT NOT NULL,
+    display_name TEXT,
+    created_at TEXT NOT NULL
+  )`);
+
+  const agentRegCols = tableColumnNames(db, "agent_registrations");
+  if (!agentRegCols.includes("last_capabilities_json")) {
+    db.run(
+      `ALTER TABLE agent_registrations ADD COLUMN last_capabilities_json TEXT NOT NULL DEFAULT '[]'`
     );
-  `);
+  }
+  if (!agentRegCols.includes("last_heartbeat_at")) {
+    db.run(`ALTER TABLE agent_registrations ADD COLUMN last_heartbeat_at TEXT`);
+  }
+  if (!agentRegCols.includes("last_agent_version")) {
+    db.run(`ALTER TABLE agent_registrations ADD COLUMN last_agent_version TEXT`);
+  }
+  if (!agentRegCols.includes("last_instance_id")) {
+    db.run(`ALTER TABLE agent_registrations ADD COLUMN last_instance_id TEXT`);
+  }
 }

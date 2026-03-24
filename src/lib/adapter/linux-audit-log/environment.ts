@@ -1,4 +1,4 @@
-import type { EnvironmentContext } from "../../analyzer/schema.js";
+import type { EnvironmentContext } from "../../analyzer/schema";
 
 export function detectEnvironment(
   sections: Record<string, string>

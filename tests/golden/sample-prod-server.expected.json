@@ -5,9 +5,25 @@
     "os_contains": "Ubuntu"
   },
   "must_be_noise": [],
-  "must_not_be_findings": ["SSH service not found", "AppArmor not present"],
-  "must_be_findings": [],
+  "must_not_be_findings": [
+    "SSH service not found",
+    "AppArmor not present",
+    "port 128",
+    "port 511"
+  ],
+  "must_be_findings": [
+    {
+      "title_contains": "port 80",
+      "severity": "medium",
+      "category": "network"
+    },
+    {
+      "title_contains": "port 443",
+      "severity": "medium",
+      "category": "network"
+    }
+  ],
   "is_incomplete": false,
-  "min_findings": 0,
+  "min_findings": 2,
   "max_findings": 20
 }

@@ -10,16 +10,28 @@
   ],
   "must_not_be_findings": [
     "SSH service not found",
-    "AppArmor not present"
+    "AppArmor not present",
+    "port 4096",
+    "port 1000"
   ],
   "must_be_findings": [
     {
       "title_contains": "Disk usage",
       "severity": "medium",
       "category": "disk"
+    },
+    {
+      "title_contains": "port 9090",
+      "severity": "low",
+      "category": "network"
+    },
+    {
+      "title_contains": "port 9100",
+      "severity": "low",
+      "category": "network"
     }
   ],
   "is_incomplete": false,
-  "min_findings": 1,
+  "min_findings": 3,
   "max_findings": 25
 }

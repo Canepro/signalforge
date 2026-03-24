@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import { analyzeArtifact } from "./index.js";
+import { analyzeArtifact } from "./index";
 
 async function main() {
   const filePath = process.argv[2];
