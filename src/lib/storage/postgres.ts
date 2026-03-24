@@ -1050,6 +1050,40 @@ class PostgresAgentsStore implements AgentsStore {
     };
   }
 
+  async rotateRegistration(sourceId: string): Promise<AgentRegistrationCreated> {
+    const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
+    if (!source) {
+      const err = new Error("source_not_found");
+      (err as Error & { code: string }).code = "source_not_found";
+      throw err;
+    }
+    const existing = await one<PgAgentRegistrationRow>(
+      this.q,
+      "SELECT * FROM agent_registrations WHERE source_id = $1",
+      [sourceId]
+    );
+    if (!existing) {
+      const err = new Error("registration_not_found");
+      (err as Error & { code: string }).code = "registration_not_found";
+      throw err;
+    }
+
+    const plainToken = generateAgentToken();
+    const tokenHash = hashAgentToken(plainToken);
+    const token_prefix = plainToken.slice(0, 8);
+    await this.q.query("UPDATE agent_registrations SET token_hash = $1 WHERE id = $2", [
+      tokenHash,
+      existing.id,
+    ]);
+    return {
+      row: (await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE id = $1", [
+        existing.id,
+      ]))!,
+      plainToken,
+      token_prefix,
+    };
+  }
+
   async applyHeartbeat(input: Parameters<AgentsStore["applyHeartbeat"]>[0]): ReturnType<AgentsStore["applyHeartbeat"]> {
     const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [input.sourceId]);
     if (!source) return { ok: false as const, code: "source_not_found" };

@@ -43,6 +43,7 @@ import {
   listSources,
   markCollectionJobSubmittedForAgent,
   reapExpiredCollectionJobLeases,
+  rotateAgentRegistrationToken,
   startCollectionJobForAgent,
   sourceToJson,
   updateSource,
@@ -359,6 +360,10 @@ class SqliteAgentsStore implements AgentsStore {
 
   async createRegistration(sourceId: string, displayName?: string | null) {
     return createAgentRegistration(this.db, sourceId, displayName);
+  }
+
+  async rotateRegistration(sourceId: string) {
+    return rotateAgentRegistrationToken(this.db, sourceId);
   }
 
   async applyHeartbeat(input: {

@@ -9,6 +9,7 @@ import {
 import { GET as GET_JOB } from "@/app/api/collection-jobs/[id]/route";
 import { POST as POST_CANCEL } from "@/app/api/collection-jobs/[id]/cancel/route";
 import { POST as POST_AGENT_REG } from "@/app/api/agent/registrations/route";
+import { POST as POST_AGENT_REISSUE } from "@/app/api/agent/registrations/reissue/route";
 import * as dbClient from "@/lib/db/client";
 import { getTestDb } from "@/lib/db/client";
 import type { Database } from "sql.js";
@@ -176,6 +177,43 @@ describe("Phase 6 API routes", () => {
       })
     );
     expect(r2.status).toBe(409);
+  });
+
+  it("POST /api/agent/registrations/reissue returns a new token for the same registration", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "R",
+          target_identifier: "tid-agent-reissue",
+          source_type: "linux_host",
+        }),
+      })
+    );
+    const { id: sourceId } = await post.json();
+
+    const created = await POST_AGENT_REG(
+      new NextRequest("http://localhost/api/agent/registrations", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ source_id: sourceId }),
+      })
+    );
+    const initial = await created.json();
+
+    const reissued = await POST_AGENT_REISSUE(
+      new NextRequest("http://localhost/api/agent/registrations/reissue", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ source_id: sourceId }),
+      })
+    );
+    expect(reissued.status).toBe(200);
+    const body = await reissued.json();
+    expect(body.reissued).toBe(true);
+    expect(body.agent_id).toBe(initial.agent_id);
+    expect(body.token).not.toBe(initial.token);
   });
 
   it("cancel job from queued", async () => {

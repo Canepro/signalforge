@@ -253,12 +253,34 @@ export async function registerAgentForSource(formData: FormData): Promise<Regist
         String(formData.get("display_name") ?? "").trim() || null
       )
     );
-    revalidatePath(`/sources/${sourceId}`);
     return { ok: true, token: plainToken, token_prefix, agent_id: row.id };
   } catch (e) {
     const code = (e as Error & { code?: string }).code;
     if (code === "source_already_registered") {
       return { ok: false, error: "already_registered" };
+    }
+    if (code === "source_not_found") {
+      return { ok: false, error: "not_found" };
+    }
+    throw e;
+  }
+}
+
+export async function reissueAgentTokenForSource(formData: FormData): Promise<RegisterAgentState> {
+  await assertAdminSession();
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!sourceId) return { ok: false, error: "missing_source" };
+
+  const storage = await getStorage();
+  try {
+    const { row, plainToken, token_prefix } = await storage.withTransaction((tx) =>
+      tx.agents.rotateRegistration(sourceId)
+    );
+    return { ok: true, token: plainToken, token_prefix, agent_id: row.id };
+  } catch (e) {
+    const code = (e as Error & { code?: string }).code;
+    if (code === "registration_not_found") {
+      return { ok: false, error: "not_registered" };
     }
     if (code === "source_not_found") {
       return { ok: false, error: "not_found" };

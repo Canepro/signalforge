@@ -928,6 +928,15 @@ export interface AgentRegistrationCreated {
   token_prefix: string;
 }
 
+function issueAgentToken() {
+  const plainToken = generateAgentToken();
+  return {
+    plainToken,
+    tokenHash: hashAgentToken(plainToken),
+    token_prefix: plainToken.slice(0, 8),
+  };
+}
+
 export function createAgentRegistration(
   db: Database,
   sourceId: string,
@@ -947,9 +956,7 @@ export function createAgentRegistration(
 
   const id = randomUUID();
   const now = new Date().toISOString();
-  const plainToken = generateAgentToken();
-  const tokenHash = hashAgentToken(plainToken);
-  const token_prefix = plainToken.slice(0, 8);
+  const { plainToken, tokenHash, token_prefix } = issueAgentToken();
 
   db.run(
     `INSERT INTO agent_registrations (id, source_id, token_hash, display_name, created_at)
@@ -961,6 +968,36 @@ export function createAgentRegistration(
     db,
     "SELECT * FROM agent_registrations WHERE id = ?",
     [id]
+  )!;
+
+  return { row, plainToken, token_prefix };
+}
+
+export function rotateAgentRegistrationToken(
+  db: Database,
+  sourceId: string
+): AgentRegistrationCreated {
+  const source = getSourceById(db, sourceId);
+  if (!source) {
+    const err = new Error("source_not_found");
+    (err as Error & { code: string }).code = "source_not_found";
+    throw err;
+  }
+
+  const existing = getAgentRegistrationBySourceId(db, sourceId);
+  if (!existing) {
+    const err = new Error("registration_not_found");
+    (err as Error & { code: string }).code = "registration_not_found";
+    throw err;
+  }
+
+  const { plainToken, tokenHash, token_prefix } = issueAgentToken();
+  db.run(`UPDATE agent_registrations SET token_hash = ? WHERE id = ?`, [tokenHash, existing.id]);
+
+  const row = getOne<AgentRegistrationRow>(
+    db,
+    "SELECT * FROM agent_registrations WHERE id = ?",
+    [existing.id]
   )!;
 
   return { row, plainToken, token_prefix };

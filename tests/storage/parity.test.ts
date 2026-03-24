@@ -549,6 +549,38 @@ for (const backend of backends) {
       ).rejects.toThrow();
     });
 
+    it("reissues an existing agent token and invalidates the old one", async () => {
+      const list = await storage.sources.list();
+      const src = list.find((s) => s.target_identifier === "parity-agent-host")!;
+      const { hashAgentToken } = await import("@/lib/db/source-job-repository");
+
+      const first = await storage.agents.getRegistrationBySourceId(src.id);
+      expect(first).not.toBeNull();
+
+      const initial = await storage.withTransaction((tx) =>
+        tx.agents.rotateRegistration(src.id)
+      );
+      const rotated = await storage.withTransaction((tx) =>
+        tx.agents.rotateRegistration(src.id)
+      );
+
+      expect(rotated.row.id).toBe(initial.row.id);
+      expect(rotated.plainToken).not.toBe(initial.plainToken);
+      expect(rotated.token_prefix).toHaveLength(8);
+
+      const oldResolved = await storage.agents.resolveRequestContextByTokenHash(
+        hashAgentToken(initial.plainToken)
+      );
+      expect(oldResolved).toBeNull();
+
+      const newResolved = await storage.agents.resolveRequestContextByTokenHash(
+        hashAgentToken(rotated.plainToken)
+      );
+      expect(newResolved).not.toBeNull();
+      expect(newResolved!.registration.id).toBe(initial.row.id);
+      expect(newResolved!.source.id).toBe(src.id);
+    });
+
     // --- FULL AGENT LIFECYCLE ---
 
     it("claim → start → fail lifecycle", async () => {

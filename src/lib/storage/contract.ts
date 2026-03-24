@@ -231,6 +231,7 @@ export interface AgentsStore {
     sourceId: string,
     displayName?: string | null
   ): Promise<AgentRegistrationCreated>;
+  rotateRegistration(sourceId: string): Promise<AgentRegistrationCreated>;
   applyHeartbeat(input: {
     sourceId: string;
     registrationId: string;

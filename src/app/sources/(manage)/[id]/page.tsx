@@ -147,7 +147,7 @@ export default async function SourceDetailPage({
               ))}
             </div>
             <p className="text-[10px] text-on-surface-variant">
-              One registration per source in v1. Token rotation is deferred.
+              One registration per source in v1. Reissue creates a new token for this same registration if the original was missed.
             </p>
             <div className="flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant">
               <span className="font-bold uppercase tracking-widest">Agent id</span>
@@ -160,6 +160,10 @@ export default async function SourceDetailPage({
                 className="rounded-md border border-outline-variant/20 bg-surface-container-low px-2 py-1 font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container"
               />
             </div>
+            <p className="text-xs text-on-surface-variant">
+              The agent id is not the credential. The enrolled machine needs the one-time token from enroll or reissue.
+            </p>
+            <AgentEnrollClient sourceId={id} hasRegistration />
           </div>
         ) : (
           <>
