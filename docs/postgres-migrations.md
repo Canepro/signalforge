@@ -86,6 +86,7 @@ The live deployment runs on Vercel with Neon Postgres.
 ## Current Limitations
 
 - No first-class production backup tooling is bundled in this repo.
+- No multi-version upgrade matrix exists yet beyond the current fresh-install plus scaffolded upgrade-path coverage.
 - No automated rollback exists beyond restore-and-redeploy discipline.
 
 Those are known gaps, not accidental omissions.
