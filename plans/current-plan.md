@@ -51,6 +51,7 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare/export hardening (small, targeted).
 - Next major architecture step: tighten backend parity. The storage abstraction and first Postgres adapter are in place, and a live E2E validation pass succeeded. Next work is parity tests and upgrade-path validation. Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
+- Backend parity now belongs in CI, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).
 - Harden agent in real use: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, systemd unit file for `signalforge-agent run`.
 - Future notifications should attach to domain events now that the source/job/agent model is stable.
