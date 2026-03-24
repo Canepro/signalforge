@@ -39,6 +39,10 @@ Apply migrations:
 bun run db:migrate:postgres
 ```
 
+Migration discipline for future schema changes:
+
+- [`postgres-migrations.md`](./postgres-migrations.md)
+
 Start the app:
 
 ```bash
@@ -103,6 +107,5 @@ The Postgres adapter has passed:
 
 ## Remaining Hardening Work
 
-- add backend-parity tests that exercise both SQLite and Postgres
 - keep future schema changes append-only through new migration files
 - validate upgrade paths across multiple Postgres migration versions

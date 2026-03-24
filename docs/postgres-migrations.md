@@ -8,7 +8,7 @@ It exists to keep production upgrades boring.
 
 1. Migration files are append-only.
 2. Never edit a migration file after it has been applied anywhere outside a disposable local database.
-3. Every schema change gets a new sequential file in [`migrations/postgres`](/home/vincent/src/signalforge/migrations/postgres).
+3. Every schema change gets a new sequential file in [`../migrations/postgres`](../migrations/postgres).
 4. Application code and migration SQL should land in the same change when one depends on the other.
 5. Backward-incompatible destructive changes are not a one-step migration.
 

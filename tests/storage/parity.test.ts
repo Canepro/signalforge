@@ -12,18 +12,52 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Storage } from "@/lib/storage/contract";
 import { getTestSqliteStorage } from "@/lib/storage/sqlite";
+import { Pool, type PoolClient } from "pg";
 
 const FIXTURES = join(__dirname, "../fixtures");
 const SAMPLE_LOG = readFileSync(join(FIXTURES, "sample-prod-server.log"), "utf-8");
+const POSTGRES_MIGRATIONS_DIR = join(process.cwd(), "migrations", "postgres");
 
 type BackendSetup = {
   name: string;
   getStorage: () => Promise<Storage>;
   teardown?: () => Promise<void>;
+};
+
+type MigrationFile = {
+  filename: string;
+  sql: string;
+  checksum: string;
+};
+
+type PostgresSchemaSnapshot = {
+  tables: Array<{ table_name: string }>;
+  columns: Array<{
+    table_name: string;
+    column_name: string;
+    data_type: string;
+    is_nullable: string;
+    column_default: string | null;
+  }>;
+  indexes: Array<{
+    tablename: string;
+    indexname: string;
+    indexdef: string;
+  }>;
+  constraints: Array<{
+    table_name: string;
+    constraint_name: string;
+    definition: string;
+  }>;
+  appliedMigrations: Array<{
+    filename: string;
+    checksum: string;
+  }>;
 };
 
 const backends: BackendSetup[] = [
@@ -44,6 +78,143 @@ if (pgUrl) {
       return pg.storage;
     },
   });
+}
+
+function loadPostgresMigrationFiles(): MigrationFile[] {
+  return readdirSync(POSTGRES_MIGRATIONS_DIR)
+    .filter((name) => name.endsWith(".sql"))
+    .sort()
+    .map((filename) => {
+      const sql = readFileSync(join(POSTGRES_MIGRATIONS_DIR, filename), "utf8");
+      return {
+        filename,
+        sql,
+        checksum: createHash("sha256").update(sql, "utf8").digest("hex"),
+      };
+    });
+}
+
+async function prepareMigrationHistoryTable(client: PoolClient, schema: string) {
+  await client.query(`SET search_path TO "${schema}"`);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename TEXT PRIMARY KEY,
+      checksum TEXT NOT NULL,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function applyMigrationFiles(
+  client: PoolClient,
+  schema: string,
+  files: MigrationFile[]
+) {
+  await prepareMigrationHistoryTable(client, schema);
+  for (const file of files) {
+    await client.query(`SET search_path TO "${schema}"`);
+    await client.query(file.sql);
+    await client.query(
+      "INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2) ON CONFLICT (filename) DO NOTHING",
+      [file.filename, file.checksum]
+    );
+  }
+}
+
+async function capturePostgresSchemaSnapshot(
+  client: PoolClient,
+  schema: string
+): Promise<PostgresSchemaSnapshot> {
+  await client.query(`SET search_path TO "${schema}"`);
+
+  const [tables, columns, indexes, constraints, appliedMigrations] = await Promise.all([
+    client.query<{ table_name: string }>(
+      `
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = $1 AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `,
+      [schema]
+    ),
+    client.query<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+      is_nullable: string;
+      column_default: string | null;
+    }>(
+      `
+        SELECT table_name, column_name, data_type, is_nullable, column_default
+        FROM information_schema.columns
+        WHERE table_schema = $1
+        ORDER BY table_name, ordinal_position
+      `,
+      [schema]
+    ),
+    client.query<{
+      tablename: string;
+      indexname: string;
+      indexdef: string;
+    }>(
+      `
+        SELECT tablename, indexname, indexdef
+        FROM pg_indexes
+        WHERE schemaname = $1
+        ORDER BY tablename, indexname
+      `,
+      [schema]
+    ),
+    client.query<{
+      table_name: string;
+      constraint_name: string;
+      definition: string;
+    }>(
+      `
+        SELECT rel.relname AS table_name, con.conname AS constraint_name, pg_get_constraintdef(con.oid, true) AS definition
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = $1
+        ORDER BY rel.relname, con.conname
+      `,
+      [schema]
+    ),
+    client.query<{ filename: string; checksum: string }>(
+      "SELECT filename, checksum FROM schema_migrations ORDER BY filename",
+      []
+    ),
+  ]);
+
+  return {
+    tables: tables.rows,
+    columns: columns.rows.map((column) => ({
+      ...column,
+      column_default: column.column_default?.replaceAll(`'${schema}.`, "'<schema>.") ?? null,
+    })),
+    indexes: indexes.rows.map((index) => ({
+      ...index,
+      indexdef: index.indexdef.replaceAll(`${schema}.`, "<schema>."),
+    })),
+    constraints: constraints.rows,
+    appliedMigrations: appliedMigrations.rows,
+  };
+}
+
+async function withTemporarySchema<T>(
+  pool: Pool,
+  fn: (client: PoolClient, schema: string) => Promise<T>
+): Promise<T> {
+  const schema = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const client = await pool.connect();
+  try {
+    await client.query(`CREATE SCHEMA "${schema}"`);
+    await client.query(`SET search_path TO "${schema}"`);
+    return await fn(client, schema);
+  } finally {
+    await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    client.release();
+  }
 }
 
 function fakeAnalysis(): import("@/lib/analyzer/schema").AnalysisResult {
@@ -501,5 +672,33 @@ for (const backend of backends) {
       expect(second.ok).toBe(false);
       if (!second.ok) expect(second.code).toBe("not_queued");
     });
+
+    if (backend.name === "postgres" && pgUrl) {
+      it("fresh-install and upgrade-path migrations converge on the same schema", async () => {
+        const migrationFiles = loadPostgresMigrationFiles();
+
+        if (migrationFiles.length < 2) {
+          return;
+        }
+
+        const pool = new Pool({ connectionString: pgUrl });
+        try {
+          const freshSnapshot = await withTemporarySchema(pool, async (client, schema) => {
+            await applyMigrationFiles(client, schema, migrationFiles);
+            return capturePostgresSchemaSnapshot(client, schema);
+          });
+
+          const upgradeSnapshot = await withTemporarySchema(pool, async (client, schema) => {
+            await applyMigrationFiles(client, schema, migrationFiles.slice(0, 1));
+            await applyMigrationFiles(client, schema, migrationFiles.slice(1));
+            return capturePostgresSchemaSnapshot(client, schema);
+          });
+
+          expect(upgradeSnapshot).toEqual(freshSnapshot);
+        } finally {
+          await pool.end();
+        }
+      });
+    }
   });
 }
