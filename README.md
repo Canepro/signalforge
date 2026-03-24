@@ -284,6 +284,7 @@ SQLite remains the easiest local quickstart path. Postgres is the recommended pr
 - beginner setup and usage: [`docs/getting-started.md`](docs/getting-started.md)
 - docs index: [`docs/README.md`](docs/README.md)
 - HTTP routes and response shapes: [`docs/api-contract.md`](docs/api-contract.md)
+- Postgres migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md)
 - Postgres validation runbook: [`docs/postgres-validation.md`](docs/postgres-validation.md)
 - external collector and CI submission: [`docs/external-submit.md`](docs/external-submit.md)
 - JSON schemas: [`docs/schemas/README.md`](docs/schemas/README.md)
