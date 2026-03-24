@@ -111,13 +111,33 @@ async function applyMigrationFiles(
   files: MigrationFile[]
 ) {
   await prepareMigrationHistoryTable(client, schema);
+  await client.query(`SET search_path TO "${schema}"`);
+
+  const existingResult = await client.query<{ filename: string; checksum: string }>(
+    "SELECT filename, checksum FROM schema_migrations ORDER BY filename"
+  );
+  const existingByFilename = new Map(
+    existingResult.rows.map((row) => [row.filename, row.checksum])
+  );
+
   for (const file of files) {
-    await client.query(`SET search_path TO "${schema}"`);
+    const existingChecksum = existingByFilename.get(file.filename);
+    if (existingChecksum !== undefined) {
+      if (existingChecksum !== file.checksum) {
+        throw new Error(
+          `Migration checksum mismatch for ${file.filename}. ` +
+            "The file changed after it was applied; create a new migration instead."
+        );
+      }
+      continue;
+    }
+
     await client.query(file.sql);
     await client.query(
-      "INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2) ON CONFLICT (filename) DO NOTHING",
+      "INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)",
       [file.filename, file.checksum]
     );
+    existingByFilename.set(file.filename, file.checksum);
   }
 }
 
@@ -674,31 +694,30 @@ for (const backend of backends) {
     });
 
     if (backend.name === "postgres" && pgUrl) {
-      it("fresh-install and upgrade-path migrations converge on the same schema", async () => {
-        const migrationFiles = loadPostgresMigrationFiles();
+      const migrationFiles = loadPostgresMigrationFiles();
 
-        if (migrationFiles.length < 2) {
-          return;
+      it.skipIf(migrationFiles.length < 2)(
+        "fresh-install and upgrade-path migrations converge on the same schema",
+        async () => {
+          const pool = new Pool({ connectionString: pgUrl });
+          try {
+            const freshSnapshot = await withTemporarySchema(pool, async (client, schema) => {
+              await applyMigrationFiles(client, schema, migrationFiles);
+              return capturePostgresSchemaSnapshot(client, schema);
+            });
+
+            const upgradeSnapshot = await withTemporarySchema(pool, async (client, schema) => {
+              await applyMigrationFiles(client, schema, migrationFiles.slice(0, 1));
+              await applyMigrationFiles(client, schema, migrationFiles.slice(1));
+              return capturePostgresSchemaSnapshot(client, schema);
+            });
+
+            expect(upgradeSnapshot).toEqual(freshSnapshot);
+          } finally {
+            await pool.end();
+          }
         }
-
-        const pool = new Pool({ connectionString: pgUrl });
-        try {
-          const freshSnapshot = await withTemporarySchema(pool, async (client, schema) => {
-            await applyMigrationFiles(client, schema, migrationFiles);
-            return capturePostgresSchemaSnapshot(client, schema);
-          });
-
-          const upgradeSnapshot = await withTemporarySchema(pool, async (client, schema) => {
-            await applyMigrationFiles(client, schema, migrationFiles.slice(0, 1));
-            await applyMigrationFiles(client, schema, migrationFiles.slice(1));
-            return capturePostgresSchemaSnapshot(client, schema);
-          });
-
-          expect(upgradeSnapshot).toEqual(freshSnapshot);
-        } finally {
-          await pool.end();
-        }
-      });
+      );
     }
   });
 }
