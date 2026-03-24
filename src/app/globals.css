@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surface hierarchy (tonal layering) */
+  --color-surface: #f8f9fa;
+  --color-surface-dim: #d1dce0;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f4f6;
+  --color-surface-container: #eaeff1;
+  --color-surface-container-high: #e3e9ec;
+  --color-surface-container-highest: #dbe4e7;
+
+  /* Text on surfaces */
+  --color-on-surface: #2b3437;
+  --color-on-surface-variant: #586064;
+  --color-outline: #737c7f;
+  --color-outline-variant: #abb3b7;
+
+  /* Primary: navy-slate operational color */
+  --color-primary: #525f71;
+  --color-primary-dim: #465365;
+  --color-on-primary: #f5f8ff;
+  --color-secondary: #48617e;
+
+  /* Severity — used only for diagnostic status */
+  --color-severity-critical: #bc162d;
+  --color-severity-critical-bg: #fef2f2;
+  --color-severity-high: #ea580c;
+  --color-severity-high-bg: #fff7ed;
+  --color-severity-medium: #d97706;
+  --color-severity-medium-bg: #fffbeb;
+  --color-severity-low: #64748b;
+  --color-severity-low-bg: #f8fafc;
+
+  /* Accent for links/focus */
+  --color-accent: #525f71;
+  --color-accent-hover: #465365;
+
+  /* Fonts */
+  --font-headline: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/*
+ * Dark palette — same tonal structure, inverted.
+ * Surfaces go dark-slate; text goes light; severity stays vivid.
+ */
+.dark {
+  --color-surface: #0f1214;
+  --color-surface-dim: #1a1f23;
+  --color-surface-container-lowest: #181d21;
+  --color-surface-container-low: #1e2428;
+  --color-surface-container: #252b30;
+  --color-surface-container-high: #2c3339;
+  --color-surface-container-highest: #343c42;
+
+  --color-on-surface: #dce3e8;
+  --color-on-surface-variant: #9aa5ad;
+  --color-outline: #6b767d;
+  --color-outline-variant: #4a545b;
+
+  --color-primary: #8fa4be;
+  --color-primary-dim: #7b92ab;
+  --color-on-primary: #1a2332;
+  --color-secondary: #7b9abc;
+
+  --color-severity-critical: #ef4444;
+  --color-severity-critical-bg: #2d1215;
+  --color-severity-high: #f97316;
+  --color-severity-high-bg: #2d1a0a;
+  --color-severity-medium: #eab308;
+  --color-severity-medium-bg: #2d2505;
+  --color-severity-low: #94a3b8;
+  --color-severity-low-bg: #1e2428;
+
+  --color-accent: #8fa4be;
+  --color-accent-hover: #a3b5c9;
+}
+
+body {
+  @apply bg-surface text-on-surface antialiased;
+  font-family: var(--font-sans);
+}
+
+@layer base {
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes healthPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+}

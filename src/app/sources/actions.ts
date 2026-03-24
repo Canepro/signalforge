@@ -1,0 +1,201 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { getDb, saveDb } from "@/lib/db/client";
+import {
+  ADMIN_SESSION_COOKIE,
+  getAdminTokenFromEnv,
+  hashAdminSessionCookie,
+  verifyAdminSessionCookie,
+} from "@/lib/api/admin-auth";
+import {
+  cancelCollectionJob,
+  createAgentRegistration,
+  getSourceById,
+  insertCollectionJob,
+  insertSource,
+  updateSource,
+  type SourceType,
+} from "@/lib/db/source-job-repository";
+
+async function assertAdminSession(): Promise<void> {
+  const jar = await cookies();
+  const v = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!verifyAdminSessionCookie(v)) {
+    redirect("/sources/login");
+  }
+}
+
+export async function loginAdminAction(formData: FormData): Promise<void> {
+  const env = getAdminTokenFromEnv();
+  if (!env) {
+    redirect("/sources/login?unconfigured=1");
+  }
+  const token = formData.get("token");
+  if (typeof token !== "string" || token !== env) {
+    redirect("/sources/login?error=1");
+  }
+  const jar = await cookies();
+  jar.set(ADMIN_SESSION_COOKIE, await hashAdminSessionCookie(env), {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+    secure: process.env.NODE_ENV === "production",
+  });
+  redirect("/sources");
+}
+
+export async function logoutAdminAction(_formData?: FormData): Promise<void> {
+  const jar = await cookies();
+  jar.delete(ADMIN_SESSION_COOKIE);
+  redirect("/sources/login");
+}
+
+export async function createSourceAction(formData: FormData): Promise<void> {
+  await assertAdminSession();
+  const display_name = String(formData.get("display_name") ?? "").trim();
+  const target_identifier = String(formData.get("target_identifier") ?? "").trim();
+  const source_type = String(formData.get("source_type") ?? "").trim();
+
+  if (!display_name || !target_identifier || !source_type) {
+    redirect("/sources/new?error=missing");
+  }
+  if (source_type !== "linux_host" && source_type !== "wsl") {
+    redirect("/sources/new?error=type");
+  }
+
+  const db = await getDb();
+  try {
+    const row = insertSource(db, {
+      display_name,
+      target_identifier,
+      source_type: source_type as SourceType,
+    });
+    saveDb();
+    revalidatePath("/sources");
+    redirect(`/sources/${row.id}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("UNIQUE") || msg.includes("unique")) {
+      redirect("/sources/new?error=duplicate");
+    }
+    throw e;
+  }
+}
+
+export async function createCollectionJobAction(formData: FormData): Promise<void> {
+  await assertAdminSession();
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!sourceId) redirect("/sources");
+
+  const db = await getDb();
+  const source = getSourceById(db, sourceId);
+  if (!source) redirect("/sources");
+
+  const request_reason = String(formData.get("request_reason") ?? "").trim() || null;
+  const idemRaw = formData.get("idempotency_key");
+  const idempotency_key =
+    typeof idemRaw === "string" && idemRaw.trim() ? idemRaw.trim() : null;
+
+  try {
+    const { row } = insertCollectionJob(db, source, {
+      request_reason,
+      idempotency_key,
+    });
+    saveDb();
+    revalidatePath(`/sources/${sourceId}`);
+    redirect(`/sources/${sourceId}?job=${row.id}`);
+  } catch (e) {
+    const code = (e as Error & { code?: string }).code;
+    if (code === "source_disabled") {
+      redirect(`/sources/${sourceId}?error=disabled`);
+    }
+    throw e;
+  }
+}
+
+export async function cancelCollectionJobAction(formData: FormData): Promise<void> {
+  await assertAdminSession();
+  const jobId = String(formData.get("job_id") ?? "");
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!jobId || !sourceId) redirect("/sources");
+
+  const db = await getDb();
+  try {
+    cancelCollectionJob(db, jobId);
+    saveDb();
+    revalidatePath(`/sources/${sourceId}`);
+  } catch (e) {
+    const code = (e as Error & { code?: string }).code;
+    if (code === "cannot_cancel_running" || code === "already_terminal") {
+      redirect(`/sources/${sourceId}?cancel_error=${code}`);
+    }
+    throw e;
+  }
+  redirect(`/sources/${sourceId}`);
+}
+
+export async function updateSourceAction(formData: FormData): Promise<void> {
+  await assertAdminSession();
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!sourceId) redirect("/sources");
+
+  const db = await getDb();
+  const source = getSourceById(db, sourceId);
+  if (!source) redirect("/sources");
+
+  const display_name = formData.get("display_name");
+  const enabledValues = formData.getAll("enabled");
+  const enabledChecked = enabledValues.includes("1");
+  const default_collector_version = formData.get("default_collector_version");
+
+  const patch: Record<string, unknown> = {};
+  if (typeof display_name === "string" && display_name.trim()) {
+    patch.display_name = display_name.trim();
+  }
+  patch.enabled = enabledChecked;
+  if (typeof default_collector_version === "string") {
+    patch.default_collector_version = default_collector_version.trim() || null;
+  }
+
+  if (Object.keys(patch).length > 0) {
+    updateSource(db, sourceId, patch);
+    saveDb();
+  }
+  revalidatePath(`/sources/${sourceId}`);
+  revalidatePath("/sources");
+}
+
+export type RegisterAgentState =
+  | { ok: false; error?: string }
+  | { ok: true; token: string; token_prefix: string; agent_id: string };
+
+export async function registerAgentForSource(formData: FormData): Promise<RegisterAgentState> {
+  await assertAdminSession();
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!sourceId) return { ok: false, error: "missing_source" };
+
+  const db = await getDb();
+  try {
+    const { row, plainToken, token_prefix } = createAgentRegistration(
+      db,
+      sourceId,
+      String(formData.get("display_name") ?? "").trim() || null
+    );
+    saveDb();
+    revalidatePath(`/sources/${sourceId}`);
+    return { ok: true, token: plainToken, token_prefix, agent_id: row.id };
+  } catch (e) {
+    const code = (e as Error & { code?: string }).code;
+    if (code === "source_already_registered") {
+      return { ok: false, error: "already_registered" };
+    }
+    if (code === "source_not_found") {
+      return { ok: false, error: "not_found" };
+    }
+    throw e;
+  }
+}
