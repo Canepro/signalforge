@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { getRun } from "@/lib/db/repository";
+import { internalServerErrorResponse } from "@/lib/api/route-errors";
 
 export async function GET(
   _request: NextRequest,
@@ -21,7 +22,6 @@ export async function GET(
 
     return NextResponse.json(JSON.parse(run.report_json));
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return internalServerErrorResponse(err, "GET /api/runs/[id]/report");
   }
 }
