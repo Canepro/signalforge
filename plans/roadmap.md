@@ -89,6 +89,8 @@ Clone locally when working across repositories; script paths are relative to you
 | 5f | API/schema publication for agent integration | Done |
 | 6c–6d | Source + CollectionJob + operator APIs, agent execution routes, /sources UI, lease reaper, domain events | Done |
 | 6e | signalforge-agent repo: thin external agent (Bun + TypeScript), validated E2E; Sources UI unified layout polish | Done |
+| 7a–7b | Storage abstraction (contract + adapters), Postgres backend, `DATABASE_DRIVER` selection, checked-in SQL migrations, `schema_migrations` tracking | Done |
+| CI | GitHub Actions: typecheck, test, build + Postgres parity (fresh `postgres:16-alpine`, apply migrations, parity suite). Checked-in migration policy. Upgrade-path test scaffold. | Done |
 
 ## Current State
 
@@ -134,7 +136,13 @@ Published contract/docs:
 - findings quality is strongest where evidence is explicit
 - recommendations remain bounded by collected evidence
 - external collector model includes reference push path (`signalforge-collectors`) and job-driven agent (`signalforge-agent`)
-- no auth / scheduling / source registration yet
+- no auth / scheduling yet
+
+## Deployment
+
+The live SignalForge instance is deployed on **Vercel** with a **Neon Postgres** backend. Local development defaults to SQLite.
+
+**Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, GitHub Actions CI.
 
 ## Active Next Work
 
@@ -142,9 +150,9 @@ Recommended near-term choices:
 
 1. Use the system with more real submissions and collect friction.
 2. Harden the API/service contract where real usage shows gaps.
-3. Preserve SQLite for local/self-hosted use, but stop treating it as the only persistence story.
-4. Advance **Phase 7** storage abstraction and multi-backend persistence: [`phase-7-storage-abstraction.md`](./phase-7-storage-abstraction.md).
-5. After the storage boundary is in place: add durable production backend support, then continue agent hardening and a second collector pattern.
+3. Continue agent hardening: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, systemd unit file.
+4. Add lint to CI.
+5. Land a second migration file (`002_*`) to activate the upgrade-path coverage in CI.
 
 ## Future Phases
 

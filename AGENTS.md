@@ -46,6 +46,12 @@ Completed through **Phase 6e** (agent repo + Sources UI polish; see `plans/curre
 
 **Providers:** OpenAI direct; Azure OpenAI Responses with **legacy** (requires `AZURE_OPENAI_API_VERSION`) or **`/openai/v1` base URL** (omit API version — Azure rejects `api-version` on v1). Deterministic fallback if unavailable or misconfigured. See `README.md` env table.
 
+**Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js (SQLite local), Postgres/Neon (production), Vitest, GitHub Actions CI.
+
+**Deployment:** Vercel with Neon Postgres. The live site uses `DATABASE_DRIVER=postgres`.
+
+**CI:** GitHub Actions (`.github/workflows/ci.yml`): typecheck, test, build on every push to `main` and on PRs; a separate Postgres parity job starts `postgres:16-alpine`, applies migrations, and runs `bun run test:parity`. Postgres schema changes follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
+
 ## Current Priorities
 
 If starting fresh in this repo, work from the current plan first:
@@ -106,6 +112,7 @@ Core directories:
 - `src/lib/adapter/linux-audit-log/`
 - `src/lib/analyzer/`
 - `src/lib/compare/`
+- `src/lib/storage/`
 - `src/lib/db/`
 - `src/app/`
 - `src/components/`
@@ -248,6 +255,18 @@ Tests:
 
 ```bash
 bun test
+```
+
+Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
+
+```bash
+bun run test:parity
+```
+
+Postgres migrations:
+
+```bash
+bun run db:migrate:postgres
 ```
 
 Build:

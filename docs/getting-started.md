@@ -73,8 +73,6 @@ Then apply migrations before starting the app:
 bun run db:migrate:postgres
 ```
 
-Migration discipline for future schema changes lives in [`postgres-migrations.md`](./postgres-migrations.md).
-
 **Sources / “Collect Fresh Evidence” (Phase 6c):** to use **`/sources`** in the UI or the operator HTTP APIs (`/api/sources`, collection jobs, agent enrollment), set a bootstrap secret:
 
 ```env
@@ -256,6 +254,12 @@ Tests:
 
 ```bash
 bun test
+```
+
+Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
+
+```bash
+bun run test:parity
 ```
 
 Production build:

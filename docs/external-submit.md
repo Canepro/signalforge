@@ -142,6 +142,6 @@ SIGNALFORGE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y-%m-%
 
 - No in-product **collection** (no SSH, no remote execution, no scheduler in this contract).
 - No **auth** on this route in the current product (secure your deployment and network as needed).
-- No **source registration** or inventory UI; metadata is stored per run for display and logic only.
+- **Source registration** exists via `/sources` (Phase 6c) for operator-managed targets and collection jobs. The `POST /api/runs` path described here remains available for direct submissions without source context.
 
 For product boundary and future collector direction, see [`../plans/phase-5-collector-architecture.md`](../plans/phase-5-collector-architecture.md).

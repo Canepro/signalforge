@@ -35,6 +35,30 @@ It does **not** currently:
 
 Collection stays external by design.
 
+## Tech Stack
+
+- **Framework:** [Next.js](https://nextjs.org/) (App Router)
+- **Runtime:** [Bun](https://bun.sh/)
+- **Language:** TypeScript
+- **UI:** React, Tailwind CSS
+- **Local DB:** SQLite via [sql.js](https://github.com/sql-js/sql.js)
+- **Production DB:** Postgres ([Neon](https://neon.tech/) in the current deployment)
+- **Testing:** [Vitest](https://vitest.dev/)
+- **Deployment:** [Vercel](https://vercel.com/)
+- **CI:** GitHub Actions (typecheck, test, build, Postgres parity)
+
+## Live Deployment
+
+SignalForge is deployed on Vercel with a Neon Postgres backend.
+
+The live site uses:
+
+- `DATABASE_DRIVER=postgres`
+- Neon-managed Postgres (connection pooling via Neon's serverless driver endpoint)
+- Vercel serverless functions for all API routes
+
+Local development defaults to SQLite. The production deployment uses Postgres exclusively.
+
 ## Start Here
 
 If you are new to the repo:
@@ -176,6 +200,11 @@ Completed at a high level:
 - target-aware compare and baseline logic
 - external submit contract docs
 - published API contract and schemas
+- Sources UI + collection jobs + agent enrollment
+- storage abstraction (SQLite + Postgres)
+- Vercel deployment with Neon Postgres
+- CI workflow (GitHub Actions: typecheck, test, build, Postgres parity)
+- Postgres migration policy with checksum enforcement
 
 Historical background only:
 
@@ -277,7 +306,18 @@ Before starting the app on Postgres, apply the checked-in SQL migrations:
 bun run db:migrate:postgres
 ```
 
-SQLite remains the easiest local quickstart path. Postgres is the recommended production backend.
+SQLite remains the easiest local quickstart path. Postgres is the recommended production backend. The live Vercel deployment uses Neon Postgres.
+
+## CI
+
+GitHub Actions runs on every push to `main` and on pull requests:
+
+- **Checks job:** `bun run typecheck`, `bun run test`, `bun run build`
+- **Postgres parity job:** starts `postgres:16-alpine`, applies migrations, runs `bun run test:parity`
+
+See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+Postgres schema changes must follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
 
 ## More Documentation
 

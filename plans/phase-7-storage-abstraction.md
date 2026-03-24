@@ -459,3 +459,17 @@ Phase 7 is successful when:
 - storage behavior is enforced by backend-agnostic contract tests
 - documentation clearly explains backend choice and tradeoffs
 - the project remains open-source-friendly and not vendor-locked
+
+## Current State (as of CI + migration discipline work)
+
+Phase 7a–7b are **implemented**:
+
+- storage contract extracted (`src/lib/storage/contract.ts`)
+- SQLite and Postgres adapters behind `DATABASE_DRIVER`
+- routes/pages/actions use `src/lib/storage/*` instead of raw `getDb()`
+- checked-in Postgres migrations (`migrations/postgres/001_init.sql`) with `schema_migrations` checksum tracking
+- backend parity tests (`tests/storage/parity.test.ts`) exercise both SQLite and Postgres against the same behavioral suite
+- CI (GitHub Actions) runs the parity suite against `postgres:16-alpine` on every push and PR
+- upgrade-path migration test scaffold compares fresh-install vs stepwise-upgrade schema snapshots (activates once `002_*` exists)
+- migration policy checked in at `docs/postgres-migrations.md`
+- live deployment on Vercel with Neon Postgres

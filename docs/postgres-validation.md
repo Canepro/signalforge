@@ -104,8 +104,13 @@ The Postgres adapter has passed:
 - full existing test suite
 - production build
 - one live end-to-end validation pass across the current product surface
+- CI parity job: migrations applied to `postgres:16-alpine` + storage parity suite (GitHub Actions)
+- backend parity tests exercising both SQLite and Postgres against the same behavioral suite
+- upgrade-path migration test scaffold (activates automatically once `002_*` exists)
+
+The live Vercel deployment runs against Neon Postgres.
 
 ## Remaining Hardening Work
 
-- keep future schema changes append-only through new migration files
-- validate upgrade paths across multiple Postgres migration versions
+- validate upgrade paths across multiple Postgres migration versions (scaffold in place; needs a second migration)
+- add lint to CI

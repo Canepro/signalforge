@@ -77,10 +77,15 @@ Before merging a Postgres schema change:
 3. Confirm the app still passes `bun run typecheck`, `bun run test`, and `bun run build`.
 4. Update docs if the operator setup changes.
 
+## Current State
+
+CI already enforces fresh-install migration application and the storage parity suite against `postgres:16-alpine` on every push and PR. An upgrade-path test scaffold compares fresh-install vs stepwise-upgrade schema snapshots; it activates automatically once a second migration file (`002_*`) exists.
+
+The live deployment runs on Vercel with Neon Postgres.
+
 ## Current Limitations
 
 - No first-class production backup tooling is bundled in this repo.
-- No multi-version upgrade matrix exists yet.
 - No automated rollback exists beyond restore-and-redeploy discipline.
 
 Those are known gaps, not accidental omissions.
