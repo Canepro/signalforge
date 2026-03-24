@@ -97,6 +97,16 @@ describe("Phase 6d agent routes", () => {
     expect(res.status).toBe(400);
   });
 
+  it("jobs/next rejects invalid wait_seconds with 400", async () => {
+    const { token } = await createSourceAndAgent(db, "tid-next-wait-bad");
+    const res = await GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next?wait_seconds=-1", {
+        headers: agentAuth(token),
+      })
+    );
+    expect(res.status).toBe(400);
+  });
+
   it("jobs/next returns gate heartbeat_required before any heartbeat", async () => {
     const { sourceId, token } = await createSourceAndAgent(db, "tid-gate-hb");
     await POST_SOURCE_JOBS(
@@ -142,6 +152,45 @@ describe("Phase 6d agent routes", () => {
     const j = await next.json();
     expect(j.jobs).toHaveLength(0);
     expect(j.gate).toBe("capabilities_empty");
+  });
+
+  it("jobs/next long-poll returns a newly queued job during wait window", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-next-wait");
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+
+    const nextPromise = GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next?wait_seconds=1", {
+        headers: agentAuth(token),
+      })
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+
+    const next = await nextPromise;
+    expect(next.status).toBe(200);
+    const body = await next.json();
+    expect(body.gate).toBeNull();
+    expect(body.jobs).toHaveLength(1);
+    expect(body.jobs[0].source_id).toBe(sourceId);
   });
 
   it("happy path: heartbeat → next → claim → start → artifact → submitted", async () => {
