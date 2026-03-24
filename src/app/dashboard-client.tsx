@@ -100,7 +100,7 @@ export function DashboardClient({
         if (result.ok) {
           setQuickRequestFeedback({
             tone: "success",
-            message: `Queued for ${result.source_name}.`,
+            message: `Queued for ${result.source_name}. A running agent should claim it shortly.`,
           });
           return;
         }
@@ -172,8 +172,8 @@ export function DashboardClient({
               {hasLiveCollectionSource ? (
                 <p className="text-[11px] leading-relaxed text-on-surface-variant">
                   {canQuickRequest ?
-                    `${quickSource!.display_name} is live and ready for one-click collection.`
-                  : `${collectionSources.length} live sources are ready. Choose one from the request panel.`}
+                    `${quickSource!.display_name} is live. One click queues work for its next agent poll.`
+                  : `${collectionSources.length} live sources are ready. Choose one to queue work for its next agent poll.`}
                 </p>
               ) : (
                 <p className="text-[11px] leading-relaxed text-on-surface-variant">

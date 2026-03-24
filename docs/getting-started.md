@@ -240,7 +240,7 @@ This proves the external push model:
 - the collector submits it with metadata via `POST /api/runs`
 - SignalForge stores the run and analyzes it
 
-For **job-driven** collection (Sources → “Collect Fresh Evidence”), use the separate execution-plane repo **`signalforge-agent`** (sibling repo, not yet published): it authenticates with an enrollment token, polls `GET /api/agent/jobs/next`, runs **signalforge-collectors** on the host, and completes `POST /api/collection-jobs/{id}/artifact`. See that README for env vars and `once` / `run` modes.
+For **job-driven** collection (Sources → “Collect Fresh Evidence”), use the separate execution-plane repo **`signalforge-agent`** (sibling repo, not yet published): it authenticates with an enrollment token, polls `GET /api/agent/jobs/next`, runs **signalforge-collectors** on the host, and completes `POST /api/collection-jobs/{id}/artifact`. For normal operator use, keep the agent running in **`run`** mode on the source machine. Use **`once`** for smoke tests, ad-hoc manual runs, or cron-style schedules.
 
 ## Step 8: Useful Commands
 

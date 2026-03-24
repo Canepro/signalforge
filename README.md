@@ -122,7 +122,7 @@ For the fuller step-by-step version, use [`docs/getting-started.md`](docs/gettin
 
 - upload an artifact
 - inspect the run detail page
-- **Sources** (`/sources`): register a target, request **Collect Fresh Evidence** jobs (queued until a thin external agent claims them via the Phase **6d** agent API — see [`docs/api-contract.md`](docs/api-contract.md) and [`plans/phase-6b-source-job-api-contract.md`](plans/phase-6b-source-job-api-contract.md))
+- **Sources** (`/sources`): register a target, request **Collect Fresh Evidence** jobs (queued until a thin external agent claims them via the Phase **6d** agent API; for interactive use, run the agent continuously on the source machine rather than invoking one-shot mode manually — see [`docs/api-contract.md`](docs/api-contract.md) and [`plans/phase-6b-source-job-api-contract.md`](plans/phase-6b-source-job-api-contract.md))
 - reanalyze the same stored artifact if needed
 - compare runs
 

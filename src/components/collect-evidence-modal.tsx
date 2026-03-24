@@ -81,6 +81,15 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `bun run src/cli.ts once`,
   ].join("\n");
 
+  const agentRun = [
+    `export SIGNALFORGE_URL=${origin}`,
+    `export SIGNALFORGE_AGENT_TOKEN='<token from enrollment>'`,
+    `export SIGNALFORGE_AGENT_INSTANCE_ID="$(hostname)-agent-1"`,
+    `export SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
+    ``,
+    `bun run src/cli.ts run`,
+  ].join("\n");
+
   const cliSubmit = `SIGNALFORGE_URL=${origin} ./scripts/analyze.sh /path/to/your-audit.log`;
 
   const collectorPush = [
@@ -139,15 +148,23 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                 and register a target
               </li>
               <li>Enroll an agent (one token per source)</li>
-              <li>Click <strong>Collect Fresh Evidence</strong> to create a queued job</li>
               <li>
-                Run <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">signalforge-agent once</code>{" "}
-                on the host — it claims, collects, and uploads automatically
+                Run <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">signalforge-agent run</code>{" "}
+                on the host so it keeps heartbeating and polling in the background
+              </li>
+              <li>
+                Click <strong>Collect Fresh Evidence</strong> to create a queued job. A running agent claims it on its next poll.
               </li>
             </ol>
+            <p className="text-[11px] leading-relaxed text-on-surface-variant">
+              Use <span className="font-semibold text-on-surface">run</span> for normal operation.{" "}
+              <span className="font-semibold text-on-surface">once</span> is best for smoke tests, debugging, or cron-style scheduled collection.
+            </p>
           </div>
 
-          <CopyBlock label="Agent one-shot (from signalforge-agent checkout)" text={agentOnce} />
+          <CopyBlock label="Agent continuous mode (recommended)" text={agentRun} />
+
+          <CopyBlock label="Agent one-shot (debug or cron)" text={agentOnce} />
 
           <div className="border-t border-outline-variant/20 pt-4 space-y-1">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Alternative: direct push</h3>

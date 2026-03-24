@@ -122,7 +122,9 @@ export default async function SourceDetailPage({
         <p className="text-sm text-on-surface-variant leading-relaxed">
           Creates a <strong>queued</strong> collection job. A thin external agent (enrolled below) must{" "}
           <strong>claim</strong> the job, run your collector, and upload the artifact.
-          Collection runs <strong>outside</strong> SignalForge.
+          Collection runs <strong>outside</strong> SignalForge. If the agent is running continuously, it should pick this up
+          on its next poll. If you only run <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">once</code> or cron,
+          the job waits until that next invocation.
         </p>
         <RequestJobForm sourceId={id} enabled={source.enabled} />
       </section>
@@ -186,6 +188,12 @@ export default async function SourceDetailPage({
             </span>
           )}
         </div>
+        {jobs.some((job) => job.status === "queued") ? (
+          <p className="text-xs leading-relaxed text-on-surface-variant">
+            <span className="font-semibold text-on-surface">Queued</span> means SignalForge has accepted the request and is waiting
+            for the source machine&apos;s agent to poll and claim it.
+          </p>
+        ) : null}
         {jobs.length === 0 ? (
           <div className="relative rounded-xl border border-dashed border-outline-variant/30 px-6 py-10 text-center overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-b from-surface-container-low/30 to-transparent pointer-events-none" />

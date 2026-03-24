@@ -112,7 +112,9 @@ export function RequestCollectionModal({
               Request collection
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              Queue a collection job for a live source. The enrolled agent will claim it on its next poll.
+              Queue a collection job for a live source. A continuously running agent should claim it on its next poll.
+              If the source only uses <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">once</code> or cron,
+              the job waits until the next invocation.
             </p>
           </div>
           <button
@@ -133,7 +135,8 @@ export function RequestCollectionModal({
               <div>
                 <p className="text-sm font-semibold text-on-surface">Collection job queued.</p>
                 <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                  {result.source_name} now has a queued job waiting for its enrolled agent.
+                  {result.source_name} now has a queued job. A running agent should claim it shortly; one-shot or cron setups
+                  will pick it up on the next run.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -236,6 +239,7 @@ export function RequestCollectionModal({
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] leading-relaxed text-on-surface-variant">
                   Need setup help instead? Use <span className="font-semibold text-on-surface">How to collect</span> in the side rail.
+                  For interactive use, keep the agent running continuously on the source machine.
                 </p>
                 <button
                   type="submit"
