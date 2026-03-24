@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveDb } from "@/lib/db/client";
-import { listNextQueuedJobSummariesForSource } from "@/lib/db/source-job-repository";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { getStorage } from "@/lib/storage";
 
 export async function GET(request: NextRequest) {
   const ctx = await resolveAgentRequest(request);
@@ -30,13 +29,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { jobs, gate } = listNextQueuedJobSummariesForSource(
-      ctx.db,
-      ctx.source,
-      ctx.registration,
-      limit
+    const storage = await getStorage();
+    const { jobs, gate } = await storage.withTransaction((tx) =>
+      tx.jobs.listNextForAgent(ctx.source.id, ctx.registration.id, limit)
     );
-    saveDb();
     return NextResponse.json({ jobs, gate });
   } catch (err) {
     return internalServerErrorResponse(err, "GET /api/agent/jobs/next");

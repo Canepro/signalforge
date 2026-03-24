@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import { getDb } from "@/lib/db/client";
-import { buildCompareDriftPayload } from "@/lib/compare/build-compare";
 import type { CompareRunSnapshot } from "@/lib/compare/build-compare";
 import { CompareClient, type CompareRunHeader } from "./compare-client";
+import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +31,8 @@ interface ComparePageProps {
 export default async function ComparePage({ params, searchParams }: ComparePageProps) {
   const { id: currentId } = await params;
   const { against } = await searchParams;
-  const db = await getDb();
-
-  const result = buildCompareDriftPayload(db, currentId, against);
+  const storage = await getStorage();
+  const result = await storage.runs.getComparePayload(currentId, against);
   if (!result.ok) {
     notFound();
   }

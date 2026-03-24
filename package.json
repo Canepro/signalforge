@@ -12,11 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/analyzer",
-    "analyze": "bun src/lib/analyzer/cli.ts"
+    "analyze": "bun src/lib/analyzer/cli.ts",
+    "db:migrate:postgres": "bun scripts/db-migrate-postgres.ts"
   },
   "dependencies": {
     "next": "^15.3.2",
     "openai": "^5.8.2",
+    "pg": "^8.20.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sql.js": "^1.14.1",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.7",
     "@types/node": "^22.15.18",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "tailwindcss": "^4.1.7",

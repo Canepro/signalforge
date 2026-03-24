@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import {
-  insertSource,
-  listSources,
-  sourceToJson,
-  type SourceType,
-} from "@/lib/db/source-job-repository";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { getStorage } from "@/lib/storage";
+import type { SourceType } from "@/lib/db/source-job-repository";
 
 function isSourceType(v: string): v is SourceType {
   return v === "linux_host" || v === "wsl";
@@ -17,17 +12,17 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
 
   try {
-    const db = await getDb();
+    const storage = await getStorage();
     const { searchParams } = new URL(request.url);
     const enabled = searchParams.get("enabled");
-    const rows =
+    const sources =
       enabled === "true" ?
-        listSources(db, { enabled: true })
+        await storage.sources.list({ enabled: true })
       : enabled === "false" ?
-        listSources(db, { enabled: false })
-      : listSources(db);
+        await storage.sources.list({ enabled: false })
+      : await storage.sources.list();
 
-    return NextResponse.json({ sources: rows.map(sourceToJson) });
+    return NextResponse.json({ sources });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -71,43 +66,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = await getDb();
+    const storage = await getStorage();
     try {
-      const row = insertSource(db, {
-        display_name,
-        target_identifier,
-        source_type,
-        expected_artifact_type:
-          typeof body.expected_artifact_type === "string" ?
-            body.expected_artifact_type
+      const row = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name,
+          target_identifier,
+          source_type,
+          expected_artifact_type:
+            typeof body.expected_artifact_type === "string" ?
+              body.expected_artifact_type
+            : undefined,
+          default_collector_type:
+            typeof body.default_collector_type === "string" ?
+              body.default_collector_type
+            : undefined,
+          default_collector_version:
+            typeof body.default_collector_version === "string" ?
+              body.default_collector_version
+            : null,
+          capabilities: Array.isArray(body.capabilities) ?
+            body.capabilities.filter((x): x is string => typeof x === "string")
           : undefined,
-        default_collector_type:
-          typeof body.default_collector_type === "string" ?
-            body.default_collector_type
-          : undefined,
-        default_collector_version:
-          typeof body.default_collector_version === "string" ?
-            body.default_collector_version
-          : null,
-        capabilities: Array.isArray(body.capabilities) ?
-          body.capabilities.filter((x): x is string => typeof x === "string")
-        : undefined,
-        attributes:
-          body.attributes && typeof body.attributes === "object" && body.attributes !== null ?
-            (body.attributes as Record<string, unknown>)
-          : undefined,
-        labels:
-          body.labels && typeof body.labels === "object" && body.labels !== null ?
-            (Object.fromEntries(
-              Object.entries(body.labels as Record<string, unknown>).filter(
-                ([k, v]) => typeof k === "string" && typeof v === "string"
-              )
-            ) as Record<string, string>)
-          : undefined,
-        enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
-      });
-      saveDb();
-      return NextResponse.json(sourceToJson(row), { status: 201 });
+          attributes:
+            body.attributes && typeof body.attributes === "object" && body.attributes !== null ?
+              (body.attributes as Record<string, unknown>)
+            : undefined,
+          labels:
+            body.labels && typeof body.labels === "object" && body.labels !== null ?
+              (Object.fromEntries(
+                Object.entries(body.labels as Record<string, unknown>).filter(
+                  ([k, v]) => typeof k === "string" && typeof v === "string"
+                )
+              ) as Record<string, string>)
+            : undefined,
+          enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+        })
+      );
+      return NextResponse.json(row, { status: 201 });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("UNIQUE") || msg.includes("unique")) {

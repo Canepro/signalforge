@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import {
   getAdminTokenFromEnv,
@@ -8,8 +8,14 @@ import {
 } from "@/lib/api/admin-auth";
 
 describe("admin-auth", () => {
+  const originalCrypto = globalThis.crypto;
+
   afterEach(() => {
     delete process.env.SIGNALFORGE_ADMIN_TOKEN;
+    Object.defineProperty(globalThis, "crypto", {
+      value: originalCrypto,
+      configurable: true,
+    });
   });
 
   it("requireAdminBearer returns 503 when token unset", () => {
@@ -51,6 +57,15 @@ describe("admin-auth", () => {
     expect(hex.length).toBe(64);
     expect(await verifyAdminSessionCookie(hex)).toBe(true);
     expect(await verifyAdminSessionCookie("deadbeef")).toBe(false);
+  });
+
+  it("hashAdminSessionCookie falls back to node webcrypto when global crypto is unavailable", async () => {
+    Object.defineProperty(globalThis, "crypto", {
+      value: undefined,
+      configurable: true,
+    });
+    const hex = await hashAdminSessionCookie("abc");
+    expect(hex.length).toBe(64);
   });
 
   it("getAdminTokenFromEnv trims whitespace", () => {

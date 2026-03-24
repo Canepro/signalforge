@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { getDb } from "@/lib/db/client";
-import { listSources, sourceToJson } from "@/lib/db/source-job-repository";
 import { SourceHealthDot } from "@/components/source-health-dot";
+import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +18,8 @@ function relativeTime(iso: string | null): string {
 }
 
 export default async function SourcesListPage() {
-  const db = await getDb();
-  const rows = listSources(db);
-  const sources = rows.map(sourceToJson);
+  const storage = await getStorage();
+  const sources = await storage.sources.list();
 
   return (
     <div className="space-y-6">

@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveDb } from "@/lib/db/client";
-import {
-  collectionJobToJson,
-  getCollectionJobById,
-  startCollectionJobForAgent,
-} from "@/lib/db/source-job-repository";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(
   request: NextRequest,
@@ -36,43 +31,10 @@ export async function POST(
   }
 
   const { id: jobId } = await params;
-  const job = getCollectionJobById(ctx.db, jobId);
-  if (!job) {
-    return NextResponse.json({ error: "Job not found", code: "not_found" }, { status: 404 });
-  }
-  if (job.source_id !== ctx.source.id) {
-    return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
-  }
-  if (job.status !== "claimed") {
-    return NextResponse.json(
-      {
-        error: "Job cannot be started in its current state (claim first; lease may have expired and requeued the job).",
-        code: "invalid_transition",
-      },
-      { status: 409 }
-    );
-  }
-  if (job.lease_owner_id !== ctx.registration.id) {
-    return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
-  }
-  if (!job.lease_owner_instance_id) {
-    return NextResponse.json({ error: "Invalid job lease state", code: "invalid_state" }, { status: 409 });
-  }
-  if (job.lease_owner_instance_id !== instanceId) {
-    return NextResponse.json(
-      { error: "instance_id does not match job lease", code: "instance_mismatch" },
-      { status: 403 }
-    );
-  }
-
-  const result = startCollectionJobForAgent(
-    ctx.db,
-    jobId,
-    ctx.source.id,
-    ctx.registration.id,
-    instanceId
+  const storage = await getStorage();
+  const result = await storage.withTransaction((tx) =>
+    tx.jobs.startForAgent(jobId, ctx.source.id, ctx.registration.id, instanceId)
   );
-  saveDb();
 
   if (!result.ok) {
     if (result.code === "wrong_job") {
@@ -96,5 +58,5 @@ export async function POST(
     );
   }
 
-  return NextResponse.json(collectionJobToJson(result.row));
+  return NextResponse.json(result.row);
 }

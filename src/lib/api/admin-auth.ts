@@ -41,11 +41,17 @@ export function requireAdminBearer(request: NextRequest): NextResponse | null {
 
 const COOKIE_SALT = "signalforge_admin_cookie_v1";
 
+async function subtleCrypto() {
+  if (globalThis.crypto?.subtle) return globalThis.crypto.subtle;
+  const { webcrypto } = await import("node:crypto");
+  return webcrypto.subtle as unknown as SubtleCrypto;
+}
+
 /** SHA-256 hex of session cookie (Web Crypto — safe for Edge middleware + Node). */
 export async function hashAdminSessionCookie(adminToken: string): Promise<string> {
   const msg = `${COOKIE_SALT}\0${adminToken}`;
   const data = new TextEncoder().encode(msg);
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const digest = await (await subtleCrypto()).digest("SHA-256", data);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import {
-  cancelCollectionJob,
-  collectionJobToJson,
-} from "@/lib/db/source-job-repository";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(
   request: NextRequest,
@@ -15,14 +11,13 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const db = await getDb();
+    const storage = await getStorage();
     try {
-      const row = cancelCollectionJob(db, id);
+      const row = await storage.withTransaction((tx) => tx.jobs.cancel(id));
       if (!row) {
         return NextResponse.json({ error: "Job not found", code: "not_found" }, { status: 404 });
       }
-      saveDb();
-      return NextResponse.json(collectionJobToJson(row));
+      return NextResponse.json(row);
     } catch (e) {
       const code = (e as Error & { code?: string }).code;
       if (code === "cannot_cancel_running") {

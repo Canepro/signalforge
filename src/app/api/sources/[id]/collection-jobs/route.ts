@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import {
-  collectionJobToJson,
-  getSourceById,
-  insertCollectionJob,
-  listCollectionJobsForSource,
-  reapExpiredCollectionJobLeases,
-} from "@/lib/db/source-job-repository";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function GET(
   request: NextRequest,
@@ -18,18 +11,19 @@ export async function GET(
 
   try {
     const { id: sourceId } = await params;
-    const db = await getDb();
-    const source = getSourceById(db, sourceId);
+    const storage = await getStorage();
+    const source = await storage.sources.getById(sourceId);
     if (!source) {
       return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
     }
 
-    reapExpiredCollectionJobLeases(db);
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") ?? undefined;
-    const jobs = listCollectionJobsForSource(db, sourceId, status ? { status } : undefined);
-    saveDb();
-    return NextResponse.json({ jobs: jobs.map(collectionJobToJson) });
+    const jobs = await storage.withTransaction(async (tx) => {
+      await tx.jobs.reapExpiredLeases();
+      return tx.jobs.listForSource(sourceId, status ? { status } : undefined);
+    });
+    return NextResponse.json({ jobs });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -45,8 +39,8 @@ export async function POST(
 
   try {
     const { id: sourceId } = await params;
-    const db = await getDb();
-    const source = getSourceById(db, sourceId);
+    const storage = await getStorage();
+    const source = await storage.sources.getById(sourceId);
     if (!source) {
       return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
     }
@@ -60,17 +54,21 @@ export async function POST(
     }
 
     try {
-      const { row, inserted } = insertCollectionJob(db, source, {
-        request_reason:
-          typeof body.request_reason === "string" ? body.request_reason : null,
-        priority: typeof body.priority === "number" ? body.priority : 0,
-        idempotency_key:
-          typeof body.idempotency_key === "string" ? body.idempotency_key : null,
-      });
-      saveDb();
-      return NextResponse.json(collectionJobToJson(row), { status: inserted ? 201 : 200 });
+      const { row, inserted } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(sourceId, {
+          request_reason:
+            typeof body.request_reason === "string" ? body.request_reason : null,
+          priority: typeof body.priority === "number" ? body.priority : 0,
+          idempotency_key:
+            typeof body.idempotency_key === "string" ? body.idempotency_key : null,
+        })
+      );
+      return NextResponse.json(row, { status: inserted ? 201 : 200 });
     } catch (e) {
       const code = (e as Error & { code?: string }).code;
+      if (code === "source_not_found") {
+        return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
+      }
       if (code === "source_disabled") {
         return NextResponse.json(
           { error: "Source is disabled", code: "source_disabled" },

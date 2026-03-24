@@ -15,9 +15,14 @@ export function setDbOverride(db: Database | null): void {
 }
 
 function sqlJsInitOptions(): { locateFile: (file: string) => string } {
-  const distDir = join(process.cwd(), "node_modules", "sql.js", "dist");
+  const nodeModulesDist = join(process.cwd(), "node_modules", "sql.js", "dist");
+  const tracedDist = join(process.cwd(), ".next", "server", "vendor-chunks", "sql.js", "dist");
   return {
-    locateFile: (file: string) => join(distDir, file),
+    locateFile: (file: string) => {
+      const tracedPath = join(tracedDist, file);
+      if (existsSync(tracedPath)) return tracedPath;
+      return join(nodeModulesDist, file);
+    },
   };
 }
 
@@ -132,6 +137,7 @@ function migrate(db: Database): void {
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     target_identifier TEXT NOT NULL,
+    target_identifier_norm TEXT,
     source_type TEXT NOT NULL,
     expected_artifact_type TEXT NOT NULL,
     default_collector_type TEXT NOT NULL,
@@ -146,8 +152,22 @@ function migrate(db: Database): void {
     updated_at TEXT NOT NULL
   )`);
 
+  const sourceCols = tableColumnNames(db, "sources");
+  if (!sourceCols.includes("target_identifier_norm")) {
+    db.run(`ALTER TABLE sources ADD COLUMN target_identifier_norm TEXT`);
+  }
+  db.run(
+    `UPDATE sources
+     SET target_identifier_norm = lower(trim(target_identifier))
+     WHERE target_identifier_norm IS NULL OR target_identifier_norm = ''`
+  );
+
   db.run(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_target_enabled ON sources(target_identifier) WHERE enabled = 1`
+  );
+  db.run(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_target_enabled_norm
+     ON sources(target_identifier_norm) WHERE enabled = 1`
   );
 
   db.run(`CREATE TABLE IF NOT EXISTS collection_jobs (

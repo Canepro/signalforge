@@ -249,6 +249,21 @@ export function getArtifactById(db: Database, id: string): ArtifactRow | null {
   return getOne<ArtifactRow>(db, "SELECT * FROM artifacts WHERE id = ?", [id]);
 }
 
+export function deleteRunById(db: Database, id: string): void {
+  db.run("DELETE FROM runs WHERE id = ?", [id]);
+}
+
+export function deleteArtifactIfUnreferenced(db: Database, id: string): void {
+  const ref = getOne<{ refs: number }>(
+    db,
+    "SELECT COUNT(*) AS refs FROM runs WHERE artifact_id = ?",
+    [id]
+  );
+  if ((ref?.refs ?? 0) === 0) {
+    db.run("DELETE FROM artifacts WHERE id = ?", [id]);
+  }
+}
+
 export function normalizeEnvironmentHostname(hostname: string | null | undefined): string | null {
   const normalized = hostname?.trim().toLowerCase();
   if (!normalized || normalized === "unknown") return null;

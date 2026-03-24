@@ -1,19 +1,11 @@
 import Link from "next/link";
-import { getDb, saveDb } from "@/lib/db/client";
-import {
-  collectionJobToJson,
-  getAgentRegistrationBySourceId,
-  getSourceById,
-  listCollectionJobsForSource,
-  reapExpiredCollectionJobLeases,
-  sourceToJson,
-} from "@/lib/db/source-job-repository";
 import { AgentEnrollClient } from "./agent-enroll-client";
 import { RequestJobForm } from "./request-job-form";
 import { CancelJobButton } from "./cancel-job-button";
 import { SourceSettingsForm } from "./source-settings-form";
 import { SourceHealthDot } from "@/components/source-health-dot";
 import { JobStatusBadge, jobBorderClass } from "@/components/job-status-badge";
+import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -48,20 +40,20 @@ export default async function SourceDetailPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const db = await getDb();
-  reapExpiredCollectionJobLeases(db);
-  saveDb();
-  const row = getSourceById(db, id);
-  if (!row) {
+  const storage = await getStorage();
+  const source = await storage.sources.getById(id);
+  if (!source) {
     return (
       <div className="text-on-surface-variant">
         Source not found. <Link href="/sources" className="underline">Back</Link>
       </div>
     );
   }
-  const source = sourceToJson(row);
-  const jobs = listCollectionJobsForSource(db, id).map(collectionJobToJson);
-  const registration = getAgentRegistrationBySourceId(db, id);
+  const jobs = await storage.withTransaction(async (tx) => {
+    await tx.jobs.reapExpiredLeases();
+    return tx.jobs.listForSource(id);
+  });
+  const registration = await storage.agents.getRegistrationBySourceId(id);
 
   return (
     <div className="space-y-8">

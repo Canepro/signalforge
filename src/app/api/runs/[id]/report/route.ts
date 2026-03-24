@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
-import { getRun } from "@/lib/db/repository";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { getStorage } from "@/lib/storage";
 
 export async function GET(
   _request: NextRequest,
@@ -9,18 +8,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const db = await getDb();
-    const run = getRun(db, id);
-
-    if (!run) {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
-    }
-
-    if (!run.report_json) {
+    const storage = await getStorage();
+    const report = await storage.runs.getReport(id);
+    if (report === null) {
       return NextResponse.json({ error: "No report available" }, { status: 404 });
     }
 
-    return NextResponse.json(JSON.parse(run.report_json));
+    return NextResponse.json(report);
   } catch (err) {
     return internalServerErrorResponse(err, "GET /api/runs/[id]/report");
   }

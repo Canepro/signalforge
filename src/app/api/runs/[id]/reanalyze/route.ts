@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import { getArtifactById, getRun, insertRun, submissionMetaFromRun } from "@/lib/db/repository";
 import { analyzeArtifact } from "@/lib/analyzer/index";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(
   _request: NextRequest,
@@ -10,33 +9,40 @@ export async function POST(
 ) {
   try {
     const { id: parentRunId } = await params;
-    const db = await getDb();
-    const run = getRun(db, parentRunId);
-    if (!run) {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
-    }
-
-    const artifact = getArtifactById(db, run.artifact_id);
-    if (!artifact) {
+    const storage = await getStorage();
+    const reanalyze = await storage.runs.getReanalyzeSource(parentRunId);
+    if (!reanalyze.ok) {
+      if (reanalyze.error === "run_not_found") {
+        return NextResponse.json({ error: "Run not found" }, { status: 404 });
+      }
       return NextResponse.json({ error: "Artifact not found" }, { status: 404 });
     }
 
-    const result = await analyzeArtifact(artifact.content, {
-      artifactType: artifact.artifact_type,
+    const result = await analyzeArtifact(reanalyze.content, {
+      artifactType: reanalyze.artifact_type,
     });
 
-    const newRun = insertRun(
-      db,
-      artifact.id,
-      result,
-      submissionMetaFromRun(run),
-      parentRunId
+    const newRun = await storage.withTransaction((tx) =>
+      tx.runs.persistAnalyzedRun({
+        artifactType: reanalyze.artifact_type,
+        sourceType: reanalyze.submission.source_type,
+        filename: reanalyze.submission.filename,
+        content: reanalyze.content,
+        ingestion: {
+          target_identifier: reanalyze.submission.target_identifier ?? null,
+          source_label: reanalyze.submission.source_label ?? null,
+          collector_type: reanalyze.submission.collector_type ?? null,
+          collector_version: reanalyze.submission.collector_version ?? null,
+          collected_at: reanalyze.submission.collected_at ?? null,
+        },
+        analysis: result,
+        parentRunId,
+      })
     );
-    saveDb();
 
     return NextResponse.json({
-      run_id: newRun.id,
-      artifact_id: artifact.id,
+      run_id: newRun.run_id,
+      artifact_id: newRun.artifact_id,
       parent_run_id: parentRunId,
       status: newRun.status,
     });

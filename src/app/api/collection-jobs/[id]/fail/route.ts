@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveDb } from "@/lib/db/client";
-import {
-  collectionJobToJson,
-  failCollectionJobForAgent,
-  getCollectionJobById,
-} from "@/lib/db/source-job-repository";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(
   request: NextRequest,
@@ -15,17 +10,6 @@ export async function POST(
   if (!ctx.ok) return ctx.response;
 
   const { id: jobId } = await params;
-  const job = getCollectionJobById(ctx.db, jobId);
-  if (!job) {
-    return NextResponse.json({ error: "Job not found", code: "not_found" }, { status: 404 });
-  }
-  if (job.source_id !== ctx.source.id) {
-    return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
-  }
-  if (job.lease_owner_id !== ctx.registration.id || !job.lease_owner_instance_id) {
-    return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
-  }
-
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
@@ -43,26 +27,21 @@ export async function POST(
       { status: 400 }
     );
   }
-  if (job.lease_owner_instance_id !== instanceId) {
-    return NextResponse.json(
-      { error: "instance_id does not match job lease", code: "instance_mismatch" },
-      { status: 403 }
-    );
-  }
 
   const code = typeof body.code === "string" ? body.code : "agent_failed";
   const message = typeof body.message === "string" ? body.message : "failed";
 
-  const result = failCollectionJobForAgent(
-    ctx.db,
-    jobId,
-    ctx.source.id,
-    ctx.registration.id,
-    instanceId,
-    code,
-    message
+  const storage = await getStorage();
+  const result = await storage.withTransaction((tx) =>
+    tx.jobs.failForAgent(
+      jobId,
+      ctx.source.id,
+      ctx.registration.id,
+      instanceId,
+      code,
+      message
+    )
   );
-  saveDb();
 
   if (!result.ok) {
     if (result.code === "wrong_job") {
@@ -86,5 +65,5 @@ export async function POST(
     );
   }
 
-  return NextResponse.json(collectionJobToJson(result.row));
+  return NextResponse.json(result.row);
 }

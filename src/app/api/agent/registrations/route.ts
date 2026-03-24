@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import { createAgentRegistration } from "@/lib/db/source-job-repository";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
   const denied = requireAdminBearer(request);
@@ -26,14 +25,11 @@ export async function POST(request: NextRequest) {
     const display_name =
       typeof body.display_name === "string" ? body.display_name : null;
 
-    const db = await getDb();
+    const storage = await getStorage();
     try {
-      const { row, plainToken, token_prefix } = createAgentRegistration(
-        db,
-        source_id,
-        display_name
+      const { row, plainToken, token_prefix } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(source_id, display_name)
       );
-      saveDb();
       return NextResponse.json(
         {
           agent_id: row.id,

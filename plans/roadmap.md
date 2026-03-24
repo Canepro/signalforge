@@ -138,16 +138,13 @@ Published contract/docs:
 
 ## Active Next Work
 
-There is no forced implementation phase immediately after 5f.
-
 Recommended near-term choices:
 
 1. Use the system with more real submissions and collect friction.
 2. Harden the API/service contract where real usage shows gaps.
-3. Advance **Phase 6a** architecture: [`phase-6-source-job-agent-architecture.md`](./phase-6-source-job-agent-architecture.md) (Source + `CollectionJob` + thin agent).
-4. **Phase 6b** — contract: [`phase-6b-source-job-api-contract.md`](./phase-6b-source-job-api-contract.md).
-5. **Phase 6c–6e shipped:** sources + jobs + operator APIs + `/sources` UI + agent registration + agent execution routes + `signalforge-agent` repo (validated E2E). **Next:** harden in real use, then second collector pattern.
-6. In parallel or after: second reference collector pattern only once one job/agent vertical slice is credible.
+3. Preserve SQLite for local/self-hosted use, but stop treating it as the only persistence story.
+4. Advance **Phase 7** storage abstraction and multi-backend persistence: [`phase-7-storage-abstraction.md`](./phase-7-storage-abstraction.md).
+5. After the storage boundary is in place: add durable production backend support, then continue agent hardening and a second collector pattern.
 
 ## Future Phases
 
@@ -183,7 +180,30 @@ Important:
 - do not implement a generalized collector framework first
 - prove a second pattern narrowly
 
-### Phase 8: Source / Target Registration Design
+### Phase 7: Storage abstraction and multi-backend persistence
+
+[`phase-7-storage-abstraction.md`](./phase-7-storage-abstraction.md) — define a backend-agnostic persistence boundary, preserve SQLite as the default local/self-hosted backend, and add a durable production backend without vendor lock-in. Recommended backend shape: SQLite for local, Postgres for production, optional libSQL later if justified.
+
+Important:
+
+- do not hard-wire the product to one hosted database vendor
+- do not let `sql.js` driver types leak through routes/pages/actions
+- do not degrade the zero-dependency OSS quickstart
+
+### Phase 8: Second Reference Collector Pattern
+
+Possible scope:
+
+- one more external push collector pattern
+- still external to SignalForge
+- likely container or Kubernetes support-bundle submission pattern
+
+Important:
+
+- do not implement a generalized collector framework first
+- prove a second pattern narrowly
+
+### Phase 9: Source / Target Registration Design
 
 Possible scope:
 
@@ -192,7 +212,7 @@ Possible scope:
 - plan how collectors identify themselves
 - design without turning the app into an execution engine
 
-### Phase 9: Fresh-Evidence Orchestration
+### Phase 10: Fresh-Evidence Orchestration
 
 Possible scope:
 
@@ -200,7 +220,7 @@ Possible scope:
 - likely push-first or hybrid orchestration
 - explicit security and trust model required first
 
-### Phase 10+: Broader Artifact Families
+### Phase 11+: Broader Artifact Families
 
 Potential future evidence types:
 

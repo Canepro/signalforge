@@ -43,6 +43,21 @@ describe("source-job-repository", () => {
     ).toThrow();
   });
 
+  it("insertSource treats enabled target_identifier as case-insensitively unique", () => {
+    insertSource(db, {
+      display_name: "A",
+      target_identifier: "Prod-Host-1",
+      source_type: "wsl",
+    });
+    expect(() =>
+      insertSource(db, {
+        display_name: "B",
+        target_identifier: "prod-host-1",
+        source_type: "linux_host",
+      })
+    ).toThrow();
+  });
+
   it("insertCollectionJob sets queued and artifact_type from source", () => {
     const s = insertSource(db, {
       display_name: "S",

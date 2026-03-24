@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveDb } from "@/lib/db/client";
-import {
-  applyAgentHeartbeat,
-  getCollectionJobById,
-  type ApplyAgentHeartbeatResult,
-} from "@/lib/db/source-job-repository";
+import type { ApplyAgentHeartbeatResult } from "@/lib/db/source-job-repository";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { getStorage } from "@/lib/storage";
 
 function heartbeatResponseBody(result: ApplyAgentHeartbeatResult) {
   const lease = result.active_job_lease;
@@ -72,70 +68,67 @@ export async function POST(request: NextRequest) {
     instance_id = body.instance_id.trim();
   }
 
-  if (active_job_id) {
-    if (!instance_id) {
-      return NextResponse.json(
-        {
-          error: "instance_id is required when active_job_id is set",
-          code: "instance_id_required",
-        },
-        { status: 400 }
-      );
-    }
-
-    const job = getCollectionJobById(ctx.db, active_job_id);
-    if (!job) {
-      return NextResponse.json(
-        { error: "active_job_id does not refer to a job", code: "active_job_not_found" },
-        { status: 409 }
-      );
-    }
-    if (job.source_id !== ctx.source.id) {
-      return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
-    }
-    if (job.lease_owner_id !== ctx.registration.id) {
-      return NextResponse.json(
-        { error: "Job is not leased to this agent registration", code: "forbidden" },
-        { status: 403 }
-      );
-    }
-    if (job.status !== "claimed" && job.status !== "running") {
-      return NextResponse.json(
-        {
-          error: "Job is not in claimed or running state",
-          code: "invalid_active_job_state",
-        },
-        { status: 409 }
-      );
-    }
-    if (!job.lease_owner_instance_id) {
-      return NextResponse.json(
-        { error: "Job has no lease instance", code: "invalid_state" },
-        { status: 409 }
-      );
-    }
-    if (job.lease_owner_instance_id !== instance_id) {
-      return NextResponse.json(
-        { error: "instance_id does not match job lease", code: "instance_mismatch" },
-        { status: 403 }
-      );
-    }
-    const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-      return NextResponse.json({ error: "Lease expired", code: "lease_expired" }, { status: 409 });
-    }
+  if (active_job_id && !instance_id) {
+    return NextResponse.json(
+      {
+        error: "instance_id is required when active_job_id is set",
+        code: "instance_id_required",
+      },
+      { status: 400 }
+    );
   }
 
   try {
-    const result = applyAgentHeartbeat(ctx.db, ctx.registration, ctx.source, {
-      capabilities,
-      attributes,
-      agent_version,
-      active_job_id,
-      instance_id,
-    });
-    saveDb();
-    return NextResponse.json(heartbeatResponseBody(result));
+    const storage = await getStorage();
+    const heartbeat = await storage.withTransaction((tx) =>
+      tx.agents.applyHeartbeat({
+        sourceId: ctx.source.id,
+        registrationId: ctx.registration.id,
+        capabilities,
+        attributes,
+        agentVersion: agent_version,
+        activeJobId: active_job_id,
+        instanceId: instance_id,
+      })
+    );
+    if (!heartbeat.ok) {
+      if (heartbeat.code === "active_job_not_found") {
+        return NextResponse.json(
+          { error: "active_job_id does not refer to a job", code: "active_job_not_found" },
+          { status: 409 }
+        );
+      }
+      if (heartbeat.code === "forbidden") {
+        return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
+      }
+      if (heartbeat.code === "invalid_active_job_state") {
+        return NextResponse.json(
+          {
+            error: "Job is not in claimed or running state",
+            code: "invalid_active_job_state",
+          },
+          { status: 409 }
+        );
+      }
+      if (heartbeat.code === "invalid_state") {
+        return NextResponse.json(
+          { error: "Job has no lease instance", code: "invalid_state" },
+          { status: 409 }
+        );
+      }
+      if (heartbeat.code === "instance_mismatch") {
+        return NextResponse.json(
+          { error: "instance_id does not match job lease", code: "instance_mismatch" },
+          { status: 403 }
+        );
+      }
+      if (heartbeat.code === "lease_expired") {
+        return NextResponse.json({ error: "Lease expired", code: "lease_expired" }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
+    }
+
+    return NextResponse.json(heartbeatResponseBody(heartbeat.result));
   } catch (err) {
     return internalServerErrorResponse(err, "POST /api/agent/heartbeat");
   }

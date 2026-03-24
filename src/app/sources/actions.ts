@@ -3,22 +3,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getDb, saveDb } from "@/lib/db/client";
 import {
   ADMIN_SESSION_COOKIE,
   getAdminTokenFromEnv,
   hashAdminSessionCookie,
   verifyAdminSessionCookie,
 } from "@/lib/api/admin-auth";
-import {
-  cancelCollectionJob,
-  createAgentRegistration,
-  getSourceById,
-  insertCollectionJob,
-  insertSource,
-  updateSource,
-  type SourceType,
-} from "@/lib/db/source-job-repository";
+import type { SourceType } from "@/lib/db/source-job-repository";
+import { getStorage } from "@/lib/storage";
 
 async function assertAdminSession(): Promise<void> {
   const jar = await cookies();
@@ -67,14 +59,15 @@ export async function createSourceAction(formData: FormData): Promise<void> {
     redirect("/sources/new?error=type");
   }
 
-  const db = await getDb();
+  const storage = await getStorage();
   try {
-    const row = insertSource(db, {
-      display_name,
-      target_identifier,
-      source_type: source_type as SourceType,
-    });
-    saveDb();
+    const row = await storage.withTransaction((tx) =>
+      tx.sources.create({
+        display_name,
+        target_identifier,
+        source_type: source_type as SourceType,
+      })
+    );
     revalidatePath("/sources");
     redirect(`/sources/${row.id}`);
   } catch (e) {
@@ -91,8 +84,8 @@ export async function createCollectionJobAction(formData: FormData): Promise<voi
   const sourceId = String(formData.get("source_id") ?? "");
   if (!sourceId) redirect("/sources");
 
-  const db = await getDb();
-  const source = getSourceById(db, sourceId);
+  const storage = await getStorage();
+  const source = await storage.sources.getById(sourceId);
   if (!source) redirect("/sources");
 
   const request_reason = String(formData.get("request_reason") ?? "").trim() || null;
@@ -101,11 +94,12 @@ export async function createCollectionJobAction(formData: FormData): Promise<voi
     typeof idemRaw === "string" && idemRaw.trim() ? idemRaw.trim() : null;
 
   try {
-    const { row } = insertCollectionJob(db, source, {
-      request_reason,
-      idempotency_key,
-    });
-    saveDb();
+    const { row } = await storage.withTransaction((tx) =>
+      tx.jobs.queueForSource(sourceId, {
+        request_reason,
+        idempotency_key,
+      })
+    );
     revalidatePath(`/sources/${sourceId}`);
     redirect(`/sources/${sourceId}?job=${row.id}`);
   } catch (e) {
@@ -123,10 +117,9 @@ export async function cancelCollectionJobAction(formData: FormData): Promise<voi
   const sourceId = String(formData.get("source_id") ?? "");
   if (!jobId || !sourceId) redirect("/sources");
 
-  const db = await getDb();
+  const storage = await getStorage();
   try {
-    cancelCollectionJob(db, jobId);
-    saveDb();
+    await storage.withTransaction((tx) => tx.jobs.cancel(jobId));
     revalidatePath(`/sources/${sourceId}`);
   } catch (e) {
     const code = (e as Error & { code?: string }).code;
@@ -143,8 +136,8 @@ export async function updateSourceAction(formData: FormData): Promise<void> {
   const sourceId = String(formData.get("source_id") ?? "");
   if (!sourceId) redirect("/sources");
 
-  const db = await getDb();
-  const source = getSourceById(db, sourceId);
+  const storage = await getStorage();
+  const source = await storage.sources.getById(sourceId);
   if (!source) redirect("/sources");
 
   const display_name = formData.get("display_name");
@@ -162,8 +155,7 @@ export async function updateSourceAction(formData: FormData): Promise<void> {
   }
 
   if (Object.keys(patch).length > 0) {
-    updateSource(db, sourceId, patch);
-    saveDb();
+    await storage.withTransaction((tx) => tx.sources.update(sourceId, patch));
   }
   revalidatePath(`/sources/${sourceId}`);
   revalidatePath("/sources");
@@ -178,14 +170,14 @@ export async function registerAgentForSource(formData: FormData): Promise<Regist
   const sourceId = String(formData.get("source_id") ?? "");
   if (!sourceId) return { ok: false, error: "missing_source" };
 
-  const db = await getDb();
+  const storage = await getStorage();
   try {
-    const { row, plainToken, token_prefix } = createAgentRegistration(
-      db,
-      sourceId,
-      String(formData.get("display_name") ?? "").trim() || null
+    const { row, plainToken, token_prefix } = await storage.withTransaction((tx) =>
+      tx.agents.createRegistration(
+        sourceId,
+        String(formData.get("display_name") ?? "").trim() || null
+      )
     );
-    saveDb();
     revalidatePath(`/sources/${sourceId}`);
     return { ok: true, token: plainToken, token_prefix, agent_id: row.id };
   } catch (e) {

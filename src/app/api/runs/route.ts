@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import { insertArtifact, insertRun, listRuns } from "@/lib/db/repository";
 import { analyzeArtifact } from "@/lib/analyzer/index";
 import { detectArtifactType } from "@/lib/adapter/registry";
 import {
@@ -8,6 +6,7 @@ import {
   ingestionRecordFromFormData,
 } from "@/lib/ingestion/meta";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,31 +52,23 @@ export async function POST(request: NextRequest) {
     const ingestion = parsedMeta.meta;
 
     const resolvedType = artifactType ?? detectArtifactType(content);
-    const db = await getDb();
-
-    const artifact = insertArtifact(db, {
-      artifact_type: resolvedType,
-      source_type: sourceType,
-      filename,
-      content,
-    });
-
     const result = await analyzeArtifact(content, { artifactType: resolvedType });
-    const run = insertRun(db, artifact.id, result, {
-      filename,
-      source_type: sourceType,
-      target_identifier: ingestion.target_identifier,
-      source_label: ingestion.source_label,
-      collector_type: ingestion.collector_type,
-      collector_version: ingestion.collector_version,
-      collected_at: ingestion.collected_at,
-    });
-    saveDb();
+    const storage = await getStorage();
+    const persisted = await storage.withTransaction((tx) =>
+      tx.runs.persistAnalyzedRun({
+        artifactType: resolvedType,
+        sourceType,
+        filename,
+        content,
+        ingestion,
+        analysis: result,
+      })
+    );
 
     return NextResponse.json({
-      run_id: run.id,
-      artifact_id: artifact.id,
-      status: run.status,
+      run_id: persisted.run_id,
+      artifact_id: persisted.artifact_id,
+      status: persisted.status,
       report: result.report,
     });
   } catch (err) {
@@ -87,8 +78,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const db = await getDb();
-    const runs = listRuns(db);
+    const storage = await getStorage();
+    const runs = await storage.runs.listSummaries();
     return NextResponse.json({ runs });
   } catch (err) {
     return internalServerErrorResponse(err, "GET /api/runs");

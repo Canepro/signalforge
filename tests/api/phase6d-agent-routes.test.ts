@@ -18,6 +18,7 @@ import type { Database } from "sql.js";
 import type { AnalysisResult } from "@/lib/analyzer/schema";
 import * as analyzer from "@/lib/analyzer/index";
 import * as sourceJobRepo from "@/lib/db/source-job-repository";
+import { getArtifactById, getRun } from "@/lib/db/repository";
 
 const ADMIN = "admin-phase6d";
 const agentAuth = (t: string) => ({ authorization: `Bearer ${t}` });
@@ -536,6 +537,77 @@ describe("Phase 6d agent routes", () => {
     );
     expect(r1.status).toBe(403);
     expect((await r1.json()).code).toBe("instance_mismatch");
+  });
+
+  it("artifact upload cleans up the new run when job submission loses the race", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-art-conflict");
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const next = await GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) })
+    );
+    const jobId = (await next.json()).jobs[0].id as string;
+
+    await POST_CLAIM(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/claim`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "proc-clean", lease_ttl_seconds: 300 }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+    await POST_START(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/start`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "proc-clean" }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    const submitSpy = vi
+      .spyOn(sourceJobRepo, "markCollectionJobSubmittedForAgent")
+      .mockReturnValueOnce(null);
+
+    const form = new FormData();
+    form.append("instance_id", "proc-clean");
+    form.append("file", new Blob([SAMPLE_LOG], { type: "text/plain" }), "cleanup.log");
+    const art = await POST_ARTIFACT(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/artifact`, {
+        method: "POST",
+        headers: agentAuth(token),
+        body: form,
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    expect(art.status).toBe(409);
+    const body = await art.json();
+    expect(body.code).toBe("conflict");
+    expect(submitSpy).toHaveBeenCalledOnce();
+
+    const args = submitSpy.mock.calls[0];
+    const artifactId = args[5] as string;
+    const runId = args[6] as string;
+    expect(getRun(db, runId)).toBeNull();
+    expect(getArtifactById(db, artifactId)).toBeNull();
   });
 
   it("heartbeat with active_job_id requires instance_id and validates lease", async () => {

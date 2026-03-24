@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db/client";
-import { getSourceById, sourceToJson, updateSource } from "@/lib/db/source-job-repository";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function GET(
   request: NextRequest,
@@ -12,12 +11,12 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const db = await getDb();
-    const row = getSourceById(db, id);
+    const storage = await getStorage();
+    const row = await storage.sources.getById(id);
     if (!row) {
       return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
     }
-    return NextResponse.json(sourceToJson(row));
+    return NextResponse.json(row);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -50,13 +49,13 @@ export async function PATCH(
       }
     }
 
-    const db = await getDb();
-    const existing = getSourceById(db, id);
+    const storage = await getStorage();
+    const existing = await storage.sources.getById(id);
     if (!existing) {
       return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
     }
 
-    const patch: Parameters<typeof updateSource>[2] = {};
+    const patch: Record<string, unknown> = {};
     if (typeof body.display_name === "string") patch.display_name = body.display_name;
     if (typeof body.default_collector_type === "string")
       patch.default_collector_type = body.default_collector_type;
@@ -79,9 +78,8 @@ export async function PATCH(
     }
     if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
 
-    const row = updateSource(db, id, patch);
-    saveDb();
-    return NextResponse.json(sourceToJson(row!));
+    const row = await storage.withTransaction((tx) => tx.sources.update(id, patch));
+    return NextResponse.json(row!);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

@@ -26,6 +26,8 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 | 6d | Agent-facing HTTP: heartbeat, jobs/next, claim/start/fail/artifact; source-bound Bearer; domain events; tests | Done |
 | 6d-hardening | Strict `instance_id` on heartbeat (when `active_job_id` set), start, fail, artifact; strict jobs/next gating (heartbeat + non-empty caps + collect match); explicit `gate` / error codes | Done |
 | API errors / job honesty | Generic **500** JSON on touched routes; heartbeat **200** reports lease extension truth; submitted jobs store **`result_analysis_status`** (run `complete` \| `error`, …) | Done |
+| 7a | Storage abstraction extracted across runs, sources, jobs, and agents; routes/pages/actions use `src/lib/storage/*` instead of raw `getDb()` | Done |
+| 7b | Initial Postgres backend adapter, backend selection via `DATABASE_DRIVER`, checked-in SQL migrations, migration script with `schema_migrations` tracking | Done |
 | 6e-agent | `signalforge-agent` repo (Bun + TypeScript): heartbeat, poll, claim, run `first-audit.sh`, upload artifact, fail with explicit codes. Fatal lease-loss (abort + POST fail). Snapshot-based artifact selection (no stale logs). Validated E2E against live SignalForge. | Done |
 | Sources UI polish | Unified sidebar+topbar layout (matches dashboard), health indicators, job status badges, property grids, source settings (rename/enable/version), agent enrollment info, action feedback (loading/saved states), cancel confirmation, staggered animations, gradient accents | Done |
 
@@ -34,6 +36,7 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 - **Artifacts:** `linux-audit-log` only (`first-audit.sh`-style host audit output).
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
+- **Persistence:** `sqlite` remains the default local backend; `postgres` is now available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
 
 ## Known limitations
@@ -47,6 +50,7 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare/export hardening (small, targeted).
+- Next major architecture step: tighten backend parity. The storage abstraction and first Postgres adapter are in place, and a live E2E validation pass succeeded. Next work is parity tests and upgrade-path validation. Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).
 - Harden agent in real use: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, systemd unit file for `signalforge-agent run`.
 - Future notifications should attach to domain events now that the source/job/agent model is stable.

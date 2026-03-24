@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveDb } from "@/lib/db/client";
-import { claimCollectionJobForAgent, collectionJobToJson } from "@/lib/db/source-job-repository";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
+import { getStorage } from "@/lib/storage";
 
 export async function POST(
   request: NextRequest,
@@ -31,16 +30,16 @@ export async function POST(
   const lease_ttl_seconds =
     typeof ttlRaw === "number" && Number.isFinite(ttlRaw) ? ttlRaw : 300;
 
-  const result = claimCollectionJobForAgent(
-    ctx.db,
-    jobId,
-    ctx.source.id,
-    ctx.registration.id,
-    instance_id,
-    lease_ttl_seconds
+  const storage = await getStorage();
+  const result = await storage.withTransaction((tx) =>
+    tx.jobs.claimForAgent(
+      jobId,
+      ctx.source.id,
+      ctx.registration.id,
+      instance_id,
+      lease_ttl_seconds
+    )
   );
-
-  saveDb();
 
   if (result.ok === false) {
     if (result.code === "not_found") {
@@ -55,5 +54,5 @@ export async function POST(
     );
   }
 
-  return NextResponse.json(collectionJobToJson(result.row));
+  return NextResponse.json(result.row);
 }

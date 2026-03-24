@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
-import { buildCompareDriftPayload } from "@/lib/compare/build-compare";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { getStorage } from "@/lib/storage";
 
 /**
  * JSON drift/compare for programmatic use (same deterministic logic as the UI compare page).
@@ -15,9 +14,8 @@ export async function GET(
   try {
     const { id } = await params;
     const against = request.nextUrl.searchParams.get("against");
-    const db = await getDb();
-
-    const result = buildCompareDriftPayload(db, id, against);
+    const storage = await getStorage();
+    const result = await storage.runs.getComparePayload(id, against);
 
     if (!result.ok) {
       if (result.error === "against_equals_current") {

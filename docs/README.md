@@ -31,10 +31,12 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`getting-started.md`](./getting-started.md) | Beginner-friendly setup and first successful run |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
+| [`postgres-validation.md`](./postgres-validation.md) | Reproducible live validation notes for the Postgres backend |
 | [`schemas/README.md`](./schemas/README.md) | Lightweight JSON Schemas for the published API contract |
 | [`../AGENTS.md`](../AGENTS.md) | Repo-local instructions, architecture, and working rules for future agents |
 | [`../plans/roadmap.md`](../plans/roadmap.md) | Long-lived product roadmap and future direction |
 | [`../plans/current-plan.md`](../plans/current-plan.md) | Current shipped state and recommended next work |
+| [`../plans/phase-7-storage-abstraction.md`](../plans/phase-7-storage-abstraction.md) | Planned storage abstraction and multi-backend persistence direction |
 
 ## What SignalForge Covers Today
 
@@ -63,3 +65,12 @@ SignalForge is strongest today on:
 - broad multi-artifact support beyond the currently shipped path
 
 Those remain current limitations or future design topics in the repo plans.
+
+## Storage Note
+
+SignalForge now supports two persistence backends at the app boundary:
+
+- `sqlite` for local development and simple self-hosting
+- `postgres` for durable remote/serverless deployment
+
+Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` and run `bun run db:migrate:postgres` before starting the app.

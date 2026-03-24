@@ -1,24 +1,16 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import type { Database } from "sql.js";
-import { getDb } from "@/lib/db/client";
-import {
-  getAgentRegistrationByTokenHash,
-  getSourceById,
-  hashAgentToken,
-  reapExpiredCollectionJobLeases,
-  type AgentRegistrationRow,
-  type SourceRow,
-} from "@/lib/db/source-job-repository";
+import { hashAgentToken } from "@/lib/db/source-job-repository";
+import { getStorage } from "@/lib/storage";
+import type { AgentRegistrationView, SourceView } from "@/lib/storage/contract";
 
 export type AgentRequestContext = {
-  db: Database;
-  registration: AgentRegistrationRow;
-  source: SourceRow;
+  registration: AgentRegistrationView;
+  source: SourceView;
 };
 
 /**
- * Bearer agent enrollment token → registration + source. Runs lease reaper (caller should `saveDb`).
+ * Bearer agent enrollment token → registration + source.
  */
 export async function resolveAgentRequest(
   request: NextRequest
@@ -38,24 +30,17 @@ export async function resolveAgentRequest(
     };
   }
 
-  const db = await getDb();
-  reapExpiredCollectionJobLeases(db);
-
-  const reg = getAgentRegistrationByTokenHash(db, hashAgentToken(token));
-  if (!reg) {
+  const storage = await getStorage();
+  const resolved = await storage.withTransaction(async (tx) => {
+    await tx.jobs.reapExpiredLeases();
+    return tx.agents.resolveRequestContextByTokenHash(hashAgentToken(token));
+  });
+  if (!resolved) {
     return {
       ok: false,
       response: NextResponse.json({ error: "Unauthorized", code: "unauthorized" }, { status: 401 }),
     };
   }
 
-  const source = getSourceById(db, reg.source_id);
-  if (!source) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Unauthorized", code: "unauthorized" }, { status: 401 }),
-    };
-  }
-
-  return { ok: true, db, registration: reg, source };
+  return { ok: true, registration: resolved.registration, source: resolved.source };
 }

@@ -248,16 +248,43 @@ If `LLM_PROVIDER=azure` and required variables for the chosen style are missing,
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DATABASE_PATH` | No | `./signalforge.db` | SQLite file path for API persistence |
+| `DATABASE_DRIVER` | No | `sqlite` | Storage backend selector: `sqlite` or `postgres` |
+| `DATABASE_PATH` | If `DATABASE_DRIVER=sqlite` | `./signalforge.db` | SQLite file path for local/self-hosted persistence |
+| `DATABASE_URL` | If `DATABASE_DRIVER=postgres` | — | Postgres connection string for durable remote persistence |
 | `SIGNALFORGE_ADMIN_TOKEN` | **Yes** for Phase 6 operator APIs + `/sources` UI | — | Bootstrap secret: `Authorization: Bearer …` on `/api/sources`, `/api/collection-jobs/*`, `/api/agent/registrations`. If unset, those routes return **503**. The dashboard **Sources** area (`/sources`) signs in via `/sources/login` (httpOnly cookie); the token is not embedded in the client bundle. |
 
 Copy `.env.example` to `.env.local` for Next, or export vars in your shell for direct analyzer and helper usage.
+
+### Storage backends
+
+Local development defaults to SQLite:
+
+```env
+DATABASE_DRIVER=sqlite
+DATABASE_PATH=./signalforge.db
+```
+
+For durable serverless or multi-instance deployment, use Postgres:
+
+```env
+DATABASE_DRIVER=postgres
+DATABASE_URL=postgres://user:password@host:5432/signalforge
+```
+
+Before starting the app on Postgres, apply the checked-in SQL migrations:
+
+```bash
+bun run db:migrate:postgres
+```
+
+SQLite remains the easiest local quickstart path. Postgres is the recommended production backend.
 
 ## More Documentation
 
 - beginner setup and usage: [`docs/getting-started.md`](docs/getting-started.md)
 - docs index: [`docs/README.md`](docs/README.md)
 - HTTP routes and response shapes: [`docs/api-contract.md`](docs/api-contract.md)
+- Postgres validation runbook: [`docs/postgres-validation.md`](docs/postgres-validation.md)
 - external collector and CI submission: [`docs/external-submit.md`](docs/external-submit.md)
 - JSON schemas: [`docs/schemas/README.md`](docs/schemas/README.md)
 - roadmap: [`plans/roadmap.md`](plans/roadmap.md)

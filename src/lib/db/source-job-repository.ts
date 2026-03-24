@@ -17,6 +17,7 @@ export interface SourceRow {
   id: string;
   display_name: string;
   target_identifier: string;
+  target_identifier_norm?: string | null;
   source_type: string;
   expected_artifact_type: string;
   default_collector_type: string;
@@ -140,15 +141,16 @@ export function insertSource(db: Database, input: CreateSourceInput): SourceRow 
 
   db.run(
     `INSERT INTO sources (
-      id, display_name, target_identifier, source_type, expected_artifact_type,
+      id, display_name, target_identifier, target_identifier_norm, source_type, expected_artifact_type,
       default_collector_type, default_collector_version,
       capabilities_json, attributes_json, labels_json, enabled,
       last_seen_at, health_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
     [
       id,
       input.display_name.trim(),
       storedTarget,
+      targetNorm,
       input.source_type,
       expected,
       input.default_collector_type ?? "signalforge-collectors",
@@ -713,7 +715,8 @@ export function claimCollectionJobForAgent(
   if (
     !claimed ||
     claimed.status !== "claimed" ||
-    claimed.lease_owner_id !== agentRegistrationId
+    claimed.lease_owner_id !== agentRegistrationId ||
+    claimed.lease_owner_instance_id !== instanceId
   ) {
     return { ok: false, code: "not_queued" };
   }

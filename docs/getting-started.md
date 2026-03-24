@@ -56,7 +56,21 @@ cp .env.example .env.local
 Minimum local setup:
 
 ```env
+DATABASE_DRIVER=sqlite
 DATABASE_PATH=./signalforge.db
+```
+
+For durable deployment or serverless environments, use Postgres instead:
+
+```env
+DATABASE_DRIVER=postgres
+DATABASE_URL=postgres://user:password@host:5432/signalforge
+```
+
+Then apply migrations before starting the app:
+
+```bash
+bun run db:migrate:postgres
 ```
 
 **Sources / “Collect Fresh Evidence” (Phase 6c):** to use **`/sources`** in the UI or the operator HTTP APIs (`/api/sources`, collection jobs, agent enrollment), set a bootstrap secret:
@@ -75,6 +89,7 @@ Optional OpenAI direct setup:
 LLM_PROVIDER=openai
 OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=gpt-5-mini
+DATABASE_DRIVER=sqlite
 DATABASE_PATH=./signalforge.db
 ```
 
@@ -88,6 +103,7 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com
 AZURE_OPENAI_API_KEY=your_key_here
 AZURE_OPENAI_API_VERSION=2025-04-01-preview
 AZURE_OPENAI_DEPLOYMENT=gpt-5.4-mini
+DATABASE_DRIVER=sqlite
 DATABASE_PATH=./signalforge.db
 ```
 
@@ -98,6 +114,7 @@ LLM_PROVIDER=azure
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/openai/v1/
 AZURE_OPENAI_API_KEY=your_key_here
 AZURE_OPENAI_DEPLOYMENT=gpt-5.4-mini
+DATABASE_DRIVER=sqlite
 DATABASE_PATH=./signalforge.db
 ```
 
@@ -243,6 +260,12 @@ Production build:
 
 ```bash
 bun run build
+```
+
+Postgres migrations:
+
+```bash
+bun run db:migrate:postgres
 ```
 
 Direct analyzer run without the web app:

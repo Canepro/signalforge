@@ -1,7 +1,6 @@
-import { getDb } from "@/lib/db/client";
-import { listRuns, deriveSeverityCounts } from "@/lib/db/repository";
 import { DashboardClient } from "./dashboard-client";
 import type { RunSummary } from "@/types/api";
+import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -68,35 +67,15 @@ function computeStats(runs: RunSummary[]): DashboardStats {
   };
 }
 
-async function computeNoiseCount(
-  db: Awaited<ReturnType<typeof getDb>>
-): Promise<number> {
-  const stmt = db.prepare("SELECT noise_json FROM runs WHERE noise_json IS NOT NULL");
-  let total = 0;
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as { noise_json: string | null };
-    if (row.noise_json) {
-      try {
-        const items = JSON.parse(row.noise_json);
-        if (Array.isArray(items)) total += items.length;
-      } catch {
-        /* skip */
-      }
-    }
-  }
-  stmt.free();
-  return total;
-}
-
 export default async function DashboardPage() {
-  const db = await getDb();
+  const storage = await getStorage();
   const nowMs = Date.now();
-  const runs = listRuns(db).map((run) => ({
+  const runs = (await storage.runs.listSummaries()).map((run) => ({
     ...run,
     created_at_label: formatRelativeTime(run.created_at, nowMs),
   }));
   const stats = computeStats(runs);
-  stats.suppressedNoise = await computeNoiseCount(db);
+  stats.suppressedNoise = await storage.runs.countSuppressedNoise();
 
   return (
     <DashboardClient
