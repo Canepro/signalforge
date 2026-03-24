@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.local/schemas/post-reanalyze-response.schema.json",
+  "title": "POST /api/runs/[id]/reanalyze success",
+  "type": "object",
+  "required": ["run_id", "artifact_id", "parent_run_id", "status"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "artifact_id": { "type": "string" },
+    "parent_run_id": { "type": "string" },
+    "status": { "type": "string" }
+  },
+  "additionalProperties": false
+}

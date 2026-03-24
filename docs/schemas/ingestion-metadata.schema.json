@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.local/schemas/ingestion-metadata.schema.json",
+  "title": "Phase 5a ingestion metadata (optional on POST /api/runs)",
+  "description": "All fields optional. Omitted or empty strings store as null. Limits match src/lib/ingestion/meta.ts",
+  "type": "object",
+  "properties": {
+    "target_identifier": { "type": "string", "maxLength": 512 },
+    "source_label": { "type": "string", "maxLength": 512 },
+    "collector_type": { "type": "string", "maxLength": 256 },
+    "collector_version": { "type": "string", "maxLength": 128 },
+    "collected_at": {
+      "type": "string",
+      "description": "ISO 8601 date-time; normalized server-side"
+    }
+  },
+  "additionalProperties": true
+}

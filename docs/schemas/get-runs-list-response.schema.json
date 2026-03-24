@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.local/schemas/get-runs-list-response.schema.json",
+  "title": "GET /api/runs success",
+  "type": "object",
+  "required": ["runs"],
+  "properties": {
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "description": "RunSummary — see src/types/api.ts"
+      }
+    }
+  },
+  "additionalProperties": false
+}

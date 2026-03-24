@@ -1,15 +1,15 @@
 # Test Fixtures
 
-Audit log files copied from [server-audit-kit](https://github.com/Canepro/server-audit-kit) for use as mandatory test assets.
+Audit log files copied from [signalforge-collectors](https://github.com/Canepro/signalforge-collectors) for use as mandatory test assets.
 
 ## Provenance
 
 | Fixture file | Source | Lines | Description |
 |---|---|---|---|
-| `sample-prod-server.log` | `server-audit-kit/examples/sample_audit.log` | 141 | Fabricated production Ubuntu 22.04 server. UFW enabled, nginx running. No ANSI codes. |
-| `wsl-nov2025-full.log` | `server-audit-kit/server_audit_20251102_232137.log` | 1532 | Full WSL2 audit, kernel 5.15.153.1-microsoft-standard-WSL2, Nov 2025. No ANSI codes. |
-| `wsl-nov2025-truncated.log` | `server-audit-kit/server_audit_20251102_231019.log` | 52 | Truncated WSL2 audit — stops after NETWORK CONFIGURATION. Incomplete. |
-| `wsl-mar2026-full.log` | `server-audit-kit/server_audit_20260320_193559.log` | 1654 | Full WSL2 audit, kernel 6.6.87.2-microsoft-standard-WSL2, Mar 2026. **Contains ANSI color codes.** |
+| `sample-prod-server.log` | `signalforge-collectors/examples/sample_audit.log` | 141 | Fabricated production Ubuntu 22.04 server. UFW enabled, nginx running. No ANSI codes. |
+| `wsl-nov2025-full.log` | `signalforge-collectors/server_audit_20251102_232137.log` | 1532 | Full WSL2 audit, kernel 5.15.153.1-microsoft-standard-WSL2, Nov 2025. No ANSI codes. |
+| `wsl-nov2025-truncated.log` | `signalforge-collectors/server_audit_20251102_231019.log` | 52 | Truncated WSL2 audit — stops after NETWORK CONFIGURATION. Incomplete. |
+| `wsl-mar2026-full.log` | `signalforge-collectors/server_audit_20260320_193559.log` | 1654 | Full WSL2 audit, kernel 6.6.87.2-microsoft-standard-WSL2, Mar 2026. **Contains ANSI color codes.** |
 
 ## Parser contract
 

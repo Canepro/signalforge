@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.local/schemas/error-response.schema.json",
+  "title": "API error body",
+  "type": "object",
+  "required": ["error"],
+  "properties": {
+    "error": { "type": "string" }
+  },
+  "additionalProperties": false
+}

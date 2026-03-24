@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.local/schemas/compare-drift-response.schema.json",
+  "title": "GET /api/runs/[id]/compare success",
+  "description": "CompareDriftPayload — deterministic drift; see src/lib/compare/build-compare.ts and findings-diff.ts",
+  "type": "object",
+  "required": [
+    "current",
+    "baseline",
+    "baseline_missing",
+    "target_mismatch",
+    "baseline_selection",
+    "against_requested",
+    "drift"
+  ],
+  "properties": {
+    "current": { "$ref": "#/$defs/compareRunSnapshot" },
+    "baseline": { "anyOf": [{ "$ref": "#/$defs/compareRunSnapshot" }, { "type": "null" }] },
+    "baseline_missing": { "type": "boolean" },
+    "target_mismatch": { "type": "boolean" },
+    "baseline_selection": {
+      "type": "string",
+      "enum": ["implicit_same_target", "explicit", "none"]
+    },
+    "against_requested": { "type": ["string", "null"] },
+    "drift": {
+      "type": "object",
+      "required": ["summary", "rows"],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "required": ["new", "resolved", "severity_up", "severity_down", "unchanged"],
+          "properties": {
+            "new": { "type": "integer" },
+            "resolved": { "type": "integer" },
+            "severity_up": { "type": "integer" },
+            "severity_down": { "type": "integer" },
+            "unchanged": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "match_key",
+              "status",
+              "title",
+              "category",
+              "section_source",
+              "previous_severity",
+              "current_severity",
+              "evidence_previous",
+              "evidence_current"
+            ],
+            "properties": {
+              "match_key": { "type": "string" },
+              "status": {
+                "type": "string",
+                "enum": ["new", "resolved", "severity_up", "severity_down"],
+                "description": "Rows exclude unchanged findings"
+              },
+              "title": { "type": "string" },
+              "category": { "type": "string" },
+              "section_source": { "type": "string" },
+              "previous_severity": {
+                "anyOf": [
+                  { "type": "null" },
+                  { "type": "string", "enum": ["critical", "high", "medium", "low"] }
+                ]
+              },
+              "current_severity": {
+                "anyOf": [
+                  { "type": "null" },
+                  { "type": "string", "enum": ["critical", "high", "medium", "low"] }
+                ]
+              },
+              "evidence_previous": { "type": ["string", "null"] },
+              "evidence_current": { "type": ["string", "null"] }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "compareRunSnapshot": {
+      "type": "object",
+      "required": [
+        "id",
+        "run_id",
+        "filename",
+        "created_at",
+        "target_identifier",
+        "environment_hostname",
+        "target_display_label"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "run_id": {
+          "type": "string",
+          "description": "Same UUID as id; aligns with run_id on POST /api/runs and POST reanalyze responses."
+        },
+        "filename": { "type": "string" },
+        "created_at": { "type": "string" },
+        "target_identifier": { "type": ["string", "null"] },
+        "environment_hostname": { "type": ["string", "null"] },
+        "target_display_label": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

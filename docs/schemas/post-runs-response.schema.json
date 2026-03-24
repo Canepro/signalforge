@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.local/schemas/post-runs-response.schema.json",
+  "title": "POST /api/runs success",
+  "type": "object",
+  "required": ["run_id", "artifact_id", "status", "report"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "artifact_id": { "type": "string" },
+    "status": { "type": "string" },
+    "report": {
+      "type": ["object", "null"],
+      "description": "AuditReport JSON; full shape defined in src/lib/analyzer/schema.ts"
+    }
+  },
+  "additionalProperties": false
+}
