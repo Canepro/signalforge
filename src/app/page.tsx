@@ -1,6 +1,7 @@
 import { DashboardClient } from "./dashboard-client";
 import type { RunSummary } from "@/types/api";
 import { getStorage } from "@/lib/storage";
+import type { DashboardCollectionSource } from "@/components/request-collection-modal";
 
 export const dynamic = "force-dynamic";
 
@@ -76,10 +77,26 @@ export default async function DashboardPage() {
   }));
   const stats = computeStats(runs);
   stats.suppressedNoise = await storage.runs.countSuppressedNoise();
+  const sources = await storage.sources.list({ enabled: true });
+  const collectionSources = (
+    await Promise.all(
+      sources.map(async (source) => {
+        const registration = await storage.agents.getRegistrationBySourceId(source.id);
+        if (!registration || source.health_status !== "online") return null;
+        return {
+          id: source.id,
+          display_name: source.display_name,
+          target_identifier: source.target_identifier,
+          last_seen_at: source.last_seen_at,
+        } satisfies DashboardCollectionSource;
+      })
+    )
+  ).filter((source): source is DashboardCollectionSource => source !== null);
 
   return (
     <DashboardClient
       runs={runs}
+      collectionSources={collectionSources}
       totalRuns={stats.totalRuns}
       criticalFindings={stats.criticalFindings}
       environmentsAnalyzed={stats.environmentsAnalyzed}

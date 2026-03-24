@@ -20,6 +20,12 @@ async function assertAdminSession(): Promise<void> {
   }
 }
 
+async function hasAdminSession(): Promise<boolean> {
+  const jar = await cookies();
+  const v = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  return verifyAdminSessionCookie(v);
+}
+
 export async function loginAdminAction(formData: FormData): Promise<void> {
   const env = getAdminTokenFromEnv();
   if (!env) {
@@ -129,6 +135,54 @@ export async function cancelCollectionJobAction(formData: FormData): Promise<voi
     throw e;
   }
   redirect(`/sources/${sourceId}`);
+}
+
+export type DashboardRequestCollectionState =
+  | { ok: false; error: "admin_required" | "missing_source" | "not_found" | "disabled" | "not_ready" }
+  | { ok: true; job_id: string; source_id: string; source_name: string };
+
+export async function requestCollectionFromDashboardAction(
+  formData: FormData
+): Promise<DashboardRequestCollectionState> {
+  if (!(await hasAdminSession())) {
+    return { ok: false, error: "admin_required" };
+  }
+
+  const sourceId = String(formData.get("source_id") ?? "");
+  if (!sourceId) return { ok: false, error: "missing_source" };
+
+  const storage = await getStorage();
+  const source = await storage.sources.getById(sourceId);
+  if (!source) return { ok: false, error: "not_found" };
+  if (!source.enabled) return { ok: false, error: "disabled" };
+  if (source.health_status !== "online") return { ok: false, error: "not_ready" };
+
+  const registration = await storage.agents.getRegistrationBySourceId(sourceId);
+  if (!registration) return { ok: false, error: "not_ready" };
+
+  const request_reason = String(formData.get("request_reason") ?? "").trim() || null;
+  try {
+    const { row } = await storage.withTransaction((tx) =>
+      tx.jobs.queueForSource(sourceId, {
+        request_reason,
+      })
+    );
+    revalidatePath("/");
+    revalidatePath("/sources");
+    revalidatePath(`/sources/${sourceId}`);
+    return {
+      ok: true,
+      job_id: row.id,
+      source_id: sourceId,
+      source_name: source.display_name,
+    };
+  } catch (e) {
+    const code = (e as Error & { code?: string }).code;
+    if (code === "source_disabled") {
+      return { ok: false, error: "disabled" };
+    }
+    throw e;
+  }
 }
 
 export async function updateSourceAction(formData: FormData): Promise<void> {
