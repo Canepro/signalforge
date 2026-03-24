@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { KpiCard } from "@/components/kpi-card";
@@ -12,6 +12,7 @@ import {
   RequestCollectionModal,
   type DashboardCollectionSource,
 } from "@/components/request-collection-modal";
+import { requestCollectionFromDashboardAction } from "@/app/sources/actions";
 import type { RunSummary } from "@/types/api";
 
 interface DashboardClientProps {
@@ -45,12 +46,77 @@ export function DashboardClient({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [isQuickRequestPending, startQuickRequestTransition] = useTransition();
+  const [quickRequestFeedback, setQuickRequestFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const hasLiveCollectionSource = collectionSources.length > 0;
+  const canQuickRequest = collectionSources.length === 1;
+  const quickSource = canQuickRequest ? collectionSources[0]! : null;
 
   const totalFindings = Object.values(severityDistribution).reduce(
     (a, b) => a + b,
     0
   );
+
+  useEffect(() => {
+    if (!quickRequestFeedback || quickRequestFeedback.tone !== "success") return;
+    const timer = window.setTimeout(() => setQuickRequestFeedback(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [quickRequestFeedback]);
+
+  function Spinner({ className = "h-4 w-4" }: { className?: string }) {
+    return (
+      <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" className="stroke-current/20" strokeWidth="3" />
+        <path
+          d="M21 12a9 9 0 00-9-9"
+          className="stroke-current"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  function handlePrimaryCollectionAction() {
+    if (!hasLiveCollectionSource) {
+      setCollectOpen(true);
+      return;
+    }
+
+    if (!canQuickRequest || !quickSource) {
+      setRequestOpen(true);
+      return;
+    }
+
+    setQuickRequestFeedback(null);
+    startQuickRequestTransition(() => {
+      const formData = new FormData();
+      formData.set("source_id", quickSource.id);
+      formData.set("request_reason", "");
+      void requestCollectionFromDashboardAction(formData).then((result) => {
+        if (result.ok) {
+          setQuickRequestFeedback({
+            tone: "success",
+            message: `Queued for ${result.source_name}.`,
+          });
+          return;
+        }
+
+        setQuickRequestFeedback({
+          tone: "error",
+          message:
+            result.error === "admin_required" ? "Admin sign-in required to queue jobs."
+            : result.error === "not_ready" ? "Source is no longer live."
+            : result.error === "disabled" ? "Source is disabled."
+            : result.error === "not_found" ? "Source no longer exists."
+            : "Choose a source before requesting collection.",
+        });
+      });
+    });
+  }
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -80,31 +146,51 @@ export function DashboardClient({
                 Active infrastructure monitoring and forensic analysis
               </p>
             </div>
-            {hasLiveCollectionSource ? (
+            <div className="flex flex-col items-start gap-2 md:items-end">
               <button
                 type="button"
-                onClick={() => setRequestOpen(true)}
-                className="flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-b from-primary to-primary-dim px-4 py-2 text-sm font-semibold text-on-primary shadow-md transition-opacity hover:opacity-90"
-                title="Queue a collection job for a live source"
+                onClick={handlePrimaryCollectionAction}
+                disabled={isQuickRequestPending}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-b from-primary to-primary-dim px-4 py-2 text-sm font-semibold text-on-primary shadow-md transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                title={
+                  !hasLiveCollectionSource ? "Set up external collection for SignalForge"
+                  : canQuickRequest ? "Queue a collection job for the live source"
+                  : "Choose a live source and queue a collection job"
+                }
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-                Request collection
+                {isQuickRequestPending ? (
+                  <Spinner />
+                ) : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                )}
+                {!hasLiveCollectionSource ? "Set up collection"
+                : canQuickRequest ? (isQuickRequestPending ? "Requesting…" : "Request collection")
+                : "Request collection"}
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCollectOpen(true)}
-                className="flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-b from-primary to-primary-dim px-4 py-2 text-sm font-semibold text-on-primary shadow-md transition-opacity hover:opacity-90"
-                title="Set up external collection for SignalForge"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-                Set up collection
-              </button>
-            )}
+              {hasLiveCollectionSource ? (
+                <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                  {canQuickRequest ?
+                    `${quickSource!.display_name} is live and ready for one-click collection.`
+                  : `${collectionSources.length} live sources are ready. Choose one from the request panel.`}
+                </p>
+              ) : (
+                <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                  No live sources yet. Complete setup once, then this becomes an operational action.
+                </p>
+              )}
+              {quickRequestFeedback ? (
+                <p
+                  className={`text-[11px] font-medium ${
+                    quickRequestFeedback.tone === "success" ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-amber-800 dark:text-amber-200"
+                  }`}
+                >
+                  {quickRequestFeedback.message}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           {/* KPI Row */}

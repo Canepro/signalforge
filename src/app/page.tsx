@@ -91,7 +91,13 @@ export default async function DashboardPage() {
         } satisfies DashboardCollectionSource;
       })
     )
-  ).filter((source): source is DashboardCollectionSource => source !== null);
+  )
+    .filter((source): source is DashboardCollectionSource => source !== null)
+    .sort((a, b) => {
+      const aMs = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+      const bMs = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+      return bMs - aMs || a.display_name.localeCompare(b.display_name);
+    });
 
   return (
     <DashboardClient
