@@ -82,6 +82,32 @@ function containerArtifact(fields: Record<string, string>): string {
   ].join("\n");
 }
 
+function kubernetesBundleArtifact(input: {
+  clusterName: string;
+  scopeLevel: "cluster" | "namespace";
+  namespace?: string;
+  documents?: Array<{
+    path: string;
+    kind: string;
+    media_type: string;
+    content: string;
+  }>;
+}): string {
+  return JSON.stringify(
+    {
+      schema_version: "kubernetes-bundle.v1",
+      cluster: { name: input.clusterName, provider: "aks" },
+      scope: {
+        level: input.scopeLevel,
+        namespace: input.scopeLevel === "namespace" ? (input.namespace ?? null) : null,
+      },
+      documents: input.documents ?? [],
+    },
+    null,
+    2
+  );
+}
+
 describe("API GET /api/runs/[id]/compare", () => {
   let db: Database;
 
@@ -534,5 +560,64 @@ describe("API GET /api/runs/[id]/compare", () => {
     expect(body.baseline.run_id).toBe(older.id);
     expect(body.baseline_selection).toBe("explicit");
     expect(body.target_mismatch).toBe(true);
+  });
+
+  it("matches implicit baseline by Kubernetes cluster scope before hostname-only fallback", async () => {
+    const artifactA = insertArtifact(db, {
+      artifact_type: "kubernetes-bundle",
+      source_type: "api",
+      filename: "payments-old.json",
+      content: kubernetesBundleArtifact({
+        clusterName: "aks-prod-eu-1",
+        scopeLevel: "namespace",
+        namespace: "payments",
+      }),
+    });
+    const artifactB = insertArtifact(db, {
+      artifact_type: "kubernetes-bundle",
+      source_type: "api",
+      filename: "checkout.json",
+      content: kubernetesBundleArtifact({
+        clusterName: "aks-prod-eu-1",
+        scopeLevel: "namespace",
+        namespace: "checkout",
+      }),
+    });
+    const artifactC = insertArtifact(db, {
+      artifact_type: "kubernetes-bundle",
+      source_type: "api",
+      filename: "payments-new.json",
+      content: kubernetesBundleArtifact({
+        clusterName: "aks-prod-eu-1",
+        scopeLevel: "namespace",
+        namespace: "payments",
+      }),
+    });
+    const finding = mkFinding("f1", "Stable Kubernetes finding", "medium");
+    const olderPayments = insertRun(db, artifactA.id, mkResult(mkReport("aks-prod-eu-1", [finding])), {
+      filename: "payments-old.json",
+      source_type: "api",
+    });
+    const newerCheckout = insertRun(db, artifactB.id, mkResult(mkReport("aks-prod-eu-1", [finding])), {
+      filename: "checkout.json",
+      source_type: "api",
+    });
+    const currentPayments = insertRun(db, artifactC.id, mkResult(mkReport("aks-prod-eu-1", [finding])), {
+      filename: "payments-new.json",
+      source_type: "api",
+    });
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-01T01:00:00.000Z", olderPayments.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-02T01:00:00.000Z", newerCheckout.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-03T01:00:00.000Z", currentPayments.id]);
+
+    const res = await GET_COMPARE(
+      new NextRequest(`http://localhost/api/runs/${currentPayments.id}/compare`),
+      { params: Promise.resolve({ id: currentPayments.id }) }
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.baseline.id).toBe(olderPayments.id);
+    expect(body.baseline.id).not.toBe(newerCheckout.id);
+    expect(body.current.target_display_label).toBe("aks-prod-eu-1 / namespace payments");
   });
 });

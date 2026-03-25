@@ -1,0 +1,30 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": false,
+    "ran_as_root": false,
+    "os_contains": "Kubernetes"
+  },
+  "must_be_noise": [],
+  "must_not_be_findings": [],
+  "must_be_findings": [
+    {
+      "title_contains": "Service exposed externally",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "Cluster-admin binding",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "CrashLoopBackOff",
+      "severity": "medium",
+      "category": "kubernetes"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 3,
+  "max_findings": 3
+}

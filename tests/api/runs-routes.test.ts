@@ -234,13 +234,13 @@ Linux meta 5.0 x86_64
       body: JSON.stringify({
         content: "=== x ===\n",
         filename: "bad.log",
-        artifact_type: "kubernetes-bundle",
+        artifact_type: "windows-evidence-pack",
       }),
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: 'Unsupported artifact_type: "kubernetes-bundle"',
+      error: 'Unsupported artifact_type: "windows-evidence-pack"',
       code: "unsupported_artifact_type",
     });
   });
@@ -298,6 +298,70 @@ ran_as_root: true
     );
     expect(
       report.findings.some((f: { title: string }) => f.title.includes("privilege escalation"))
+    ).toBe(true);
+  });
+
+  it("POST JSON accepts kubernetes-bundle and persists a Kubernetes run", async () => {
+    const req = new NextRequest("http://localhost/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        artifact_type: "kubernetes-bundle",
+        filename: "k8s-bundle.json",
+        source_type: "api",
+        target_identifier: "cluster:aks-prod-eu-1:namespace:payments",
+        content: JSON.stringify({
+          schema_version: "kubernetes-bundle.v1",
+          cluster: { name: "aks-prod-eu-1", provider: "aks" },
+          scope: { level: "namespace", namespace: "payments" },
+          documents: [
+            {
+              path: "services/public-services.json",
+              kind: "service-exposure",
+              media_type: "application/json",
+              content: JSON.stringify([
+                { namespace: "payments", name: "payments-public", type: "LoadBalancer" },
+              ]),
+            },
+            {
+              path: "rbac/bindings.json",
+              kind: "rbac-bindings",
+              media_type: "application/json",
+              content: JSON.stringify([
+                {
+                  scope: "cluster",
+                  subject: "system:serviceaccount:payments:default",
+                  roleRef: "cluster-admin",
+                },
+              ]),
+            },
+          ],
+        }),
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const detailRes = await GET_RUN(new NextRequest("http://localhost/api/runs/x"), {
+      params: Promise.resolve({ id: body.run_id }),
+    });
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(detail.artifact_type).toBe("kubernetes-bundle");
+    expect(detail.target_identifier).toBe("cluster:aks-prod-eu-1:namespace:payments");
+
+    const reportRes = await GET_REPORT(new NextRequest("http://localhost/api/runs/x/report"), {
+      params: Promise.resolve({ id: body.run_id }),
+    });
+    const report = await reportRes.json();
+    expect(report.environment_context.os).toContain("Kubernetes");
+    expect(
+      report.findings.some((f: { title: string }) => f.title.includes("Service exposed externally"))
+    ).toBe(true);
+    expect(
+      report.findings.some((f: { title: string }) => f.title.includes("Cluster-admin binding"))
     ).toBe(true);
   });
 

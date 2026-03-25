@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { ContainerDiagnosticsAdapter } from "@/lib/adapter/container-diagnostics/index";
+import { KubernetesBundleAdapter } from "@/lib/adapter/kubernetes-bundle/index";
 import { LinuxAuditLogAdapter } from "@/lib/adapter/linux-audit-log/index";
 import { AnalysisResultSchema, AuditReportSchema } from "@/lib/analyzer/schema";
 
@@ -52,6 +53,11 @@ const FIXTURE_FILES = [
     log: "container-payments-prod.txt",
     golden: "container-payments-prod.expected.json",
     adapter: new ContainerDiagnosticsAdapter(),
+  },
+  {
+    log: "kubernetes-payments-bundle.json",
+    golden: "kubernetes-payments-bundle.expected.json",
+    adapter: new KubernetesBundleAdapter(),
   },
 ];
 
@@ -359,6 +365,48 @@ ran_as_root: true
       ).toBe(true);
       expect(
         result.report!.summary.some((line) => line.toLowerCase().includes("container"))
+      ).toBe(true);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
+    }
+  });
+
+  it("fallback wording is Kubernetes-aware for kubernetes-bundle", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const envSnap = { ...process.env };
+
+    try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.LLM_PROVIDER;
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_ENDPOINT;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const raw = readFileSync(join(FIXTURES, "kubernetes-payments-bundle.json"), "utf-8");
+      const result = await analyzeArtifact(raw, {
+        apiKey: undefined,
+        artifactType: "kubernetes-bundle",
+      });
+
+      expect(result.meta.llm_succeeded).toBe(false);
+      expect(result.report).not.toBeNull();
+      expect(result.environment.os).toContain("Kubernetes");
+      expect(
+        result.report!.summary.some((line) => line.toLowerCase().includes("kubernetes"))
+      ).toBe(true);
+      expect(
+        result.report!.top_actions_now.some((action) =>
+          action.toLowerCase().includes("cluster-admin")
+        )
+      ).toBe(true);
+      expect(
+        result.report!.top_actions_now.some((action) =>
+          action.toLowerCase().includes("loadbalancer")
+        )
       ).toBe(true);
     } finally {
       for (const k of Object.keys(process.env)) {

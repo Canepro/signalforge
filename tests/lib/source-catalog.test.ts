@@ -23,6 +23,9 @@ describe("source-catalog", () => {
     expect(defaultCapabilitiesForArtifactType("container-diagnostics")).toEqual([
       "collect:container-diagnostics",
     ]);
+    expect(defaultCapabilitiesForArtifactType("kubernetes-bundle")).toEqual([
+      "collect:kubernetes-bundle",
+    ]);
   });
 
   it("provides stable labels for the current source and artifact families", () => {
@@ -30,5 +33,6 @@ describe("source-catalog", () => {
     expect(getSourceTypeLabel("wsl")).toBe("WSL");
     expect(getArtifactTypeLabel("linux-audit-log")).toBe("Linux audit log");
     expect(getArtifactTypeLabel("container-diagnostics")).toBe("Container diagnostics");
+    expect(getArtifactTypeLabel("kubernetes-bundle")).toBe("Kubernetes bundle");
   });
 });

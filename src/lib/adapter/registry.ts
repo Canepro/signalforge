@@ -1,5 +1,6 @@
 import type { ArtifactAdapter } from "./types";
 import { ContainerDiagnosticsAdapter } from "./container-diagnostics/index";
+import { KubernetesBundleAdapter } from "./kubernetes-bundle/index";
 import { LinuxAuditLogAdapter } from "./linux-audit-log/index";
 import {
   DEFAULT_EXPECTED_ARTIFACT_TYPE,
@@ -11,6 +12,7 @@ import {
 const adapters: Record<ArtifactType, ArtifactAdapter> = {
   "linux-audit-log": new LinuxAuditLogAdapter(),
   "container-diagnostics": new ContainerDiagnosticsAdapter(),
+  "kubernetes-bundle": new KubernetesBundleAdapter(),
 };
 
 export class UnsupportedArtifactTypeError extends Error {
@@ -42,6 +44,14 @@ export function getAdapter(artifactType: string): ArtifactAdapter {
 }
 
 export function detectArtifactType(content: string): ArtifactType {
+  try {
+    const parsed = JSON.parse(content) as { schema_version?: string };
+    if (parsed.schema_version === "kubernetes-bundle.v1") {
+      return "kubernetes-bundle";
+    }
+  } catch {
+    // Fall through to text-family detection.
+  }
   if (
     /^===\s*container-diagnostics\s*===/im.test(content) ||
     (/^container_name:/im.test(content) && /^runtime:/im.test(content))

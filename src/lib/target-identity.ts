@@ -2,6 +2,7 @@ import {
   containerValueFor,
   parseContainerSections,
 } from "@/lib/adapter/container-diagnostics/parse";
+import { parseKubernetesBundle } from "@/lib/adapter/kubernetes-bundle/parse";
 
 /**
  * Preferred target identity for compare/baseline (Phase 5b).
@@ -66,6 +67,39 @@ function containerDisplayLabel(params: PreferredTargetParams): string | null {
   return containerName;
 }
 
+function kubernetesScopeKey(params: PreferredTargetParams): string | null {
+  if (params.artifact_type !== "kubernetes-bundle" || !params.artifact_content) {
+    return null;
+  }
+
+  const manifest = parseKubernetesBundle(params.artifact_content);
+  const cluster = normalizeTargetPart(manifest?.cluster.name);
+  if (!cluster) return null;
+
+  if (manifest?.scope.level === "namespace") {
+    const namespace = normalizeTargetPart(manifest.scope.namespace);
+    if (namespace) return `k8s:${cluster}:namespace:${namespace}`;
+  }
+
+  return `k8s:${cluster}:cluster`;
+}
+
+function kubernetesDisplayLabel(params: PreferredTargetParams): string | null {
+  if (params.artifact_type !== "kubernetes-bundle" || !params.artifact_content) {
+    return null;
+  }
+
+  const manifest = parseKubernetesBundle(params.artifact_content);
+  const cluster = manifest?.cluster.name?.trim();
+  if (!cluster) return null;
+
+  if (manifest?.scope.level === "namespace" && manifest.scope.namespace?.trim()) {
+    return `${cluster} / namespace ${manifest.scope.namespace.trim()}`;
+  }
+
+  return `${cluster} / cluster`;
+}
+
 /**
  * Stable key for "same target" comparisons. Uses `id:` / `host:` prefixes so a
  * target id never collides with a hostname string.
@@ -75,6 +109,8 @@ export function preferredTargetMatchKey(params: PreferredTargetParams): string |
   if (tid !== null) return `id:${tid}`;
   const workload = containerWorkloadKey(params);
   if (workload !== null) return workload;
+  const kubernetes = kubernetesScopeKey(params);
+  if (kubernetes !== null) return kubernetes;
   const host = params.environment_hostname?.trim();
   if (host) return `host:${host.toLowerCase()}`;
   return null;
@@ -86,6 +122,8 @@ export function preferredTargetDisplayLabel(params: PreferredTargetParams): stri
   if (raw) return raw;
   const container = containerDisplayLabel(params);
   if (container) return container;
+  const kubernetes = kubernetesDisplayLabel(params);
+  if (kubernetes) return kubernetes;
   return params.environment_hostname;
 }
 

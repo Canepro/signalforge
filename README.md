@@ -218,6 +218,7 @@ Current shipped artifact families:
 
 - `linux-audit-log`
 - `container-diagnostics`
+- `kubernetes-bundle`
 
 Current strengths:
 
@@ -230,7 +231,7 @@ Current strengths:
 
 Current limitations:
 
-- one artifact family only
+- Kubernetes support is still a first slice built around the `kubernetes-bundle.v1` JSON manifest, not raw support-bundle archive ingestion
 - recommendations are bounded by captured evidence
 - findings quality will continue to improve as more real logs are reviewed
 

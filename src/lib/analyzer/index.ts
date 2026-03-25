@@ -204,6 +204,7 @@ function severityWeight(severity: Finding["severity"]): number {
 const CATEGORY_TIE_BREAK: Record<string, number> = {
   disk: 6,
   auth: 5,
+  kubernetes: 5,
   packages: 4,
   ssh: 3,
   network: 2,
@@ -280,6 +281,18 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("not pinned")) {
       return `${finding.title}, which makes rollbacks and provenance harder to control over time.`;
+    }
+  }
+  if (finding.category === "kubernetes") {
+    const title = finding.title.toLowerCase();
+    if (title.includes("service exposed externally")) {
+      return `${finding.title}, which may expose the workload beyond the intended cluster or namespace boundary.`;
+    }
+    if (title.includes("cluster-admin binding")) {
+      return `${finding.title}, which grants broad control over cluster resources and should be tightly limited.`;
+    }
+    if (title.includes("crashloopbackoff")) {
+      return `${finding.title}, indicating the workload is failing to stay healthy and may be degraded for operators or callers.`;
     }
   }
   return `${finding.title}.`;
@@ -404,6 +417,19 @@ function buildActionForFinding(
     }
     if (tl.includes("not pinned")) {
       return "Pin the image to an immutable version or digest so deploys and rollback behavior stay predictable.";
+    }
+  }
+
+  if (finding.category === "kubernetes") {
+    const tl = finding.title.toLowerCase();
+    if (tl.includes("service exposed externally")) {
+      return "Review whether the LoadBalancer service truly needs public reachability, and switch it to ClusterIP or an internal load balancer if broad exposure is not required.";
+    }
+    if (tl.includes("cluster-admin binding")) {
+      return "Remove the cluster-admin binding or replace it with the narrowest RBAC role that still meets the workload or operator need.";
+    }
+    if (tl.includes("crashloopbackoff")) {
+      return "Inspect pod events and workload logs for the crashing deployment, fix the startup or configuration failure, and confirm the workload stabilizes.";
     }
   }
 

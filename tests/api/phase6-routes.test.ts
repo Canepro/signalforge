@@ -98,13 +98,13 @@ describe("Phase 6 API routes", () => {
           display_name: "Bad",
           target_identifier: "bad-artifact-type",
           source_type: "linux_host",
-          expected_artifact_type: "kubernetes-bundle",
+          expected_artifact_type: "windows-evidence-pack",
         }),
       })
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: 'Unsupported expected_artifact_type: "kubernetes-bundle"',
+      error: 'Unsupported expected_artifact_type: "windows-evidence-pack"',
       code: "unsupported_artifact_type",
     });
   });

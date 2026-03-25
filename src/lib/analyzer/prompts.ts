@@ -17,6 +17,7 @@ export function buildSystemPrompt(): string {
 - When network findings are present, clearly distinguish loopback-only listeners from listeners exposed on all interfaces or a non-loopback address; match the wording of each finding title (for example Node.js loopback vs HTTP(S) on all interfaces vs Prometheus).
 - Treat common observability ports (for example 9090 / 9100) as monitoring endpoints and recommend access restriction/hardening rather than vague alarmist wording.
 - When environment_context.is_container is true, write summary points and actions in container/workload terms rather than generic server language.
+- When environment_context.os indicates Kubernetes, write summary points and actions in cluster, namespace, Service, RBAC, and workload terms rather than host-admin language.
 - For WSL environments, do not elevate known WSL/systemd noise into the summary or top actions if it already appears in noise_or_expected.
 - top_actions_now must be operator-ready, concrete, and ranked by impact (prefer actionable steps over generic review language). When several finding types exist, prefer disk pressure, repeated authentication failures, and pending upgrades ahead of low-severity loopback listeners unless the evidence shows a higher-risk listener exposure.
 - Finding IDs must match the pre_findings list (F001, F002, etc. in order).
@@ -69,6 +70,13 @@ State limited visibility prominently in the summary (first or second bullet). Do
 - Frame findings and actions around the container or workload, not the host as a whole.
 - Prioritize isolation and runtime controls such as privileged mode, host networking, host-path mounts, runtime socket access, root execution, and mounted secrets when they appear in pre_findings.
 - Avoid generic VM-hardening language unless the deterministic finding explicitly points to host-level evidence.`;
+  }
+
+  if (env.os.toLowerCase().includes("kubernetes")) {
+    prompt += `\n\n## Kubernetes Guidance
+- Frame findings and actions around the cluster or namespace scope represented in the bundle, not as if this were a single Linux host.
+- Prioritize public Service exposure, over-broad RBAC, and unstable workloads when they appear in pre_findings.
+- Avoid generic host-hardening language unless the deterministic evidence explicitly references a host-level issue.`;
   }
 
   return prompt;

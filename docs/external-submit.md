@@ -36,8 +36,10 @@ This document describes the current `POST /api/runs` submission contract.
 | **Multipart** | `file` (uploaded file). Optionally `artifact_type`, `source_type`. |
 
 If `artifact_type` is omitted, the server infers a type from content.
-Today, the shipped artifact families are `linux-audit-log` and `container-diagnostics`.
+Today, the shipped artifact families are `linux-audit-log`, `container-diagnostics`, and `kubernetes-bundle`.
 If the supplied or inferred `artifact_type` is unsupported, the route returns **400** with `code: "unsupported_artifact_type"`.
+
+For `kubernetes-bundle`, `content` should be a UTF-8 JSON manifest with `schema_version: "kubernetes-bundle.v1"` and a `documents` array of named text documents. Raw archives are not accepted in this v1 contract.
 
 ## Optional Ingestion Metadata
 
@@ -117,7 +119,6 @@ The **`signalforge-collectors`** repository includes a narrow **reference push p
 
 That same pattern can later be reused for:
 
-- Kubernetes bundles
 - container diagnostics
 - Windows evidence packs
 - macOS evidence packs

@@ -294,6 +294,32 @@ function containerArtifact(fields: Record<string, string>): string {
   ].join("\n");
 }
 
+function kubernetesBundleArtifact(input: {
+  clusterName: string;
+  scopeLevel: "cluster" | "namespace";
+  namespace?: string;
+  documents?: Array<{
+    path: string;
+    kind: string;
+    media_type: string;
+    content: string;
+  }>;
+}): string {
+  return JSON.stringify(
+    {
+      schema_version: "kubernetes-bundle.v1",
+      cluster: { name: input.clusterName, provider: "aks" },
+      scope: {
+        level: input.scopeLevel,
+        namespace: input.scopeLevel === "namespace" ? (input.namespace ?? null) : null,
+      },
+      documents: input.documents ?? [],
+    },
+    null,
+    2
+  );
+}
+
 for (const backend of backends) {
   describe(`storage parity [${backend.name}]`, () => {
     let storage: Storage;
@@ -598,6 +624,77 @@ for (const backend of backends) {
       expect(result.payload.baseline?.id).not.toBe(newerSearch.run_id);
     });
 
+    it("compare prefers matching Kubernetes scope over hostname-only fallback", async () => {
+      const olderPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "payments-old.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "payments",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const newerCheckout = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "checkout.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "checkout",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const currentPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "payments-new.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "payments",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(currentPayments.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(olderPayments.run_id);
+      expect(result.payload.baseline?.id).not.toBe(newerCheckout.run_id);
+      expect(result.payload.current.target_display_label).toBe("aks-prod-eu-1 / namespace payments");
+    });
+
     // --- SOURCES ---
 
     it("create and list sources", async () => {
@@ -635,7 +732,7 @@ for (const backend of backends) {
             display_name: "Unsupported",
             target_identifier: "unsupported-artifact-source",
             source_type: "linux_host",
-            expected_artifact_type: "kubernetes-bundle",
+            expected_artifact_type: "windows-evidence-pack",
           })
         )
       ).rejects.toThrow();

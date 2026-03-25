@@ -1,0 +1,31 @@
+{
+  "schema_version": "kubernetes-bundle.v1",
+  "cluster": {
+    "name": "aks-prod-eu-1",
+    "provider": "aks"
+  },
+  "scope": {
+    "level": "namespace",
+    "namespace": "payments"
+  },
+  "documents": [
+    {
+      "path": "services/public-services.json",
+      "kind": "service-exposure",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"payments\",\"name\":\"payments-public\",\"type\":\"LoadBalancer\"},{\"namespace\":\"payments\",\"name\":\"payments-internal\",\"type\":\"ClusterIP\"}]"
+    },
+    {
+      "path": "rbac/bindings.json",
+      "kind": "rbac-bindings",
+      "media_type": "application/json",
+      "content": "[{\"scope\":\"cluster\",\"subject\":\"system:serviceaccount:payments:default\",\"roleRef\":\"cluster-admin\"}]"
+    },
+    {
+      "path": "workloads/status.json",
+      "kind": "workload-status",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api\",\"status\":\"CrashLoopBackOff\",\"restarts\":12}]"
+    }
+  ]
+}

@@ -24,6 +24,11 @@ export const ARTIFACT_TYPE_OPTIONS = [
     label: "Container diagnostics",
     description: "Structured text diagnostics for a single container or containerized workload.",
   },
+  {
+    value: "kubernetes-bundle",
+    label: "Kubernetes bundle",
+    description: "UTF-8 JSON manifest carrying named Kubernetes evidence documents.",
+  },
 ] as const;
 
 export type ArtifactType = (typeof ARTIFACT_TYPE_OPTIONS)[number]["value"];
