@@ -56,8 +56,26 @@ type KubernetesSecurityContext = {
   } | null;
 };
 
+type KubernetesEnvVar = {
+  name?: string;
+  valueFrom?: {
+    secretKeyRef?: {
+      name?: string;
+      key?: string;
+    } | null;
+  } | null;
+};
+
+type KubernetesEnvFromSource = {
+  secretRef?: {
+    name?: string;
+  } | null;
+};
+
 type KubernetesContainerSpec = {
   name?: string;
+  env?: KubernetesEnvVar[];
+  envFrom?: KubernetesEnvFromSource[];
   securityContext?: KubernetesSecurityContext;
   readinessProbe?: unknown;
   livenessProbe?: unknown;
@@ -69,6 +87,7 @@ type KubernetesContainerSpec = {
 
 type KubernetesPodSpec = {
   automountServiceAccountToken?: boolean;
+  serviceAccountName?: string;
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
 };
@@ -109,6 +128,14 @@ function hasResourceEntries(resources: Record<string, string> | undefined): bool
 
 function normalizedList(values: string[] | undefined): string[] {
   return (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
+}
+
+function secretEnvRefCount(container: KubernetesContainerSpec): number {
+  return (container.env ?? []).filter((item) => item.valueFrom?.secretKeyRef != null).length;
+}
+
+function secretEnvFromRefCount(container: KubernetesContainerSpec): number {
+  return (container.envFrom ?? []).filter((item) => item.secretRef != null).length;
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -307,6 +334,7 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         for (const workload of workloads) {
           const label = workloadLabel(workload.namespace, workload.name);
           const podSecurityContext = workload.pod_spec?.securityContext;
+          const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
 
           if (workload.pod_spec?.automountServiceAccountToken !== false) {
             findings.push({
@@ -319,6 +347,23 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             });
           }
 
+          if (
+            workload.pod_spec?.automountServiceAccountToken !== false &&
+            serviceAccountName === "default"
+          ) {
+            findings.push({
+              title: `Kubernetes workload uses the default service account with token automount: ${label}`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(workload),
+              rule_id: "kubernetes.workload_default_service_account_automount",
+            });
+          }
+
+          let workloadSecretEnvRefCount = 0;
+          let workloadSecretEnvFromRefCount = 0;
+
           for (const container of workload.pod_spec?.containers ?? []) {
             const securityContext = container.securityContext ?? {};
             const combinedSeccompType =
@@ -327,6 +372,8 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
               securityContext.runAsNonRoot ?? podSecurityContext?.runAsNonRoot;
             const readOnlyRootFilesystem =
               securityContext.readOnlyRootFilesystem ?? podSecurityContext?.readOnlyRootFilesystem;
+            workloadSecretEnvRefCount += secretEnvRefCount(container);
+            workloadSecretEnvFromRefCount += secretEnvFromRefCount(container);
 
             if (securityContext.privileged) {
               findings.push({
@@ -406,6 +453,34 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 rule_id: "kubernetes.workload_resources",
               });
             }
+          }
+
+          if (workloadSecretEnvRefCount > 0) {
+            findings.push({
+              title: `Kubernetes workload injects Secret values into environment variables: ${label} (${workloadSecretEnvRefCount} refs)`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                secret_env_reference_count: workloadSecretEnvRefCount,
+              }),
+              rule_id: "kubernetes.workload_secret_env_refs",
+            });
+          }
+
+          if (workloadSecretEnvFromRefCount > 0) {
+            findings.push({
+              title: `Kubernetes workload bulk-imports Secret data into environment variables: ${label} (${workloadSecretEnvFromRefCount} refs)`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                secret_env_from_reference_count: workloadSecretEnvFromRefCount,
+              }),
+              rule_id: "kubernetes.workload_secret_env_from_refs",
+            });
           }
         }
       }

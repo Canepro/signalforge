@@ -528,15 +528,18 @@ describe("API GET /api/runs/[id]/compare", () => {
                 name: "payments-api",
                 kind: "Deployment",
                 pod_spec: {
+                  serviceAccountName: "payments-api",
                   securityContext: {
                         runAsNonRoot: true,
                         readOnlyRootFilesystem: true,
                         seccompProfile: { type: "RuntimeDefault" },
                       },
                       automountServiceAccountToken: false,
-                      containers: [
+                  containers: [
                     {
                       name: "api",
+                      env: [],
+                      envFrom: [],
                       securityContext: {
                         allowPrivilegeEscalation: false,
                         readOnlyRootFilesystem: true,
@@ -669,10 +672,30 @@ describe("API GET /api/runs/[id]/compare", () => {
                 name: "payments-api",
                 kind: "Deployment",
                 pod_spec: {
+                  serviceAccountName: "default",
                   automountServiceAccountToken: true,
                   containers: [
                     {
                       name: "api",
+                      env: [
+                        {
+                          name: "DATABASE_URL",
+                          valueFrom: {
+                            secretKeyRef: { name: "payments-api-secrets", key: "database_url" },
+                          },
+                        },
+                        {
+                          name: "PAYMENTS_API_KEY",
+                          valueFrom: {
+                            secretKeyRef: { name: "payments-api-secrets", key: "api_key" },
+                          },
+                        },
+                      ],
+                      envFrom: [
+                        {
+                          secretRef: { name: "payments-api-env" },
+                        },
+                      ],
                       securityContext: {
                         privileged: true,
                         allowPrivilegeEscalation: true,
@@ -782,6 +805,27 @@ describe("API GET /api/runs/[id]/compare", () => {
         }),
         expect.objectContaining({
           key: "writable_root_filesystem_workload_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "default_service_account_automount_workload_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "secret_env_reference_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "secret_env_from_reference_count",
           family: "kubernetes-bundle",
           previous: 0,
           current: 1,

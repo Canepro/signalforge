@@ -83,7 +83,24 @@ type KubernetesSecurityContext = {
   } | null;
 };
 
+type KubernetesEnvVar = {
+  valueFrom?: {
+    secretKeyRef?: {
+      name?: string;
+      key?: string;
+    } | null;
+  } | null;
+};
+
+type KubernetesEnvFromSource = {
+  secretRef?: {
+    name?: string;
+  } | null;
+};
+
 type KubernetesContainerSpec = {
+  env?: KubernetesEnvVar[];
+  envFrom?: KubernetesEnvFromSource[];
   securityContext?: KubernetesSecurityContext;
   readinessProbe?: unknown;
   livenessProbe?: unknown;
@@ -95,6 +112,7 @@ type KubernetesContainerSpec = {
 
 type KubernetesPodSpec = {
   automountServiceAccountToken?: boolean;
+  serviceAccountName?: string;
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
 };
@@ -115,6 +133,9 @@ type KubernetesEvidenceSummary = {
   workload_hardening_gap_count: number;
   service_account_token_automount_count: number;
   writable_root_filesystem_workload_count: number;
+  default_service_account_automount_workload_count: number;
+  secret_env_reference_count: number;
+  secret_env_from_reference_count: number;
 };
 
 function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
@@ -288,6 +309,14 @@ function normalizedList(values: string[] | undefined): string[] {
   return (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
 }
 
+function secretEnvRefCount(container: KubernetesContainerSpec): number {
+  return (container.env ?? []).filter((item) => item.valueFrom?.secretKeyRef != null).length;
+}
+
+function secretEnvFromRefCount(container: KubernetesContainerSpec): number {
+  return (container.envFrom ?? []).filter((item) => item.secretRef != null).length;
+}
+
 function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
   let gaps = 0;
   const podSecurityContext = workload.pod_spec?.securityContext;
@@ -332,6 +361,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       workload_hardening_gap_count: 0,
       service_account_token_automount_count: 0,
       writable_root_filesystem_workload_count: 0,
+      default_service_account_automount_workload_count: 0,
+      secret_env_reference_count: 0,
+      secret_env_from_reference_count: 0,
     };
   }
 
@@ -344,6 +376,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let workloadHardeningGapCount = 0;
   let serviceAccountTokenAutomountCount = 0;
   let writableRootFilesystemWorkloadCount = 0;
+  let defaultServiceAccountAutomountWorkloadCount = 0;
+  let secretEnvReferenceCount = 0;
+  let secretEnvFromReferenceCount = 0;
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
 
@@ -413,6 +448,13 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (workload.pod_spec?.automountServiceAccountToken !== false) {
           serviceAccountTokenAutomountCount += 1;
         }
+        const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
+        if (
+          workload.pod_spec?.automountServiceAccountToken !== false &&
+          serviceAccountName === "default"
+        ) {
+          defaultServiceAccountAutomountWorkloadCount += 1;
+        }
 
         const podSecurityContext = workload.pod_spec?.securityContext;
         const hasWritableRootFilesystem = (workload.pod_spec?.containers ?? []).some((container) => {
@@ -422,6 +464,14 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
           return readOnlyRootFilesystem !== true;
         });
         if (hasWritableRootFilesystem) writableRootFilesystemWorkloadCount += 1;
+        secretEnvReferenceCount += (workload.pod_spec?.containers ?? []).reduce(
+          (total, container) => total + secretEnvRefCount(container),
+          0
+        );
+        secretEnvFromReferenceCount += (workload.pod_spec?.containers ?? []).reduce(
+          (total, container) => total + secretEnvFromRefCount(container),
+          0
+        );
       }
     }
   }
@@ -445,6 +495,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     workload_hardening_gap_count: workloadHardeningGapCount,
     service_account_token_automount_count: serviceAccountTokenAutomountCount,
     writable_root_filesystem_workload_count: writableRootFilesystemWorkloadCount,
+    default_service_account_automount_workload_count: defaultServiceAccountAutomountWorkloadCount,
+    secret_env_reference_count: secretEnvReferenceCount,
+    secret_env_from_reference_count: secretEnvFromReferenceCount,
   };
 }
 
@@ -589,6 +642,27 @@ function buildFamilyMetrics(
         "Workloads with writable root filesystems",
         previous.writable_root_filesystem_workload_count,
         next.writable_root_filesystem_workload_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "default_service_account_automount_workload_count",
+        "Workloads using the default service account with token automount",
+        previous.default_service_account_automount_workload_count,
+        next.default_service_account_automount_workload_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "secret_env_reference_count",
+        "Secret-backed environment references",
+        previous.secret_env_reference_count,
+        next.secret_env_reference_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "secret_env_from_reference_count",
+        "Secret imports via envFrom",
+        previous.secret_env_from_reference_count,
+        next.secret_env_from_reference_count,
         "kubernetes-bundle"
       ),
     ];

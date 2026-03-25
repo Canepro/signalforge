@@ -25,7 +25,7 @@
       "path": "workloads/specs.json",
       "kind": "workload-specs",
       "media_type": "application/json",
-      "content": "[{\"namespace\":\"ingress-nginx\",\"name\":\"nginx-ingress-controller\",\"kind\":\"Deployment\",\"pod_spec\":{\"automountServiceAccountToken\":true,\"containers\":[{\"name\":\"controller\",\"securityContext\":{\"allowPrivilegeEscalation\":false,\"runAsNonRoot\":true,\"readOnlyRootFilesystem\":false,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":10254}},\"livenessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":10254}},\"resources\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"128Mi\"},\"limits\":{\"cpu\":\"500m\",\"memory\":\"256Mi\"}}}]}}]"
+      "content": "[{\"namespace\":\"ingress-nginx\",\"name\":\"nginx-ingress-controller\",\"kind\":\"Deployment\",\"pod_spec\":{\"serviceAccountName\":\"ingress-controller\",\"automountServiceAccountToken\":true,\"containers\":[{\"name\":\"controller\",\"securityContext\":{\"allowPrivilegeEscalation\":false,\"runAsNonRoot\":true,\"readOnlyRootFilesystem\":false,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":10254}},\"livenessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":10254}},\"resources\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"128Mi\"},\"limits\":{\"cpu\":\"500m\",\"memory\":\"256Mi\"}}}]}}]"
     },
     {
       "path": "workloads/status.json",

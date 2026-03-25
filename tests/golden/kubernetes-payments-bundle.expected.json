@@ -44,6 +44,21 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "uses the default service account with token automount",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "injects Secret values into environment variables",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "bulk-imports Secret data into environment variables",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "does not enforce runAsNonRoot",
       "severity": "medium",
       "category": "kubernetes"
@@ -85,6 +100,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 15,
-  "max_findings": 15
+  "min_findings": 18,
+  "max_findings": 18
 }

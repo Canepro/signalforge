@@ -31,7 +31,7 @@
       "path": "workloads/specs.json",
       "kind": "workload-specs",
       "media_type": "application/json",
-      "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api\",\"kind\":\"Deployment\",\"pod_spec\":{\"containers\":[{\"name\":\"api\",\"securityContext\":{\"privileged\":true,\"allowPrivilegeEscalation\":true,\"runAsNonRoot\":false,\"seccompProfile\":{\"type\":\"Unconfined\"}},\"readinessProbe\":null,\"livenessProbe\":null,\"resources\":{}}]}}]"
+      "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api\",\"kind\":\"Deployment\",\"pod_spec\":{\"serviceAccountName\":\"default\",\"automountServiceAccountToken\":true,\"containers\":[{\"name\":\"api\",\"env\":[{\"name\":\"DATABASE_URL\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"payments-api-secrets\",\"key\":\"database_url\"}}},{\"name\":\"PAYMENTS_API_KEY\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"payments-api-secrets\",\"key\":\"api_key\"}}}],\"envFrom\":[{\"secretRef\":{\"name\":\"payments-api-env\"}}],\"securityContext\":{\"privileged\":true,\"allowPrivilegeEscalation\":true,\"runAsNonRoot\":false,\"seccompProfile\":{\"type\":\"Unconfined\"}},\"readinessProbe\":null,\"livenessProbe\":null,\"resources\":{}}]}}]"
     },
     {
       "path": "network/network-policies.json",

@@ -51,9 +51,29 @@ const RAW = JSON.stringify(
             name: "payments-api",
             kind: "Deployment",
             pod_spec: {
+              serviceAccountName: "default",
+              automountServiceAccountToken: true,
               containers: [
                 {
                   name: "api",
+                  env: [
+                    {
+                      name: "DATABASE_URL",
+                      valueFrom: {
+                        secretKeyRef: {
+                          name: "payments-api-secrets",
+                          key: "database_url",
+                        },
+                      },
+                    },
+                  ],
+                  envFrom: [
+                    {
+                      secretRef: {
+                        name: "payments-api-env",
+                      },
+                    },
+                  ],
                   securityContext: {
                     privileged: true,
                     allowPrivilegeEscalation: true,
@@ -145,6 +165,15 @@ describe("KubernetesBundleAdapter", () => {
     ).toBe(true);
     expect(
       findings.some((finding) => finding.title.includes("automatically mounts service account tokens"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("uses the default service account with token automount"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("injects Secret values into environment variables"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("bulk-imports Secret data into environment variables"))
     ).toBe(true);
     expect(findings.some((finding) => finding.title.includes("does not enforce runAsNonRoot"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("uses a writable root filesystem"))).toBe(true);

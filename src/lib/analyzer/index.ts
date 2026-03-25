@@ -230,10 +230,10 @@ function kubernetesTitlePriority(title: string): number {
   if (normalized.includes("grants wildcard access")) return 7;
   if (normalized.includes("without networkpolicy isolation")) return 6;
   if (normalized.includes("service exposed externally")) return 5;
-  if (normalized.includes("automatically mounts service account tokens")) return 4;
-  if (normalized.includes("runs privileged")) return 3;
-  if (normalized.includes("allows privilege escalation")) return 2;
-  if (normalized.includes("writable root filesystem")) return 1;
+  if (normalized.includes("uses the default service account with token automount")) return 4;
+  if (normalized.includes("automatically mounts service account tokens")) return 3;
+  if (normalized.includes("bulk-imports secret data into environment variables")) return 2;
+  if (normalized.includes("injects secret values into environment variables")) return 1;
   return 0;
 }
 
@@ -334,6 +334,15 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("automatically mounts service account tokens")) {
       return `${finding.title}, which increases the chance that in-cluster credentials are exposed to pods that do not actually need them.`;
+    }
+    if (title.includes("uses the default service account with token automount")) {
+      return `${finding.title}, which increases the chance that broad namespace-default identity is available inside a pod without a workload-specific review.`;
+    }
+    if (title.includes("injects secret values into environment variables")) {
+      return `${finding.title}, which can make credential exposure easier through process env dumps, crash output, or debugging workflows.`;
+    }
+    if (title.includes("bulk-imports secret data into environment variables")) {
+      return `${finding.title}, which widens credential exposure because an entire Secret is loaded into the process environment instead of only the required keys.`;
     }
     if (title.includes("writable root filesystem")) {
       return `${finding.title}, which weakens immutable workload assumptions and makes tampering or persistence inside the pod easier.`;
@@ -513,6 +522,15 @@ function buildActionForFinding(
     }
     if (tl.includes("automatically mounts service account tokens")) {
       return "Set automountServiceAccountToken to false for workloads that do not need direct Kubernetes API access, and use a narrower identity path only where required.";
+    }
+    if (tl.includes("uses the default service account with token automount")) {
+      return "Move the workload off the default service account, grant only the RBAC it actually needs, and keep token automount disabled unless the pod must call the Kubernetes API directly.";
+    }
+    if (tl.includes("bulk-imports secret data into environment variables")) {
+      return "Replace broad envFrom Secret imports with narrowly scoped secretKeyRef entries or mounted files so only the required keys reach the workload.";
+    }
+    if (tl.includes("injects secret values into environment variables")) {
+      return "Review whether those secrets need to live in environment variables at all, and prefer narrower file-based mounts or workload identity where that reduces exposure.";
     }
     if (tl.includes("writable root filesystem")) {
       return "Set readOnlyRootFilesystem to true where possible, then move required writable state onto explicit volumes and confirm the workload still starts cleanly.";
