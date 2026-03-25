@@ -208,6 +208,8 @@ Possible scope:
 - still external to SignalForge
 - likely container or Kubernetes support-bundle submission pattern
 
+Phase 8 starts from the hardened single-family base and must first lock: artifact envelope compatibility, the deterministic `evidence_delta` compare model, target-identity scope, and source/registration assumptions.
+
 Important:
 
 - do not implement a generalized collector framework first
@@ -221,6 +223,7 @@ Possible scope:
 - define target/source labels vs stable identifiers
 - plan how collectors identify themselves
 - design without turning the app into an execution engine
+- Phase 9 should explicitly resolve the execution-scope model before multi-scope container/Kubernetes automation work. Phase 8 push-first work can proceed without this change.
 
 ### Phase 10: Fresh-Evidence Orchestration
 

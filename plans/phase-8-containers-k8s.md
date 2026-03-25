@@ -10,12 +10,14 @@ Durable decisions that apply across all phases:
 - **Artifact strategy**: add two narrow artifact families, not a generic collector framework:
   - `container-diagnostics`
   - `kubernetes-bundle`
+- **Artifact envelope guardrail**: Phase 8 must declare whether each family fits the current text-oriented ingestion path. If a family requires raw archive or binary upload support, that is a prerequisite ingestion/storage slice, not an adapter-only follow-on.
 - **Acquisition model**: ship both families as **push-first** submission patterns first. Do not block on job-driven collection or agent orchestration.
 - **Reuse path**: preserve the existing ingestion contract (`POST /api/runs` and job-bound artifact upload) and extend adapter selection by `artifact_type`.
-- **Compare model**: keep deterministic finding-key drift as the base layer, but add a second read model for “same findings, changed evidence/metadata” so compare remains useful when systems are stable.
+- **Compare model**: keep deterministic finding-key drift as the base layer, but add a second read model exposed as deterministic `evidence_delta` data so compare remains useful when systems are stable.
 - **Execution-plane shape**: prefer one SignalForge agent product over many unrelated agents, but let it ship in different deployment forms and advertise bounded capabilities based on environment and trust level.
+- **Source/registration guardrail**: do not deepen the current one-registration-per-source assumption while adding new artifact families. Phase 8 can stay push-first, but any later Sources or orchestration work must treat execution scope as a design gate.
 - **Identity**:
-  - containers should prefer explicit `target_identifier` values such as `container:<host>:<runtime>:<name-or-id>`
+  - containers should prefer explicit `target_identifier` values that reflect the intended compare scope, for example `container-workload:<host>:<runtime>:<service>` or `container-instance:<host>:<runtime>:<container-id>`
   - Kubernetes should prefer explicit `target_identifier` values such as `cluster:<cluster-name>` or `cluster:<cluster-name>:namespace:<scope>`
 - **Operator UX**: containers and Kubernetes must feel like first-class evidence types in upload, run detail, compare, and docs before any orchestration work is considered.
 - **Trust model**: collection and remediation are different trust classes. Remediation is deferred for now, but not forbidden as a future product direction.
@@ -34,16 +36,40 @@ That gives the fastest route to a demoable result without reopening the product 
 
 ---
 
+## Pre-Implementation Contract Gates
+
+These are not optional polish items. Lock them before implementation work spreads across adapters, compare, docs, and Sources:
+
+1. **Artifact envelope gate**
+   - `container-diagnostics` should fit the current text-oriented upload path in v1, either as plain text or a small structured artifact normalized to text or JSON before submission.
+   - `kubernetes-bundle` must explicitly choose between:
+     - a normalized text or JSON evidence export that still fits current ingestion, or
+     - a raw archive upload path, which would require a separate ingestion/storage contract change before the Kubernetes adapter begins.
+2. **Compare payload gate**
+   - Phase 0 should add a shared deterministic compare payload block named `evidence_delta` for stable evidence and metadata deltas.
+   - This should land in the compare read model and API contract, not as UI-only logic.
+3. **Identity gate**
+   - Containers must declare whether compare is anchored to a workload-style identity or an instance-style identity.
+   - Kubernetes must make scope explicit so cluster-wide and namespace-scoped evidence do not silently compare as if they were the same target.
+4. **Source/registration gate**
+   - The shipped Source model is still effectively one source, one expected artifact family, one registration.
+   - That is acceptable for push-first Phase 8 work, but any follow-on Sources or orchestration work must first decide whether new execution forms are separate sources, multiple registrations per source, or a more explicit registration-scope model.
+
+If these gates are skipped, early code will likely be correct locally but expensive to reshape once real submissions arrive.
+
+---
+
 ## Open Decisions To Lock Before Coding
 
 These should be settled quickly before writing implementation code:
 
-- **Container artifact shape**: one plain-text collector output vs a small structured bundle rendered to text for ingestion.
+- **Container artifact shape**: one plain-text collector output vs a small structured bundle normalized to text or JSON before ingestion.
 - **Kubernetes scope**: cluster-wide support bundle first vs namespace-scoped evidence first.
-- **Compare delta contract**: whether “same findings, changed evidence” is a sibling summary block or a new row status family.
+- **Kubernetes artifact envelope**: normalized text or JSON export first vs raw archive support as a prerequisite ingestion change.
+- **Compare delta contract**: whether `evidence_delta` is a sibling summary block or a new row status family, and what exact API payload carries it.
 - **Reference collectors**: whether the first container and Kubernetes push paths live only in `signalforge-collectors` or begin as documented external contracts with fixtures first.
 - **Target identity defaults**:
-  - containers: prefer container name + runtime + host, with container ID as supporting metadata
+  - containers: prefer a workload-stable identifier when the user story is workload compare, with container ID kept as supporting metadata
   - Kubernetes: prefer cluster identifier + optional namespace scope, not pod names
 - **Kubernetes capability scope**:
   - namespace-scoped collection for workload-local diagnostics
@@ -105,12 +131,108 @@ This keeps the door open for a broader execution-plane product later without mud
 
 Add a deterministic “stability and evidence delta” layer to compare so runs can show meaningful movement even when there are no new, resolved, or severity-shifted findings. This should work for the existing Linux evidence first, then carry forward to new artifact families.
 
+The implementation should add a shared compare payload block named `evidence_delta`, produced by shared compare code and exposed through the read API. Candidate fields include:
+
+- evidence or artifact changed vs identical
+- metadata differences such as `collected_at`, `collector_type`, `collector_version`, and `target_identifier`
+- stable aggregate changes that are deterministic and family-aware, such as package counts, listener counts, object counts, or section completeness markers
+- a summary string or count block the UI can render when finding drift is empty
+
+### Recommended `evidence_delta` contract
+
+Use a sibling payload block on compare responses rather than adding more `drift.rows` statuses. Recommendation:
+
+```ts
+type EvidenceDeltaStatus = "changed" | "unchanged" | "added" | "removed";
+
+interface EvidenceDeltaMetricRow {
+  key: string;
+  label: string;
+  family: "common" | "linux-audit-log" | "container-diagnostics" | "kubernetes-bundle";
+  status: EvidenceDeltaStatus;
+  previous: string | number | boolean | null;
+  current: string | number | boolean | null;
+  unit?: string | null;
+}
+
+interface EvidenceDeltaPayload {
+  changed: boolean;
+  summary: {
+    metadata_changed: number;
+    metric_changes: number;
+    artifact_changed: boolean;
+  };
+  metadata: {
+    filename: EvidenceDeltaStatus;
+    target_identifier: EvidenceDeltaStatus;
+    collected_at: EvidenceDeltaStatus;
+    collector_type: EvidenceDeltaStatus;
+    collector_version: EvidenceDeltaStatus;
+  };
+  metrics: EvidenceDeltaMetricRow[];
+}
+```
+
+Recommended compare response shape:
+
+```json
+{
+  "current": { "...": "existing fields" },
+  "baseline": { "...": "existing fields" },
+  "baseline_missing": false,
+  "target_mismatch": false,
+  "baseline_selection": "implicit_same_target",
+  "against_requested": null,
+  "drift": { "...": "existing finding drift payload" },
+  "evidence_delta": {
+    "changed": true,
+    "summary": {
+      "metadata_changed": 2,
+      "metric_changes": 1,
+      "artifact_changed": true
+    },
+    "metadata": {
+      "filename": "unchanged",
+      "target_identifier": "unchanged",
+      "collected_at": "changed",
+      "collector_type": "unchanged",
+      "collector_version": "changed"
+    },
+    "metrics": [
+      {
+        "key": "listener_count",
+        "label": "Listening ports",
+        "family": "linux-audit-log",
+        "status": "changed",
+        "previous": 14,
+        "current": 16,
+        "unit": null
+      }
+    ]
+  }
+}
+```
+
+Why this shape:
+
+- it preserves backward compatibility for existing `drift`
+- it avoids overloading finding drift with non-finding changes
+- it gives the UI a compact summary and a deterministic details list
+- it lets each artifact family add stable metrics without changing the top-level contract
+
+Guardrails:
+
+- `evidence_delta` should be present even when there is no finding drift
+- when `baseline_missing=true`, return `evidence_delta=null` rather than inventing synthetic changes
+- do not emit raw evidence excerpts here; this block is for stable metadata and aggregate deltas only
+
 ### Acceptance criteria
 
 - [ ] Compare distinguishes “no finding drift” from “no meaningful change at all”.
 - [ ] Compare exposes stable deltas such as evidence changes, package-count changes, listener count changes, metadata differences, or collection-time differences when findings remain matched.
 - [ ] The compare UI shows a useful empty-state alternative such as “same finding set; evidence changed in X places”.
 - [ ] Existing deterministic finding drift remains unchanged as the primary compatibility layer.
+- [ ] The compare API contract documents the new deterministic delta block so Linux, container, and Kubernetes runs use the same read model.
 
 ### Notes
 
@@ -128,6 +250,8 @@ This is not optional polish. If compare remains dead when findings are unchanged
 
 Introduce `container-diagnostics` as the second artifact family. Define a narrow reference collector pattern that gathers container runtime facts and container-focused security/configuration evidence, submits it through the existing ingestion API, and produces deterministic findings plus one LLM explanation pass.
 
+For the first slice, keep the artifact envelope compatible with the current ingestion path. That means plain text or a small structured payload normalized to text or JSON before upload, not raw runtime archives.
+
 ### Acceptance criteria
 
 - [ ] SignalForge accepts `artifact_type=container-diagnostics`.
@@ -135,6 +259,7 @@ Introduce `container-diagnostics` as the second artifact family. Define a narrow
 - [ ] At least one real fixture and one golden expected-output contract exist for a container artifact.
 - [ ] Upload, run detail, and compare work end-to-end for container runs.
 - [ ] Docs describe the reference submission pattern and required metadata for stable compare.
+- [ ] The docs make the intended compare identity explicit: container workload vs container instance.
 
 ### Tracer-bullet success condition
 
@@ -178,7 +303,12 @@ Container quality work should stay narrow at first:
 
 ### What to build
 
-Introduce `kubernetes-bundle` as a third artifact family. Start with support-bundle style evidence that is easy to export and upload, rather than live-cluster access from SignalForge. Focus the first slice on cluster/namespace configuration and health evidence that can be analyzed deterministically.
+Introduce `kubernetes-bundle` as a third artifact family. Start with support-bundle style evidence that is easy to export and upload, rather than live-cluster access from SignalForge. Focus the first slice on cluster or namespace configuration and health evidence that can be analyzed deterministically.
+
+Before implementation starts, explicitly choose the artifact envelope:
+
+- If v1 uses normalized text or JSON evidence, keep the current ingestion path and document the export shape.
+- If v1 requires raw archive uploads, create a prerequisite ingestion/storage phase and do not treat Kubernetes as only an adapter addition.
 
 ### Acceptance criteria
 
@@ -187,6 +317,7 @@ Introduce `kubernetes-bundle` as a third artifact family. Start with support-bun
 - [ ] At least one real fixture and one golden expected-output contract exist for Kubernetes evidence.
 - [ ] Upload, run detail, and compare work end-to-end for Kubernetes runs.
 - [ ] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
+- [ ] The implementation makes scope explicit so cluster-wide and namespace-scoped bundles do not compare accidentally.
 
 ### Tracer-bullet success condition
 
@@ -232,12 +363,19 @@ Kubernetes quality work should start with high-signal areas only:
 
 Extend Sources and collection setup so container and Kubernetes evidence types become visible product concepts without pretending that the current host agent can collect them automatically. Keep push-first flows as the default until there is a proven reason to add execution-plane support for either family.
 
+This phase must not silently assume that one logical source always maps to one registration or one execution scope. If Sources grow beyond the current host model, document whether different deployment forms or capability scopes are represented as:
+
+- separate sources
+- multiple registrations bound to one source
+- a new execution-scope model layered under one source identity
+
 ### Acceptance criteria
 
 - [ ] Source registration supports the new artifact families and collector labels.
 - [ ] “How to collect” guidance is artifact-aware for Linux, containers, and Kubernetes.
 - [ ] The UI clearly distinguishes push-first submission patterns from job-driven host collection.
 - [ ] No live-cluster or container-runtime remote execution is introduced into the web app.
+- [ ] The chosen model for execution scope is documented before any multi-scope agent behavior is implied in UI copy or API shape.
 
 ### Notes
 
@@ -270,4 +408,5 @@ Make an explicit product decision after real submissions: keep both families pus
 If orchestration is added later, choose capability scope based on diagnostic need:
 - container hosts may need local runtime visibility
 - Kubernetes may need cluster-scoped read access for meaningful diagnostics
+- do not assume the current one-registration-per-source shape is sufficient for Kubernetes or mixed-scope execution
 - future remediation should be a separate decision and trust tier, not bundled into the first orchestration step
