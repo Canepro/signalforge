@@ -53,10 +53,17 @@ const RAW = JSON.stringify(
             pod_spec: {
               serviceAccountName: "default",
               automountServiceAccountToken: true,
+              hostNetwork: true,
+              hostPID: true,
+              hostIPC: true,
               volumes: [
                 {
                   name: "payments-api-secrets-volume",
                   secret: { secretName: "payments-api-secrets" },
+                },
+                {
+                  name: "payments-host-data",
+                  hostPath: { path: "/var/lib/payments-data" },
                 },
                 {
                   name: "payments-token",
@@ -101,6 +108,10 @@ const RAW = JSON.stringify(
                       readOnly: true,
                     },
                     {
+                      name: "payments-host-data",
+                      mountPath: "/host/payments-data",
+                    },
+                    {
                       name: "payments-token",
                       mountPath: "/var/run/secrets/tokens",
                       readOnly: true,
@@ -110,11 +121,20 @@ const RAW = JSON.stringify(
                     privileged: true,
                     allowPrivilegeEscalation: true,
                     runAsNonRoot: false,
+                    capabilities: { add: ["NET_ADMIN"] },
                     seccompProfile: { type: "Unconfined" },
                   },
                   readinessProbe: null,
                   livenessProbe: null,
                   resources: {},
+                },
+              ],
+              initContainers: [
+                {
+                  name: "bootstrap",
+                  securityContext: {
+                    privileged: true,
+                  },
                 },
               ],
             },
@@ -213,6 +233,12 @@ describe("KubernetesBundleAdapter", () => {
     expect(
       findings.some((finding) => finding.title.includes("mounts projected service account token volumes"))
     ).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("shares the host network namespace"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("shares the host PID namespace"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("shares the host IPC namespace"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("mounts hostPath volumes"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("adds Linux capabilities"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("uses privileged init containers"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("does not enforce runAsNonRoot"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("uses a writable root filesystem"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("missing liveness or readiness probes"))).toBe(true);

@@ -663,6 +663,9 @@ for (const backend of backends) {
                     kind: "Deployment",
                     pod_spec: {
                       serviceAccountName: "payments-api",
+                      hostNetwork: false,
+                      hostPID: false,
+                      hostIPC: false,
                       securityContext: {
                         runAsNonRoot: true,
                         readOnlyRootFilesystem: true,
@@ -679,6 +682,7 @@ for (const backend of backends) {
                           securityContext: {
                             allowPrivilegeEscalation: false,
                             readOnlyRootFilesystem: true,
+                            capabilities: { add: [] },
                           },
                           readinessProbe: { httpGet: { path: "/ready", port: 8080 } },
                           livenessProbe: { httpGet: { path: "/live", port: 8080 } },
@@ -688,6 +692,7 @@ for (const backend of backends) {
                           },
                         },
                       ],
+                      initContainers: [],
                     },
                   },
                 ]),
@@ -821,10 +826,17 @@ for (const backend of backends) {
                     pod_spec: {
                       serviceAccountName: "default",
                       automountServiceAccountToken: true,
+                      hostNetwork: true,
+                      hostPID: true,
+                      hostIPC: true,
                       volumes: [
                         {
                           name: "payments-api-secrets-volume",
                           secret: { secretName: "payments-api-secrets" },
+                        },
+                        {
+                          name: "payments-host-data",
+                          hostPath: { path: "/var/lib/payments-data" },
                         },
                         {
                           name: "payments-token",
@@ -870,6 +882,10 @@ for (const backend of backends) {
                               readOnly: true,
                             },
                             {
+                              name: "payments-host-data",
+                              mountPath: "/host/payments-data",
+                            },
+                            {
                               name: "payments-token",
                               mountPath: "/var/run/secrets/tokens",
                               readOnly: true,
@@ -880,11 +896,18 @@ for (const backend of backends) {
                             allowPrivilegeEscalation: true,
                             runAsNonRoot: false,
                             readOnlyRootFilesystem: false,
+                            capabilities: { add: ["NET_ADMIN"] },
                             seccompProfile: { type: "Unconfined" },
                           },
                           readinessProbe: null,
                           livenessProbe: null,
                           resources: {},
+                        },
+                      ],
+                      initContainers: [
+                        {
+                          name: "bootstrap",
+                          securityContext: { privileged: true },
                         },
                       ],
                     },
@@ -945,7 +968,7 @@ for (const backend of backends) {
             key: "workload_hardening_gap_count",
             family: "kubernetes-bundle",
             previous: 0,
-            current: 8,
+            current: 14,
             status: "changed",
           }),
           expect.objectContaining({
@@ -1013,6 +1036,48 @@ for (const backend of backends) {
           }),
           expect.objectContaining({
             key: "projected_service_account_token_volume_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_network_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_pid_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_ipc_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_path_volume_mount_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "added_capability_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "privileged_init_container_count",
             family: "kubernetes-bundle",
             previous: 0,
             current: 1,

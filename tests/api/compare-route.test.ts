@@ -529,6 +529,9 @@ describe("API GET /api/runs/[id]/compare", () => {
                 kind: "Deployment",
                 pod_spec: {
                   serviceAccountName: "payments-api",
+                  hostNetwork: false,
+                  hostPID: false,
+                  hostIPC: false,
                   securityContext: {
                         runAsNonRoot: true,
                         readOnlyRootFilesystem: true,
@@ -545,6 +548,7 @@ describe("API GET /api/runs/[id]/compare", () => {
                       securityContext: {
                         allowPrivilegeEscalation: false,
                         readOnlyRootFilesystem: true,
+                        capabilities: { add: [] },
                       },
                       readinessProbe: { httpGet: { path: "/ready", port: 8080 } },
                       livenessProbe: { httpGet: { path: "/live", port: 8080 } },
@@ -554,6 +558,7 @@ describe("API GET /api/runs/[id]/compare", () => {
                       },
                     },
                   ],
+                  initContainers: [],
                 },
               },
             ]),
@@ -676,10 +681,17 @@ describe("API GET /api/runs/[id]/compare", () => {
                 pod_spec: {
                   serviceAccountName: "default",
                   automountServiceAccountToken: true,
+                  hostNetwork: true,
+                  hostPID: true,
+                  hostIPC: true,
                   volumes: [
                     {
                       name: "payments-api-secrets-volume",
                       secret: { secretName: "payments-api-secrets" },
+                    },
+                    {
+                      name: "payments-host-data",
+                      hostPath: { path: "/var/lib/payments-data" },
                     },
                     {
                       name: "payments-token",
@@ -725,6 +737,10 @@ describe("API GET /api/runs/[id]/compare", () => {
                           readOnly: true,
                         },
                         {
+                          name: "payments-host-data",
+                          mountPath: "/host/payments-data",
+                        },
+                        {
                           name: "payments-token",
                           mountPath: "/var/run/secrets/tokens",
                           readOnly: true,
@@ -735,11 +751,18 @@ describe("API GET /api/runs/[id]/compare", () => {
                         allowPrivilegeEscalation: true,
                         runAsNonRoot: false,
                         readOnlyRootFilesystem: false,
+                        capabilities: { add: ["NET_ADMIN"] },
                         seccompProfile: { type: "Unconfined" },
                       },
                       readinessProbe: null,
                       livenessProbe: null,
                       resources: {},
+                    },
+                  ],
+                  initContainers: [
+                    {
+                      name: "bootstrap",
+                      securityContext: { privileged: true },
                     },
                   ],
                 },
@@ -806,7 +829,7 @@ describe("API GET /api/runs/[id]/compare", () => {
           key: "workload_hardening_gap_count",
           family: "kubernetes-bundle",
           previous: 0,
-          current: 8,
+          current: 14,
           status: "changed",
         }),
         expect.objectContaining({
@@ -874,6 +897,48 @@ describe("API GET /api/runs/[id]/compare", () => {
         }),
         expect.objectContaining({
           key: "projected_service_account_token_volume_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "host_network_workload_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "host_pid_workload_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "host_ipc_workload_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "host_path_volume_mount_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "added_capability_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "privileged_init_container_count",
           family: "kubernetes-bundle",
           previous: 0,
           current: 1,

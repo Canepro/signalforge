@@ -69,6 +69,36 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "shares the host network namespace",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "shares the host PID namespace",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "shares the host IPC namespace",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "mounts hostPath volumes",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "adds Linux capabilities",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "uses privileged init containers",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "does not enforce runAsNonRoot",
       "severity": "medium",
       "category": "kubernetes"
@@ -110,6 +140,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 20,
-  "max_findings": 20
+  "min_findings": 26,
+  "max_findings": 26
 }
