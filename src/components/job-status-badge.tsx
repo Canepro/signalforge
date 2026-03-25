@@ -1,36 +1,63 @@
-const jobStatusConfig: Record<string, { className: string; icon: string; border: string }> = {
+const jobStatusConfig: Record<
+  string,
+  {
+    className: string;
+    iconClassName: string;
+    dotClassName: string;
+    icon: string;
+    border: string;
+    live?: boolean;
+  }
+> = {
   queued: {
-    className: "bg-severity-medium/10 text-severity-medium",
+    className: "border border-severity-medium/20 bg-severity-medium/[0.08] text-severity-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-severity-medium/10 text-severity-medium",
+    dotClassName: "bg-severity-medium",
     border: "border-l-severity-medium",
     icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+    live: true,
   },
   claimed: {
-    className: "bg-secondary/10 text-secondary",
+    className: "border border-secondary/20 bg-secondary/[0.08] text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-secondary/10 text-secondary",
+    dotClassName: "bg-secondary",
     border: "border-l-secondary",
     icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+    live: true,
   },
   running: {
-    className: "bg-primary/15 text-primary",
+    className: "border border-primary/20 bg-primary/[0.1] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-primary/10 text-primary",
+    dotClassName: "bg-primary",
     border: "border-l-primary",
     icon: "M13 10V3L4 14h7v7l9-11h-7z",
+    live: true,
   },
   submitted: {
-    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    className: "border border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-700 dark:text-emerald-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    dotClassName: "bg-emerald-500",
     border: "border-l-emerald-500",
     icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   failed: {
-    className: "bg-severity-critical/10 text-severity-critical",
+    className: "border border-severity-critical/15 bg-severity-critical/[0.08] text-severity-critical shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-severity-critical/10 text-severity-critical",
+    dotClassName: "bg-severity-critical",
     border: "border-l-severity-critical",
     icon: "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   expired: {
-    className: "bg-severity-critical/10 text-severity-critical",
+    className: "border border-severity-critical/15 bg-severity-critical/[0.08] text-severity-critical shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-severity-critical/10 text-severity-critical",
+    dotClassName: "bg-severity-critical",
     border: "border-l-severity-critical",
     icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   cancelled: {
-    className: "bg-surface-container text-on-surface-variant",
+    className: "border border-outline-variant/20 bg-surface-container-low text-on-surface-variant shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-surface-container text-on-surface-variant",
+    dotClassName: "bg-outline-variant",
     border: "border-l-outline-variant",
     icon: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
   },
@@ -38,15 +65,23 @@ const jobStatusConfig: Record<string, { className: string; icon: string; border:
 
 export function JobStatusBadge({ status }: { status: string }) {
   const cfg = jobStatusConfig[status] ?? {
-    className: "bg-surface-container text-on-surface-variant",
+    className: "border border-outline-variant/20 bg-surface-container-low text-on-surface-variant shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-surface-container text-on-surface-variant",
+    dotClassName: "bg-outline-variant",
     border: "border-l-outline-variant",
     icon: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cfg.className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${cfg.className}`}
     >
-      <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <span className="relative inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+        {cfg.live ? (
+          <span className={`absolute inline-flex h-full w-full rounded-full ${cfg.dotClassName} opacity-35 animate-ping`} />
+        ) : null}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${cfg.dotClassName}`} />
+      </span>
+      <svg className={`h-4 w-4 shrink-0 rounded-full p-[3px] ${cfg.iconClassName}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d={cfg.icon} />
       </svg>
       {status}

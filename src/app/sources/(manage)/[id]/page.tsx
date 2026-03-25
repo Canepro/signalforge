@@ -7,6 +7,7 @@ import { SourceSettingsForm } from "./source-settings-form";
 import { SourceHealthDot } from "@/components/source-health-dot";
 import { JobStatusBadge, jobBorderClass } from "@/components/job-status-badge";
 import { CopyTextButton } from "@/components/copy-text-button";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,7 @@ export default async function SourceDetailPage({
 
   return (
     <div className="space-y-8">
+      <LivePageRefresh intervalMs={8000} />
       {/* Header */}
       <div>
         <Link href="/sources" className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary transition-colors">

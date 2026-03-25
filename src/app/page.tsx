@@ -1,4 +1,5 @@
 import { DashboardClient } from "./dashboard-client";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import type { RunSummary } from "@/types/api";
 import { getStorage } from "@/lib/storage";
 import type { DashboardCollectionSource } from "@/components/request-collection-modal";
@@ -100,15 +101,18 @@ export default async function DashboardPage() {
     });
 
   return (
-    <DashboardClient
-      runs={runs}
-      collectionSources={collectionSources}
-      totalRuns={stats.totalRuns}
-      criticalFindings={stats.criticalFindings}
-      environmentsAnalyzed={stats.environmentsAnalyzed}
-      suppressedNoise={stats.suppressedNoise}
-      severityDistribution={stats.severityDistribution}
-      environmentMix={stats.environmentMix}
-    />
+    <>
+      <LivePageRefresh intervalMs={10000} />
+      <DashboardClient
+        runs={runs}
+        collectionSources={collectionSources}
+        totalRuns={stats.totalRuns}
+        criticalFindings={stats.criticalFindings}
+        environmentsAnalyzed={stats.environmentsAnalyzed}
+        suppressedNoise={stats.suppressedNoise}
+        severityDistribution={stats.severityDistribution}
+        environmentMix={stats.environmentMix}
+      />
+    </>
   );
 }

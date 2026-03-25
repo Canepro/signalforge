@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { SourceHealthDot } from "@/components/source-health-dot";
 import { getStorage } from "@/lib/storage";
 
@@ -28,6 +29,7 @@ export default async function SourcesListPage({
 
   return (
     <div className="space-y-6">
+      <LivePageRefresh intervalMs={10000} />
       {sp?.deleted === "1" && (
         <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
           Source deleted.
