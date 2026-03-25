@@ -17,6 +17,7 @@ type KubernetesServiceExposure = {
 
 type KubernetesRbacBinding = {
   scope?: string;
+  namespace?: string;
   subject?: string;
   roleRef?: string;
 };
@@ -156,6 +157,22 @@ function roleLabel(
     return `${trimmedNamespace}/${trimmedName}`;
   }
   return trimmedName || trimmedNamespace || trimmedScope || "unknown-role";
+}
+
+function roleKey(
+  scope: string | undefined,
+  namespace: string | undefined,
+  name: string | undefined
+): string | null {
+  const trimmedScope = scope?.trim() || "cluster";
+  const trimmedName = name?.trim();
+  if (!trimmedName) return null;
+  if (trimmedScope === "namespace") {
+    const trimmedNamespace = namespace?.trim();
+    if (!trimmedNamespace) return null;
+    return `namespace:${trimmedNamespace}:${trimmedName}`;
+  }
+  return `cluster:${trimmedName}`;
 }
 
 function serviceAccountKey(namespace: string | undefined, name: string | undefined): string | null {
@@ -337,15 +354,62 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     const externalServiceNamespaces = new Set<string>();
     const namespacesWithNetworkPolicy = new Set<string>();
     const clusterAdminServiceAccounts = new Set<string>();
+    const wildcardRoleKeys = new Set<string>();
+    const escalationRoleKeys = new Set<string>();
+    const nodeProxyRoleKeys = new Set<string>();
+    const serviceAccountRoleBindings = new Map<string, Set<string>>();
+
+    for (const doc of manifest.documents) {
+      if (doc.kind !== "rbac-roles") continue;
+      const roles = parseKubernetesDocumentJson<KubernetesRbacRole[]>(doc) ?? [];
+      for (const role of roles) {
+        const currentRoleKey = roleKey(role.scope, role.namespace, role.name);
+        if (!currentRoleKey) continue;
+
+        let hasWildcardAccess = false;
+        let hasNodeProxyAccess = false;
+        let hasEscalationVerbs = false;
+
+        for (const rule of role.rules ?? []) {
+          const apiGroups = normalizedList(rule.apiGroups);
+          const resources = normalizedList(rule.resources);
+          const verbs = normalizedList(rule.verbs);
+
+          if (apiGroups.includes("*") || resources.includes("*") || verbs.includes("*")) {
+            hasWildcardAccess = true;
+          }
+          if (["bind", "escalate", "impersonate"].some((verb) => verbs.includes(verb))) {
+            hasEscalationVerbs = true;
+          }
+          if (resources.includes("nodes/proxy")) {
+            hasNodeProxyAccess = true;
+          }
+        }
+
+        if (hasWildcardAccess) wildcardRoleKeys.add(currentRoleKey);
+        if (hasEscalationVerbs) escalationRoleKeys.add(currentRoleKey);
+        if (hasNodeProxyAccess) nodeProxyRoleKeys.add(currentRoleKey);
+      }
+    }
 
     for (const doc of manifest.documents) {
       if (doc.kind !== "rbac-bindings") continue;
       const bindings = parseKubernetesDocumentJson<KubernetesRbacBinding[]>(doc) ?? [];
       for (const binding of bindings) {
         const roleRef = binding.roleRef?.trim().toLowerCase();
-        if (roleRef !== "cluster-admin") continue;
         const subjectKey = parseServiceAccountSubjectKey(binding.subject);
-        if (subjectKey) clusterAdminServiceAccounts.add(subjectKey);
+        if (subjectKey) {
+          const bindingRoleKey = roleKey(binding.scope, binding.namespace, binding.roleRef);
+          if (bindingRoleKey) {
+            let roleBindings = serviceAccountRoleBindings.get(subjectKey);
+            if (!roleBindings) {
+              roleBindings = new Set<string>();
+              serviceAccountRoleBindings.set(subjectKey, roleBindings);
+            }
+            roleBindings.add(bindingRoleKey);
+          }
+          if (roleRef === "cluster-admin") clusterAdminServiceAccounts.add(subjectKey);
+        }
       }
     }
 
@@ -524,6 +588,65 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 cluster_admin_binding: true,
               }),
               rule_id: "kubernetes.workload_cluster_admin_service_account",
+            });
+          }
+
+          const workloadRoleBindings =
+            (workloadServiceAccountKey &&
+              serviceAccountRoleBindings.get(workloadServiceAccountKey)) ||
+            new Set<string>();
+          const boundWildcardRoleCount = Array.from(workloadRoleBindings).filter((bindingRoleKey) =>
+            wildcardRoleKeys.has(bindingRoleKey)
+          ).length;
+          const boundEscalationRoleCount = Array.from(workloadRoleBindings).filter((bindingRoleKey) =>
+            escalationRoleKeys.has(bindingRoleKey)
+          ).length;
+          const boundNodeProxyRoleCount = Array.from(workloadRoleBindings).filter((bindingRoleKey) =>
+            nodeProxyRoleKeys.has(bindingRoleKey)
+          ).length;
+
+          if (boundWildcardRoleCount > 0) {
+            findings.push({
+              title: `Kubernetes workload service account is bound to wildcard RBAC roles: ${label} (${boundWildcardRoleCount} roles)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                wildcard_role_binding_count: boundWildcardRoleCount,
+              }),
+              rule_id: "kubernetes.workload_wildcard_rbac_service_account",
+            });
+          }
+
+          if (boundEscalationRoleCount > 0) {
+            findings.push({
+              title: `Kubernetes workload service account is bound to privilege-escalation RBAC roles: ${label} (${boundEscalationRoleCount} roles)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                privilege_escalation_role_binding_count: boundEscalationRoleCount,
+              }),
+              rule_id: "kubernetes.workload_privilege_escalation_rbac_service_account",
+            });
+          }
+
+          if (boundNodeProxyRoleCount > 0) {
+            findings.push({
+              title: `Kubernetes workload service account is bound to node proxy RBAC roles: ${label} (${boundNodeProxyRoleCount} roles)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                node_proxy_role_binding_count: boundNodeProxyRoleCount,
+              }),
+              rule_id: "kubernetes.workload_node_proxy_rbac_service_account",
             });
           }
 

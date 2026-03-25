@@ -19,7 +19,7 @@
       "path": "rbac/bindings.json",
       "kind": "rbac-bindings",
       "media_type": "application/json",
-      "content": "[{\"scope\":\"cluster\",\"subject\":\"system:serviceaccount:payments:default\",\"roleRef\":\"cluster-admin\"}]"
+      "content": "[{\"scope\":\"cluster\",\"subject\":\"system:serviceaccount:payments:default\",\"roleRef\":\"cluster-admin\"},{\"scope\":\"namespace\",\"namespace\":\"payments\",\"subject\":\"system:serviceaccount:payments:default\",\"roleRef\":\"payments-ops\"},{\"scope\":\"cluster\",\"subject\":\"system:serviceaccount:payments:default\",\"roleRef\":\"payments-breakglass\"}]"
     },
     {
       "path": "workloads/status.json",

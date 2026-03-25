@@ -26,6 +26,17 @@ const RAW = JSON.stringify(
             subject: "system:serviceaccount:payments:default",
             roleRef: "cluster-admin",
           },
+          {
+            scope: "namespace",
+            namespace: "payments",
+            subject: "system:serviceaccount:payments:default",
+            roleRef: "payments-ops",
+          },
+          {
+            scope: "cluster",
+            subject: "system:serviceaccount:payments:default",
+            roleRef: "payments-breakglass",
+          },
         ]),
       },
       {
@@ -223,6 +234,15 @@ describe("KubernetesBundleAdapter", () => {
     ).toBe(true);
     expect(
       findings.some((finding) => finding.title.includes("service account is bound to cluster-admin"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("service account is bound to wildcard RBAC roles"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("service account is bound to privilege-escalation RBAC roles"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("service account is bound to node proxy RBAC roles"))
     ).toBe(true);
     expect(
       findings.some((finding) => finding.title.includes("injects Secret values into environment variables"))

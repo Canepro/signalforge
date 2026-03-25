@@ -56,6 +56,8 @@ type KubernetesServiceExposure = {
 };
 
 type KubernetesRbacBinding = {
+  scope?: string;
+  namespace?: string;
   subject?: string;
   roleRef?: string;
 };
@@ -67,6 +69,9 @@ type KubernetesRbacRule = {
 };
 
 type KubernetesRbacRole = {
+  scope?: string;
+  namespace?: string;
+  name?: string;
   rules?: KubernetesRbacRule[];
 };
 
@@ -164,6 +169,9 @@ type KubernetesEvidenceSummary = {
   external_service_count: number;
   cluster_admin_binding_count: number;
   workload_cluster_admin_binding_count: number;
+  workload_rbac_wildcard_binding_count: number;
+  workload_rbac_privilege_escalation_binding_count: number;
+  workload_rbac_node_proxy_binding_count: number;
   rbac_wildcard_role_count: number;
   rbac_privilege_escalation_role_count: number;
   rbac_node_proxy_access_role_count: number;
@@ -379,6 +387,22 @@ function parseServiceAccountSubjectKey(subject: string | undefined): string | nu
   return null;
 }
 
+function roleKey(
+  scope: string | undefined,
+  namespace: string | undefined,
+  name: string | undefined
+): string | null {
+  const trimmedScope = scope?.trim() || "cluster";
+  const trimmedName = name?.trim();
+  if (!trimmedName) return null;
+  if (trimmedScope === "namespace") {
+    const trimmedNamespace = namespace?.trim();
+    if (!trimmedNamespace) return null;
+    return `namespace:${trimmedNamespace}:${trimmedName}`;
+  }
+  return `cluster:${trimmedName}`;
+}
+
 function secretEnvRefCount(container: KubernetesContainerSpec): number {
   return (container.env ?? []).filter((item) => item.valueFrom?.secretKeyRef != null).length;
 }
@@ -506,6 +530,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       external_service_count: 0,
       cluster_admin_binding_count: 0,
       workload_cluster_admin_binding_count: 0,
+      workload_rbac_wildcard_binding_count: 0,
+      workload_rbac_privilege_escalation_binding_count: 0,
+      workload_rbac_node_proxy_binding_count: 0,
       rbac_wildcard_role_count: 0,
       rbac_privilege_escalation_role_count: 0,
       rbac_node_proxy_access_role_count: 0,
@@ -531,6 +558,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
   let workloadClusterAdminBindingCount = 0;
+  let workloadRbacWildcardBindingCount = 0;
+  let workloadRbacPrivilegeEscalationBindingCount = 0;
+  let workloadRbacNodeProxyBindingCount = 0;
   let rbacWildcardRoleCount = 0;
   let rbacPrivilegeEscalationRoleCount = 0;
   let rbacNodeProxyAccessRoleCount = 0;
@@ -552,6 +582,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
   const clusterAdminServiceAccounts = new Set<string>();
+  const wildcardRoleKeys = new Set<string>();
+  const escalationRoleKeys = new Set<string>();
+  const nodeProxyRoleKeys = new Set<string>();
+  const serviceAccountRoleBindings = new Map<string, Set<string>>();
 
   for (const doc of manifest.documents) {
     if (doc.kind === "service-exposure") {
@@ -570,9 +604,19 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
 
     if (doc.kind === "rbac-bindings") {
       for (const binding of parseKubernetesJson<KubernetesRbacBinding>(doc)) {
+        const subjectKey = parseServiceAccountSubjectKey(binding.subject);
+        const bindingRoleKey = roleKey(binding.scope, binding.namespace, binding.roleRef);
+        if (subjectKey && bindingRoleKey) {
+          let roleBindings = serviceAccountRoleBindings.get(subjectKey);
+          if (!roleBindings) {
+            roleBindings = new Set<string>();
+            serviceAccountRoleBindings.set(subjectKey, roleBindings);
+          }
+          roleBindings.add(bindingRoleKey);
+        }
+
         if (binding.roleRef?.trim() === "cluster-admin") {
           clusterAdminBindingCount += 1;
-          const subjectKey = parseServiceAccountSubjectKey(binding.subject);
           if (subjectKey) clusterAdminServiceAccounts.add(subjectKey);
         }
       }
@@ -581,6 +625,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
 
     if (doc.kind === "rbac-roles") {
       for (const role of parseKubernetesJson<KubernetesRbacRole>(doc)) {
+        const currentRoleKey = roleKey(role.scope, role.namespace, role.name);
         let hasWildcardAccess = false;
         let hasPrivilegeEscalation = false;
         let hasNodeProxyAccess = false;
@@ -601,9 +646,18 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
           }
         }
 
-        if (hasWildcardAccess) rbacWildcardRoleCount += 1;
-        if (hasPrivilegeEscalation) rbacPrivilegeEscalationRoleCount += 1;
-        if (hasNodeProxyAccess) rbacNodeProxyAccessRoleCount += 1;
+        if (hasWildcardAccess) {
+          rbacWildcardRoleCount += 1;
+          if (currentRoleKey) wildcardRoleKeys.add(currentRoleKey);
+        }
+        if (hasPrivilegeEscalation) {
+          rbacPrivilegeEscalationRoleCount += 1;
+          if (currentRoleKey) escalationRoleKeys.add(currentRoleKey);
+        }
+        if (hasNodeProxyAccess) {
+          rbacNodeProxyAccessRoleCount += 1;
+          if (currentRoleKey) nodeProxyRoleKeys.add(currentRoleKey);
+        }
       }
       continue;
     }
@@ -640,6 +694,19 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         ) {
           workloadClusterAdminBindingCount += 1;
         }
+        const workloadRoleBindings =
+          (workloadServiceAccountKey &&
+            serviceAccountRoleBindings.get(workloadServiceAccountKey)) ||
+          new Set<string>();
+        workloadRbacWildcardBindingCount += Array.from(workloadRoleBindings).filter((bindingRoleKey) =>
+          wildcardRoleKeys.has(bindingRoleKey)
+        ).length;
+        workloadRbacPrivilegeEscalationBindingCount += Array.from(workloadRoleBindings).filter(
+          (bindingRoleKey) => escalationRoleKeys.has(bindingRoleKey)
+        ).length;
+        workloadRbacNodeProxyBindingCount += Array.from(workloadRoleBindings).filter(
+          (bindingRoleKey) => nodeProxyRoleKeys.has(bindingRoleKey)
+        ).length;
 
         const podSecurityContext = workload.pod_spec?.securityContext;
         const hasWritableRootFilesystem = (workload.pod_spec?.containers ?? []).some((container) => {
@@ -679,6 +746,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
     workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
+    workload_rbac_wildcard_binding_count: workloadRbacWildcardBindingCount,
+    workload_rbac_privilege_escalation_binding_count:
+      workloadRbacPrivilegeEscalationBindingCount,
+    workload_rbac_node_proxy_binding_count: workloadRbacNodeProxyBindingCount,
     rbac_wildcard_role_count: rbacWildcardRoleCount,
     rbac_privilege_escalation_role_count: rbacPrivilegeEscalationRoleCount,
     rbac_node_proxy_access_role_count: rbacNodeProxyAccessRoleCount,
@@ -793,6 +864,27 @@ function buildFamilyMetrics(
         "Workloads bound to cluster-admin",
         previous.workload_cluster_admin_binding_count,
         next.workload_cluster_admin_binding_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_rbac_wildcard_binding_count",
+        "Workload bindings to wildcard RBAC roles",
+        previous.workload_rbac_wildcard_binding_count,
+        next.workload_rbac_wildcard_binding_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_rbac_privilege_escalation_binding_count",
+        "Workload bindings to escalation RBAC roles",
+        previous.workload_rbac_privilege_escalation_binding_count,
+        next.workload_rbac_privilege_escalation_binding_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_rbac_node_proxy_binding_count",
+        "Workload bindings to node proxy RBAC roles",
+        previous.workload_rbac_node_proxy_binding_count,
+        next.workload_rbac_node_proxy_binding_count,
         "kubernetes-bundle"
       ),
       metricRow(
