@@ -71,8 +71,11 @@ function containerArtifact(fields: Record<string, string>): string {
     "container_name",
     "image",
     "published_ports",
+    "mounts",
+    "writable_mounts",
     "added_capabilities",
     "secrets",
+    "ran_as_root",
   ];
   return [
     "=== container-diagnostics ===",
@@ -350,8 +353,11 @@ describe("API GET /api/runs/[id]/compare", () => {
         container_name: "payments",
         image: "registry.example/payments:1.2.3",
         published_ports: "8080:80",
+        mounts: "/srv/config:/config",
+        writable_mounts: "/config",
         added_capabilities: "NET_BIND_SERVICE",
         secrets: "db-password",
+        ran_as_root: "false",
       }),
     });
     const newerArtifact = insertArtifact(db, {
@@ -364,8 +370,11 @@ describe("API GET /api/runs/[id]/compare", () => {
         container_name: "payments",
         image: "registry.example/payments:1.2.4",
         published_ports: "8080:80,8443:443",
+        mounts: "/srv/config:/config,/srv/data:/data",
+        writable_mounts: "/config,/data",
         added_capabilities: "NET_BIND_SERVICE,SYS_PTRACE",
         secrets: "db-password,api-key",
+        ran_as_root: "true",
       }),
     });
     const finding = mkFinding("f1", "Stable container finding", "medium");
@@ -414,6 +423,27 @@ describe("API GET /api/runs/[id]/compare", () => {
           current: 2,
           status: "changed",
         }),
+        expect.objectContaining({
+          key: "mount_count",
+          family: "container-diagnostics",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "writable_mount_count",
+          family: "container-diagnostics",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "runs_as_root",
+          family: "container-diagnostics",
+          previous: false,
+          current: true,
+          status: "changed",
+        }),
       ])
     );
   });
@@ -450,6 +480,25 @@ describe("API GET /api/runs/[id]/compare", () => {
                 scope: "cluster",
                 subject: "system:serviceaccount:payments:payments-api",
                 roleRef: "cluster-admin",
+              },
+            ]),
+          },
+          {
+            path: "rbac/roles.json",
+            kind: "rbac-roles",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                scope: "namespace",
+                namespace: "payments",
+                name: "payments-ops",
+                rules: [
+                  {
+                    apiGroups: ["*"],
+                    resources: ["*"],
+                    verbs: ["*"],
+                  },
+                ],
               },
             ]),
           },
@@ -536,6 +585,53 @@ describe("API GET /api/runs/[id]/compare", () => {
                 scope: "cluster",
                 subject: "system:serviceaccount:payments:payments-jobs",
                 roleRef: "cluster-admin",
+              },
+            ]),
+          },
+          {
+            path: "rbac/roles.json",
+            kind: "rbac-roles",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                scope: "namespace",
+                namespace: "payments",
+                name: "payments-ops",
+                rules: [
+                  {
+                    apiGroups: ["*"],
+                    resources: ["*"],
+                    verbs: ["*"],
+                  },
+                ],
+              },
+              {
+                scope: "namespace",
+                namespace: "payments",
+                name: "payments-automation",
+                rules: [
+                  {
+                    apiGroups: ["*"],
+                    resources: ["*"],
+                    verbs: ["get", "list", "*"],
+                  },
+                ],
+              },
+              {
+                scope: "cluster",
+                name: "payments-breakglass",
+                rules: [
+                  {
+                    apiGroups: ["rbac.authorization.k8s.io"],
+                    resources: ["clusterroles"],
+                    verbs: ["bind", "escalate", "impersonate"],
+                  },
+                  {
+                    apiGroups: [""],
+                    resources: ["nodes/proxy"],
+                    verbs: ["get"],
+                  },
+                ],
               },
             ]),
           },
@@ -639,6 +735,27 @@ describe("API GET /api/runs/[id]/compare", () => {
           family: "kubernetes-bundle",
           previous: 0,
           current: 6,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "rbac_wildcard_role_count",
+          family: "kubernetes-bundle",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "rbac_privilege_escalation_role_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "rbac_node_proxy_access_role_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
           status: "changed",
         }),
       ])

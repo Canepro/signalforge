@@ -55,8 +55,18 @@ const FIXTURE_FILES = [
     adapter: new ContainerDiagnosticsAdapter(),
   },
   {
+    log: "container-database-service.txt",
+    golden: "container-database-service.expected.json",
+    adapter: new ContainerDiagnosticsAdapter(),
+  },
+  {
     log: "kubernetes-payments-bundle.json",
     golden: "kubernetes-payments-bundle.expected.json",
+    adapter: new KubernetesBundleAdapter(),
+  },
+  {
+    log: "kubernetes-public-ingress-namespace.json",
+    golden: "kubernetes-public-ingress-namespace.expected.json",
     adapter: new KubernetesBundleAdapter(),
   },
 ];

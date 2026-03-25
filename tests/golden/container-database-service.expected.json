@@ -1,0 +1,30 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": true,
+    "ran_as_root": true,
+    "os_contains": "Container"
+  },
+  "must_be_noise": [],
+  "must_not_be_findings": [],
+  "must_be_findings": [
+    {
+      "title_contains": "publishes ports",
+      "severity": "medium",
+      "category": "network"
+    },
+    {
+      "title_contains": "runs as root",
+      "severity": "medium",
+      "category": "container"
+    },
+    {
+      "title_contains": "writable mounted volumes",
+      "severity": "medium",
+      "category": "container"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 3,
+  "max_findings": 4
+}

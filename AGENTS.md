@@ -126,6 +126,8 @@ Core directories:
 - Prefer targeted rule improvements over broad abstraction.
 - Preserve evidence grounding for every finding.
 - Keep UI operator-first, table-first, and light-theme by default.
+- Use the local `naming-quality` skill whenever naming or renaming files, fixtures, modules, exported identifiers, routes, API fields, or user-facing labels.
+- Treat naming as part of product quality. Prefer scenario-based, open-source-safe names over names tied to the author's machine, provider, runtime, or temporary environment unless that provenance is itself the behavior under test.
 - Do not optimize Kubernetes or container work for the weakest demo that happens to pass tests. Prefer slices that feel credible to a real platform engineer.
 - For Kubernetes, container, and platform-security work, prefer official upstream guidance and cloud-provider best practices over ad hoc heuristics when choosing rules, priorities, and wording.
 - Use relevant local skills proactively when the task matches them, especially `kubernetes-platform-architecture`, `k8s-sre-triage`, `gitops-workflow`, `observability-architecture`, `grill-me`, and `tdd`.
@@ -158,6 +160,7 @@ This environment usually provides a Codex skill catalog at runtime. Agents shoul
 - `grill-me`
 - `setup-pre-commit`
 - `openai-docs`
+- `naming-quality` when available
 
 ### Adjacent Platform / Ops Skills
 

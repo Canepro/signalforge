@@ -14,6 +14,7 @@ host_pid: true
 added_capabilities: SYS_ADMIN, NET_ADMIN
 allow_privilege_escalation: true
 mounts: /var/run/docker.sock:/var/run/docker.sock,/srv/data:/data
+writable_mounts: /data
 secrets: /run/secrets/db-password
 ran_as_root: true
 `;
@@ -40,6 +41,9 @@ describe("ContainerDiagnosticsAdapter", () => {
     expect(findings.some((finding) => finding.title.includes("host PID"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("Linux capabilities"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("privilege escalation"))).toBe(
+      true
+    );
+    expect(findings.some((finding) => finding.title.includes("writable mounted volumes"))).toBe(
       true
     );
   });

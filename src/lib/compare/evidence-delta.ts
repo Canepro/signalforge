@@ -41,8 +41,11 @@ export interface EvidenceDeltaPayload {
 
 type ContainerEvidenceSummary = {
   published_port_count: number;
+  mount_count: number;
+  writable_mount_count: number;
   added_capability_count: number;
   secret_mount_count: number;
+  runs_as_root: boolean;
 };
 
 type KubernetesServiceExposure = {
@@ -53,6 +56,16 @@ type KubernetesServiceExposure = {
 
 type KubernetesRbacBinding = {
   roleRef?: string;
+};
+
+type KubernetesRbacRule = {
+  apiGroups?: string[];
+  resources?: string[];
+  verbs?: string[];
+};
+
+type KubernetesRbacRole = {
+  rules?: KubernetesRbacRule[];
 };
 
 type KubernetesNetworkPolicy = {
@@ -91,6 +104,9 @@ type KubernetesEvidenceSummary = {
   document_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
+  rbac_wildcard_role_count: number;
+  rbac_privilege_escalation_role_count: number;
+  rbac_node_proxy_access_role_count: number;
   network_policy_count: number;
   exposed_namespace_without_network_policy_count: number;
   workload_hardening_gap_count: number;
@@ -241,8 +257,13 @@ function summarizeContainerEvidence(content: string): ContainerEvidenceSummary {
   const sections = parseContainerSections(content);
   return {
     published_port_count: parseContainerList(sections.published_ports).length,
+    mount_count: parseContainerList(sections.mounts).length,
+    writable_mount_count: parseContainerList(sections.writable_mounts).length,
     added_capability_count: parseContainerList(sections.added_capabilities).length,
     secret_mount_count: parseContainerList(sections.secrets).length,
+    runs_as_root: ["true", "yes", "1", "on"].includes(
+      (sections.ran_as_root ?? "").trim().toLowerCase()
+    ),
   };
 }
 
@@ -253,6 +274,10 @@ function hasResourceEntries(resources: Record<string, string> | undefined): bool
 function parseKubernetesJson<T>(doc: KubernetesBundleDocument): T[] {
   const parsed = parseKubernetesDocumentJson<T[]>(doc);
   return Array.isArray(parsed) ? parsed : [];
+}
+
+function normalizedList(values: string[] | undefined): string[] {
+  return (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
 }
 
 function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
@@ -287,6 +312,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       document_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
+      rbac_wildcard_role_count: 0,
+      rbac_privilege_escalation_role_count: 0,
+      rbac_node_proxy_access_role_count: 0,
       network_policy_count: 0,
       exposed_namespace_without_network_policy_count: 0,
       workload_hardening_gap_count: 0,
@@ -295,6 +323,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
 
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
+  let rbacWildcardRoleCount = 0;
+  let rbacPrivilegeEscalationRoleCount = 0;
+  let rbacNodeProxyAccessRoleCount = 0;
   let networkPolicyCount = 0;
   let workloadHardeningGapCount = 0;
   const externalServiceNamespaces = new Set<string>();
@@ -318,6 +349,35 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     if (doc.kind === "rbac-bindings") {
       for (const binding of parseKubernetesJson<KubernetesRbacBinding>(doc)) {
         if (binding.roleRef?.trim() === "cluster-admin") clusterAdminBindingCount += 1;
+      }
+      continue;
+    }
+
+    if (doc.kind === "rbac-roles") {
+      for (const role of parseKubernetesJson<KubernetesRbacRole>(doc)) {
+        let hasWildcardAccess = false;
+        let hasPrivilegeEscalation = false;
+        let hasNodeProxyAccess = false;
+
+        for (const rule of role.rules ?? []) {
+          const apiGroups = normalizedList(rule.apiGroups);
+          const resources = normalizedList(rule.resources);
+          const verbs = normalizedList(rule.verbs);
+
+          if (apiGroups.includes("*") || resources.includes("*") || verbs.includes("*")) {
+            hasWildcardAccess = true;
+          }
+          if (["bind", "escalate", "impersonate"].some((verb) => verbs.includes(verb))) {
+            hasPrivilegeEscalation = true;
+          }
+          if (resources.includes("nodes/proxy")) {
+            hasNodeProxyAccess = true;
+          }
+        }
+
+        if (hasWildcardAccess) rbacWildcardRoleCount += 1;
+        if (hasPrivilegeEscalation) rbacPrivilegeEscalationRoleCount += 1;
+        if (hasNodeProxyAccess) rbacNodeProxyAccessRoleCount += 1;
       }
       continue;
     }
@@ -349,6 +409,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     document_count: manifest.documents.length,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
+    rbac_wildcard_role_count: rbacWildcardRoleCount,
+    rbac_privilege_escalation_role_count: rbacPrivilegeEscalationRoleCount,
+    rbac_node_proxy_access_role_count: rbacNodeProxyAccessRoleCount,
     network_policy_count: networkPolicyCount,
     exposed_namespace_without_network_policy_count: exposedNamespaceWithoutNetworkPolicyCount,
     workload_hardening_gap_count: workloadHardeningGapCount,
@@ -373,6 +436,20 @@ function buildFamilyMetrics(
         "container-diagnostics"
       ),
       metricRow(
+        "mount_count",
+        "Mounted volumes",
+        previous.mount_count,
+        next.mount_count,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "writable_mount_count",
+        "Writable mounted volumes",
+        previous.writable_mount_count,
+        next.writable_mount_count,
+        "container-diagnostics"
+      ),
+      metricRow(
         "added_capability_count",
         "Added Linux capabilities",
         previous.added_capability_count,
@@ -384,6 +461,13 @@ function buildFamilyMetrics(
         "Mounted secrets",
         previous.secret_mount_count,
         next.secret_mount_count,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "runs_as_root",
+        "Runs as root",
+        previous.runs_as_root,
+        next.runs_as_root,
         "container-diagnostics"
       ),
     ];
@@ -412,6 +496,27 @@ function buildFamilyMetrics(
         "Cluster-admin bindings",
         previous.cluster_admin_binding_count,
         next.cluster_admin_binding_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "rbac_wildcard_role_count",
+        "RBAC roles with wildcard access",
+        previous.rbac_wildcard_role_count,
+        next.rbac_wildcard_role_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "rbac_privilege_escalation_role_count",
+        "RBAC roles with escalation verbs",
+        previous.rbac_privilege_escalation_role_count,
+        next.rbac_privilege_escalation_role_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "rbac_node_proxy_access_role_count",
+        "RBAC roles with node proxy access",
+        previous.rbac_node_proxy_access_role_count,
+        next.rbac_node_proxy_access_role_count,
         "kubernetes-bundle"
       ),
       metricRow(

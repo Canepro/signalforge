@@ -46,6 +46,7 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
     const findings: PreFinding[] = [];
     const publishedPorts = parseContainerList(sections.published_ports);
     const mounts = parseContainerList(sections.mounts);
+    const writableMounts = parseContainerList(sections.writable_mounts);
     const secrets = parseContainerList(sections.secrets);
 
     if (publishedPorts.length > 0) {
@@ -145,6 +146,17 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
         section_source: "mounts",
         evidence: sections.mounts,
         rule_id: "container.host_path",
+      });
+    }
+
+    if (writableMounts.length > 0) {
+      findings.push({
+        title: "Container has writable mounted volumes",
+        severity_hint: "medium",
+        category: "container",
+        section_source: "writable_mounts",
+        evidence: sections.writable_mounts,
+        rule_id: "container.writable_mounts",
       });
     }
 

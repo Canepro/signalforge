@@ -1,0 +1,31 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": false,
+    "ran_as_root": false,
+    "os_contains": "Kubernetes"
+  },
+  "must_be_noise": [],
+  "must_not_be_findings": [
+    "privileged",
+    "privilege escalation",
+    "runAsNonRoot",
+    "seccomp profile",
+    "resource requests or limits"
+  ],
+  "must_be_findings": [
+    {
+      "title_contains": "Service exposed externally",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "without NetworkPolicy isolation",
+      "severity": "high",
+      "category": "kubernetes"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 2,
+  "max_findings": 2
+}

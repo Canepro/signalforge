@@ -329,6 +329,9 @@ function summarizeFallbackFinding(finding: Finding): string {
     if (title.includes("allows privilege escalation")) {
       return `${finding.title}, which reduces the process-level guardrails expected in a hardened workload.`;
     }
+    if (title.includes("writable mounted volumes")) {
+      return `${finding.title}, which can make persistence, tampering, or unexpected state carry-over easier if the container is compromised.`;
+    }
     if (title.includes("runasnonroot")) {
       return `${finding.title}, so the workload may still execute as root unless the image and pod settings are tightened together.`;
     }
@@ -495,6 +498,9 @@ function buildActionForFinding(
     }
     if (tl.includes("allows privilege escalation")) {
       return "Set allowPrivilegeEscalation to false unless the workload has a documented exception, and verify the container still starts and serves traffic.";
+    }
+    if (tl.includes("writable mounted volumes")) {
+      return "Review which mounted paths truly need write access, switch the rest to read-only, and confirm the workload still functions with the narrower filesystem permissions.";
     }
     if (tl.includes("runasnonroot")) {
       return "Set runAsNonRoot to true and align the image user so the workload does not rely on root execution.";

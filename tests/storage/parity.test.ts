@@ -283,8 +283,11 @@ function containerArtifact(fields: Record<string, string>): string {
     "container_name",
     "image",
     "published_ports",
+    "mounts",
+    "writable_mounts",
     "added_capabilities",
     "secrets",
+    "ran_as_root",
   ];
   return [
     "=== container-diagnostics ===",
@@ -478,8 +481,11 @@ for (const backend of backends) {
             container_name: "payments",
             image: "registry.example/payments:1.2.3",
             published_ports: "8080:80",
+            mounts: "/srv/config:/config",
+            writable_mounts: "/config",
             added_capabilities: "NET_BIND_SERVICE",
             secrets: "db-password",
+            ran_as_root: "false",
           }),
           ingestion: {
             target_identifier: "container:payments",
@@ -503,8 +509,11 @@ for (const backend of backends) {
             container_name: "payments",
             image: "registry.example/payments:1.2.4",
             published_ports: "8080:80,8443:443",
+            mounts: "/srv/config:/config,/srv/data:/data",
+            writable_mounts: "/config,/data",
             added_capabilities: "NET_BIND_SERVICE,SYS_PTRACE",
             secrets: "db-password,api-key",
+            ran_as_root: "true",
           }),
           ingestion: {
             target_identifier: "container:payments",
@@ -547,6 +556,27 @@ for (const backend of backends) {
             current: 2,
             status: "changed",
           }),
+          expect.objectContaining({
+            key: "mount_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "writable_mount_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "runs_as_root",
+            family: "container-diagnostics",
+            previous: false,
+            current: true,
+            status: "changed",
+          }),
         ])
       );
     });
@@ -584,6 +614,25 @@ for (const backend of backends) {
                     scope: "cluster",
                     subject: "system:serviceaccount:payments:payments-api",
                     roleRef: "cluster-admin",
+                  },
+                ]),
+              },
+              {
+                path: "rbac/roles.json",
+                kind: "rbac-roles",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    name: "payments-ops",
+                    rules: [
+                      {
+                        apiGroups: ["*"],
+                        resources: ["*"],
+                        verbs: ["*"],
+                      },
+                    ],
                   },
                 ]),
               },
@@ -685,6 +734,53 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "rbac/roles.json",
+                kind: "rbac-roles",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    name: "payments-ops",
+                    rules: [
+                      {
+                        apiGroups: ["*"],
+                        resources: ["*"],
+                        verbs: ["*"],
+                      },
+                    ],
+                  },
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    name: "payments-automation",
+                    rules: [
+                      {
+                        apiGroups: ["*"],
+                        resources: ["*"],
+                        verbs: ["get", "list", "*"],
+                      },
+                    ],
+                  },
+                  {
+                    scope: "cluster",
+                    name: "payments-breakglass",
+                    rules: [
+                      {
+                        apiGroups: ["rbac.authorization.k8s.io"],
+                        resources: ["clusterroles"],
+                        verbs: ["bind", "escalate", "impersonate"],
+                      },
+                      {
+                        apiGroups: [""],
+                        resources: ["nodes/proxy"],
+                        verbs: ["get"],
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
                 path: "network/network-policies.json",
                 kind: "network-policies",
                 media_type: "application/json",
@@ -778,6 +874,27 @@ for (const backend of backends) {
             family: "kubernetes-bundle",
             previous: 0,
             current: 6,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "rbac_wildcard_role_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "rbac_privilege_escalation_role_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "rbac_node_proxy_access_role_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
             status: "changed",
           }),
         ])
