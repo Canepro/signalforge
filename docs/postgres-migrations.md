@@ -77,6 +77,12 @@ Before merging a Postgres schema change:
 3. Confirm the app still passes `bun run typecheck`, `bun run test`, and `bun run build`.
 4. Update docs if the operator setup changes.
 
+For local disposable validation, you can also use:
+
+- `bash scripts/run-postgres-parity-local.sh`
+
+That helper prefers an explicit `--url`, otherwise it detects a local Podman Postgres container such as `signalforge-pg`, applies migrations, and runs the parity suite with one-shot env vars.
+
 ## Current State
 
 CI already enforces fresh-install migration application and the storage parity suite against `postgres:16-alpine` on every push and PR. An upgrade-path test scaffold compares fresh-install vs stepwise-upgrade schema snapshots; it activates automatically once a second migration file (`002_*`) exists.
