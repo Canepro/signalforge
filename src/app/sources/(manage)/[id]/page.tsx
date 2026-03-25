@@ -8,6 +8,7 @@ import { SourceHealthDot } from "@/components/source-health-dot";
 import { JobStatusBadge, jobBorderClass } from "@/components/job-status-badge";
 import { CopyTextButton } from "@/components/copy-text-button";
 import { LivePageRefresh } from "@/components/live-page-refresh";
+import { getArtifactTypeLabel, getSourceTypeLabel } from "@/lib/source-catalog";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -84,8 +85,8 @@ export default async function SourceDetailPage({
       {/* Properties grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Type", value: source.source_type },
-          { label: "Artifact", value: source.expected_artifact_type },
+          { label: "Type", value: getSourceTypeLabel(source.source_type) },
+          { label: "Artifact", value: getArtifactTypeLabel(source.expected_artifact_type) },
           {
             label: "Collector",
             value: `${source.default_collector_type}${source.default_collector_version ? ` @ ${source.default_collector_version}` : ""}`,

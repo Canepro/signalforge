@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeArtifact } from "@/lib/analyzer/index";
+import { emitRunLifecycleEvents } from "@/lib/domain-events";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
@@ -39,6 +40,13 @@ export async function POST(
         parentRunId,
       })
     );
+    emitRunLifecycleEvents({
+      run_id: newRun.run_id,
+      artifact_id: newRun.artifact_id,
+      status: newRun.status,
+      analysis_error: result.analysis_error ?? null,
+      parent_run_id: parentRunId,
+    });
 
     return NextResponse.json({
       run_id: newRun.run_id,

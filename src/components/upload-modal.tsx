@@ -2,6 +2,10 @@
 
 import { useRef, useState, useEffect, useCallback, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DEFAULT_EXPECTED_ARTIFACT_TYPE,
+  getArtifactTypeLabel,
+} from "@/lib/source-catalog";
 
 interface UploadModalProps {
   open: boolean;
@@ -15,6 +19,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentArtifactLabel = getArtifactTypeLabel(DEFAULT_EXPECTED_ARTIFACT_TYPE);
 
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -124,7 +129,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               <div className="text-xs text-on-surface-variant">
-                Drop a log file here, or
+                Drop an artifact file here, or
               </div>
               <button
                 onClick={() => fileRef.current?.click()}
@@ -154,8 +159,9 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
         )}
 
         <div className="mt-3 text-[10px] text-outline-variant">
-          Supported: Linux audit logs, system diagnostic outputs. The artifact
-          will be analyzed immediately upon upload.
+          Current shipped artifact family: {currentArtifactLabel} (
+          <code className="text-[10px] font-mono">{DEFAULT_EXPECTED_ARTIFACT_TYPE}</code>).
+          Uploaded artifacts are analyzed immediately.
         </div>
       </div>
     </div>

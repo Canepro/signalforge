@@ -31,9 +31,9 @@ It does **not** currently:
 - SSH into servers
 - run `kubectl` against clusters
 - execute collectors inside the app
-- perform remediation
+- perform remediation from the current product
 
-Collection stays external by design.
+Collection stays external by design. Remediation remains deferred, and any future remediation path would need to be a separate higher-trust capability with explicit approvals and auditability.
 
 ## Tech Stack
 

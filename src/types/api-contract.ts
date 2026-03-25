@@ -43,9 +43,10 @@ export type GetRunReportResponse = AuditReport;
 /** `GET /api/runs/[id]/compare` — 200 body (deterministic drift; no LLM). */
 export type GetCompareResponse = CompareDriftPayload;
 
-/** Standard error JSON for 4xx/5xx when the handler returns `{ error: string }`. */
+/** Standard error JSON for 4xx/5xx when the handler returns `{ error: string, code?: string }`. */
 export interface ApiErrorBody {
   error: string;
+  code?: string;
 }
 
 /** Optional `POST /api/runs` ingestion fields (JSON body or multipart form). */

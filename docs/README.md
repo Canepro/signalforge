@@ -62,10 +62,10 @@ SignalForge is strongest today on:
 - auth or multi-user deployment guidance
 - scheduling
 - fleet management
-- remediation
+- remediation in the current product scope
 - broad multi-artifact support beyond the currently shipped path
 
-Those remain current limitations or future design topics in the repo plans.
+Those remain current limitations or future design topics in the repo plans. Remediation is deferred, not permanently ruled out, and would require a separate higher-trust model if introduced later.
 
 ## Storage Note
 

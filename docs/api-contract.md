@@ -70,8 +70,8 @@ Submit artifact content as JSON or multipart.
 | **Optional (Phase 5a)** | Same keys as multipart fields | `target_identifier`, `source_label`, `collector_type`, `collector_version`, `collected_at` |
 
 **200:** `PostRunsResponse` — `run_id`, `artifact_id`, `status`, `report` (parsed audit report).  
-**400:** `{ "error": string }` (validation).  
-**500:** `{ "error": string }`
+**400:** `{ "error": string, "code"?: string }` (validation). Includes `code: "unsupported_artifact_type"` when the supplied or inferred artifact family is not supported by this SignalForge build.  
+**500:** `{ "error": string, "code"?: string }`
 
 TypeScript: `PostRunsResponse` in `src/types/api-contract.ts`.  
 Schema: `docs/schemas/post-runs-response.schema.json`, `docs/schemas/ingestion-metadata.schema.json`.
@@ -145,7 +145,7 @@ TypeScript: `PostReanalyzeResponse`. Schema: `docs/schemas/post-reanalyze-respon
 
 ## Error Shape
 
-Most errors use `{ "error": string }`. Schema: `docs/schemas/error-response.schema.json`.
+Most errors use `{ "error": string, "code"?: string }`. Schema: `docs/schemas/error-response.schema.json`.
 
 ## CLI Helpers
 
@@ -192,7 +192,7 @@ Clients should tolerate unknown fields.
 All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
 
 **`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`), `default_collector_type`, `capabilities`, `labels`, `enabled`.  
-**201:** source object. **400** validation. **409** `duplicate_target_identifier`.
+**201:** source object. **400** validation, including `code: "unsupported_artifact_type"` when `expected_artifact_type` is not supported. **409** `duplicate_target_identifier`.
 
 **`GET /api/sources`** — **200:** `{ "sources": Source[] }`.
 
@@ -228,7 +228,7 @@ All routes below require `Authorization: Bearer <agent_token>` (from registratio
 
 **`POST /api/collection-jobs/{id}/fail`** — JSON **`instance_id` (required)**, `code`, `message`. **claimed** or **running** → **failed** when lease and instance match. **400** `instance_id_required`. **403** `instance_mismatch`. **409** on lease/expiry or bad state.
 
-**`POST /api/collection-jobs/{id}/artifact`** — `multipart/form-data` like `POST /api/runs` (file + optional ingestion fields). **`instance_id` is required:** form field `instance_id` **or** header `X-SignalForge-Agent-Instance-Id` (must match job lease). **400** `instance_id_required` / `file_required`. **403** `instance_mismatch`. Target and collector defaults are **forced from the source**; `source_label` is `agent:<registration_id>`, `source_type` `agent`. Only from **running** with a matching lease. **409** `job_already_submitted` on duplicate completion.
+**`POST /api/collection-jobs/{id}/artifact`** — `multipart/form-data` like `POST /api/runs` (file + optional ingestion fields). **`instance_id` is required:** form field `instance_id` **or** header `X-SignalForge-Agent-Instance-Id` (must match job lease). **400** `instance_id_required` / `file_required` / `unsupported_artifact_type`. **403** `instance_mismatch`. Target and collector defaults are **forced from the source**; `source_label` is `agent:<registration_id>`, `source_type` `agent`. Only from **running** with a matching lease. **409** `job_already_submitted` on duplicate completion and **409** `artifact_type_mismatch` when the upload family does not match the queued job’s `artifact_type`.
 
 **Job vs run outcome:** The collection job **`status` stays `submitted`** once the artifact is stored and the run is created (ingest + analyze pipeline ran). **`result_analysis_status`** on the job (and **`run_status`** in the **200** JSON body) copies the linked run’s `status` (e.g. **`complete`** or **`error`**). Operators and agents should treat **`submitted` + `result_analysis_status: "error"`** as “delivered but analysis failed,” not a fully successful outcome.
 

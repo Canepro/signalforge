@@ -6,6 +6,7 @@ import type { Database } from "sql.js";
 import { insertArtifact, insertRun, getRun, submissionMetaFromRun } from "@/lib/db/repository";
 import type { AnalysisResult } from "@/lib/analyzer/schema";
 import * as analyzer from "@/lib/analyzer/index";
+import * as domainEvents from "@/lib/domain-events";
 import { POST as POST_REANALYZE } from "@/app/api/runs/[id]/reanalyze/route";
 
 function minimalAnalysisResult(): AnalysisResult {
@@ -124,5 +125,42 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
     expect(child!.parent_run_id).toBe(first.id);
     expect(child!.artifact_id).toBe(artifact.id);
     expect(submissionMetaFromRun(child!)).toEqual(submissionMetaFromRun(first));
+  });
+
+  it("emits run lifecycle events for the child run", async () => {
+    const emitSpy = vi
+      .spyOn(domainEvents, "emitRunLifecycleEvents")
+      .mockImplementation(() => {});
+
+    const artifact = insertArtifact(db, {
+      artifact_type: "linux-audit-log",
+      source_type: "api",
+      filename: "base.log",
+      content: "artifact-bytes",
+    });
+    const first = insertRun(db, artifact.id, minimalAnalysisResult(), {
+      filename: "base.log",
+      source_type: "api",
+    });
+
+    const res = await POST_REANALYZE(new NextRequest("http://localhost/x"), {
+      params: Promise.resolve({ id: first.id }),
+    });
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      run_id: string;
+      artifact_id: string;
+      status: string;
+      parent_run_id: string;
+    };
+
+    expect(emitSpy).toHaveBeenCalledWith({
+      run_id: body.run_id,
+      artifact_id: body.artifact_id,
+      status: body.status,
+      analysis_error: null,
+      parent_run_id: body.parent_run_id,
+    });
   });
 });

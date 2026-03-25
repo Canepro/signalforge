@@ -58,8 +58,10 @@ SignalForge should not, in the near model:
 
 - become a privileged SSH / kubectl / docker execution engine
 - own broad collector execution inside the app
-- become a remediation platform
+- implement remediation in the current product scope
 - expand into generic fleet management too early
+
+Remediation remains deferred rather than permanently ruled out. If it is ever added, it should be treated as a separate higher-trust capability class from read-only diagnostics and collection.
 
 Reference repos:
 
@@ -250,7 +252,7 @@ Intentionally deferred:
 - collectors inside SignalForge
 - privileged remote execution from the dashboard
 - auth-heavy multi-user expansion before the product boundary is settled
-- remediation engine
+- remediation capabilities in the current product scope
 - generalized policy engine
 - chat surfaces
 - broad fleet-management scope

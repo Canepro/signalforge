@@ -89,6 +89,26 @@ describe("Phase 6 API routes", () => {
     expect(second.status).toBe(409);
   });
 
+  it("POST /api/sources rejects unsupported expected_artifact_type", async () => {
+    const res = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Bad",
+          target_identifier: "bad-artifact-type",
+          source_type: "linux_host",
+          expected_artifact_type: "container-diagnostics",
+        }),
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'Unsupported expected_artifact_type: "container-diagnostics"',
+      code: "unsupported_artifact_type",
+    });
+  });
+
   it("PATCH /api/sources rejects immutable fields", async () => {
     const post = await POST_SOURCES(
       new NextRequest("http://localhost/api/sources", {

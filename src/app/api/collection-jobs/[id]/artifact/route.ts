@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeArtifact } from "@/lib/analyzer/index";
-import { detectArtifactType } from "@/lib/adapter/registry";
+import {
+  detectArtifactType,
+  isSupportedArtifactType,
+} from "@/lib/adapter/registry";
 import { parseIngestionMeta, ingestionRecordFromFormData } from "@/lib/ingestion/meta";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
-import { emitDomainEvent } from "@/lib/domain-events";
+import { emitRunLifecycleEvents } from "@/lib/domain-events";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
@@ -72,6 +75,15 @@ export async function POST(
   const ingestion = parsedMeta.meta;
 
   const resolvedType = artifactType ?? detectArtifactType(content);
+  if (!isSupportedArtifactType(resolvedType)) {
+    return NextResponse.json(
+      {
+        error: `Unsupported artifact_type: "${resolvedType}"`,
+        code: "unsupported_artifact_type",
+      },
+      { status: 400 }
+    );
+  }
 
   try {
     const result = await analyzeArtifact(content, { artifactType: resolvedType });
@@ -97,6 +109,15 @@ export async function POST(
       }
       if (submitted.code === "wrong_source") {
         return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
+      }
+      if (submitted.code === "artifact_type_mismatch") {
+        return NextResponse.json(
+          {
+            error: "Uploaded artifact_type does not match the requested job artifact_type",
+            code: "artifact_type_mismatch",
+          },
+          { status: 409 }
+        );
       }
       if (submitted.code === "job_already_submitted") {
         return NextResponse.json(
@@ -136,24 +157,14 @@ export async function POST(
       );
     }
 
-    const occurred = new Date().toISOString();
-    emitDomainEvent("run.created", {
+    emitRunLifecycleEvents({
       run_id: submitted.run_id,
       artifact_id: submitted.artifact_id,
       source_id: ctx.source.id,
       job_id: jobId,
-      occurred_at: occurred,
+      status: submitted.run_status,
+      analysis_error: result.analysis_error ?? null,
     });
-    if (submitted.run_status === "complete") {
-      emitDomainEvent("run.completed", { run_id: submitted.run_id, job_id: jobId, occurred_at: occurred });
-    } else {
-      emitDomainEvent("run.failed", {
-        run_id: submitted.run_id,
-        job_id: jobId,
-        error: result.analysis_error ?? submitted.run_status,
-        occurred_at: occurred,
-      });
-    }
 
     return NextResponse.json({
       job: {

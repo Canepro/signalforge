@@ -7,10 +7,10 @@ import type {
   CollectionJobSummary,
   ListNextQueuedJobsResult,
   PatchSourceInput,
-  SourceType,
 } from "@/lib/db/source-job-repository";
 import type { RunSubmissionMeta } from "@/lib/db/repository";
 import type { ParsedIngestionMeta } from "@/lib/ingestion/meta";
+import type { SourceType } from "@/lib/source-catalog";
 import type { RunDetail, RunSummary } from "@/types/api";
 import type { GetRunDetailResponse } from "@/types/api-contract";
 
@@ -210,6 +210,7 @@ export interface JobsStore {
         code:
           | "not_found"
           | "wrong_source"
+          | "artifact_type_mismatch"
           | "job_already_submitted"
           | "invalid_state"
           | "lease_expired"

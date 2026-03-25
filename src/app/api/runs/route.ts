@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeArtifact } from "@/lib/analyzer/index";
-import { detectArtifactType } from "@/lib/adapter/registry";
+import {
+  detectArtifactType,
+  isSupportedArtifactType,
+} from "@/lib/adapter/registry";
 import {
   parseIngestionMeta,
   ingestionRecordFromFormData,
 } from "@/lib/ingestion/meta";
+import { emitRunLifecycleEvents } from "@/lib/domain-events";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
@@ -52,6 +56,15 @@ export async function POST(request: NextRequest) {
     const ingestion = parsedMeta.meta;
 
     const resolvedType = artifactType ?? detectArtifactType(content);
+    if (!isSupportedArtifactType(resolvedType)) {
+      return NextResponse.json(
+        {
+          error: `Unsupported artifact_type: "${resolvedType}"`,
+          code: "unsupported_artifact_type",
+        },
+        { status: 400 }
+      );
+    }
     const result = await analyzeArtifact(content, { artifactType: resolvedType });
     const storage = await getStorage();
     const persisted = await storage.withTransaction((tx) =>
@@ -64,6 +77,12 @@ export async function POST(request: NextRequest) {
         analysis: result,
       })
     );
+    emitRunLifecycleEvents({
+      run_id: persisted.run_id,
+      artifact_id: persisted.artifact_id,
+      status: persisted.status,
+      analysis_error: result.analysis_error ?? null,
+    });
 
     return NextResponse.json({
       run_id: persisted.run_id,

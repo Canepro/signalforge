@@ -69,6 +69,15 @@ export async function POST(
       if (code === "source_not_found") {
         return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
       }
+      if (code === "unsupported_artifact_type") {
+        return NextResponse.json(
+          {
+            error: "Source expected_artifact_type is not supported by this SignalForge build",
+            code: "unsupported_artifact_type",
+          },
+          { status: 409 }
+        );
+      }
       if (code === "source_disabled") {
         return NextResponse.json(
           { error: "Source is disabled", code: "source_disabled" },

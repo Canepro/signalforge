@@ -37,6 +37,7 @@ This document describes the current `POST /api/runs` submission contract.
 
 If `artifact_type` is omitted, the server infers a type from content.
 Today, the only shipped artifact family is `linux-audit-log`.
+If the supplied or inferred `artifact_type` is unsupported, the route returns **400** with `code: "unsupported_artifact_type"`.
 
 ## Optional Ingestion Metadata
 

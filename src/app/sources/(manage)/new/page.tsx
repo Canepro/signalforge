@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { createSourceAction } from "../../actions";
+import {
+  DEFAULT_EXPECTED_ARTIFACT_TYPE,
+  getArtifactTypeLabel,
+  listSourceTypeOptions,
+} from "@/lib/source-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +14,8 @@ export default async function NewSourcePage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const sp = await searchParams;
+  const sourceTypeOptions = listSourceTypeOptions();
+  const defaultArtifactLabel = getArtifactTypeLabel(DEFAULT_EXPECTED_ARTIFACT_TYPE);
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -69,10 +76,33 @@ export default async function NewSourcePage({
             required
             className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
           >
-            <option value="linux_host">linux_host</option>
-            <option value="wsl">wsl</option>
+            {sourceTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.value}
+              </option>
+            ))}
           </select>
+          <span className="text-[10px] text-on-surface-variant mt-1 block leading-snug">
+            Current default artifact family:{" "}
+            <code className="text-[10px] font-mono bg-surface-container px-1 py-0.5 rounded">
+              {DEFAULT_EXPECTED_ARTIFACT_TYPE}
+            </code>{" "}
+            ({defaultArtifactLabel}).
+          </span>
         </label>
+        <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            Supported source types
+          </p>
+          <ul className="mt-2 space-y-1.5 text-[11px] leading-relaxed text-on-surface-variant">
+            {sourceTypeOptions.map((option) => (
+              <li key={option.value}>
+                <span className="font-semibold text-on-surface">{option.label}</span>:{" "}
+                {option.description}
+              </li>
+            ))}
+          </ul>
+        </div>
         <div className="flex gap-3 pt-2">
           <button
             type="submit"

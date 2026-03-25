@@ -77,8 +77,26 @@ export function submissionMetaFromRun(row: RunRow): RunSubmissionMeta {
   };
 }
 
-export function contentHash(content: string): string {
+function legacyContentHash(content: string): string {
   return createHash("sha256").update(content).digest("hex");
+}
+
+/**
+ * Family-aware artifact hash for new writes.
+ *
+ * The default artifact type preserves current callers/tests for the shipped
+ * `linux-audit-log` family, while insert lookup still falls back to the legacy
+ * raw-content hash for pre-upgrade rows.
+ */
+export function contentHash(
+  content: string,
+  artifactType = "linux-audit-log"
+): string {
+  return createHash("sha256")
+    .update(artifactType, "utf8")
+    .update("\0")
+    .update(content, "utf8")
+    .digest("hex");
 }
 
 function allRows<T>(db: Database, sql: string, params: unknown[] = []): T[] {
@@ -108,6 +126,24 @@ export function findArtifactByHash(db: Database, hash: string): ArtifactRow | nu
   return getOne<ArtifactRow>(db, "SELECT * FROM artifacts WHERE content_hash = ?", [hash]);
 }
 
+function findArtifactByContent(
+  db: Database,
+  artifactType: string,
+  content: string
+): ArtifactRow | null {
+  const familyHash = contentHash(content, artifactType);
+  const legacyHash = legacyContentHash(content);
+  return getOne<ArtifactRow>(
+    db,
+    `SELECT * FROM artifacts
+     WHERE content_hash = ?
+        OR (artifact_type = ? AND content_hash = ?)
+     ORDER BY CASE WHEN content_hash = ? THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [familyHash, artifactType, legacyHash, familyHash]
+  );
+}
+
 /**
  * Deduplicates by content_hash. On a cache hit, the returned row reflects the **first** insert’s
  * artifact-table metadata; use `insertRun` with per-submission `filename` / `source_type` for API truth.
@@ -121,8 +157,8 @@ export function insertArtifact(
     content: string;
   }
 ): ArtifactRow {
-  const hash = contentHash(opts.content);
-  const existing = findArtifactByHash(db, hash);
+  const hash = contentHash(opts.content, opts.artifact_type);
+  const existing = findArtifactByContent(db, opts.artifact_type, opts.content);
   if (existing) return existing;
 
   const id = randomUUID();

@@ -277,6 +277,9 @@ class SqliteJobsStore implements JobsStore {
     const job = getCollectionJobById(this.db, input.jobId);
     if (!job) return { ok: false as const, code: "not_found" };
     if (job.source_id !== input.sourceId) return { ok: false as const, code: "wrong_source" };
+    if (job.artifact_type !== input.artifactType) {
+      return { ok: false as const, code: "artifact_type_mismatch" };
+    }
     if (job.status === "submitted" && job.result_run_id && job.result_artifact_id) {
       return {
         ok: false as const,

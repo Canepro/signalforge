@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import type { Finding } from "@/lib/analyzer/schema";
+import { isSupportedArtifactType } from "@/lib/adapter/registry";
 import { buildRunDetail, toRunDetailJson } from "@/lib/api/run-detail-json";
 import {
   contentHash,
@@ -24,8 +25,6 @@ import type {
   StorageTx,
 } from "./contract";
 import {
-  collectCapabilityForArtifactType,
-  defaultCapabilitiesForArtifactType,
   generateAgentToken,
   hashAgentToken,
   type AgentRegistrationCreated,
@@ -38,6 +37,10 @@ import {
 import type { CompareDriftPayload, CompareRunSnapshot } from "@/lib/compare/build-compare";
 import { compareTargetsMismatch, normalizeTargetIdentifier, preferredTargetDisplayLabel } from "@/lib/target-identity";
 import { emitDomainEvent } from "@/lib/domain-events";
+import {
+  collectCapabilityForArtifactType,
+  defaultCapabilitiesForArtifactType,
+} from "@/lib/source-catalog";
 
 type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -303,17 +306,38 @@ async function insertArtifactPg(
   q: Queryable,
   opts: { artifact_type: string; source_type: string; filename: string; content: string }
 ) {
-  const hash = contentHash(opts.content);
-  const existing = await one<PgArtifactRow>(q, "SELECT * FROM artifacts WHERE content_hash = $1", [hash]);
+  const hash = contentHash(opts.content, opts.artifact_type);
+  const legacyHash = createHash("sha256").update(opts.content, "utf8").digest("hex");
+  const existing = await one<PgArtifactRow>(
+    q,
+    `SELECT * FROM artifacts
+     WHERE content_hash = $1
+        OR (artifact_type = $2 AND content_hash = $3)
+     ORDER BY CASE WHEN content_hash = $1 THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [hash, opts.artifact_type, legacyHash]
+  );
   if (existing) return existing;
   const id = randomUUID();
   const now = new Date().toISOString();
-  await q.query(
+  const inserted = await q.query<PgArtifactRow>(
     `INSERT INTO artifacts (id, created_at, artifact_type, source_type, filename, content_hash, content)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (content_hash) DO NOTHING
+     RETURNING *`,
     [id, now, opts.artifact_type, opts.source_type, opts.filename, hash, opts.content]
   );
-  return (await getArtifactById(q, id))!;
+  if (inserted.rows[0]) return inserted.rows[0];
+  return (
+    (await one<PgArtifactRow>(q, "SELECT * FROM artifacts WHERE content_hash = $1", [hash])) ??
+    (await one<PgArtifactRow>(
+      q,
+      `SELECT * FROM artifacts
+       WHERE artifact_type = $1 AND content_hash = $2
+       LIMIT 1`,
+      [opts.artifact_type, legacyHash]
+    ))!
+  );
 }
 
 async function insertRunPg(
@@ -552,6 +576,11 @@ class PostgresSourcesStore implements SourcesStore {
     const id = randomUUID();
     const now = new Date().toISOString();
     const expected = input.expected_artifact_type ?? "linux-audit-log";
+    if (!isSupportedArtifactType(expected)) {
+      const err = new Error("unsupported_artifact_type") as Error & { code: string };
+      err.code = "unsupported_artifact_type";
+      throw err;
+    }
     const targetNorm = normalizeTargetIdentifier(input.target_identifier);
     if (!targetNorm) throw new Error("target_identifier is required");
     await this.q.query(
@@ -693,6 +722,11 @@ class PostgresJobsStore implements JobsStore {
     if (!source.enabled) {
       const err = new Error("source_disabled");
       (err as Error & { code: string }).code = "source_disabled";
+      throw err;
+    }
+    if (!isSupportedArtifactType(source.expected_artifact_type)) {
+      const err = new Error("unsupported_artifact_type") as Error & { code: string };
+      err.code = "unsupported_artifact_type";
       throw err;
     }
     if (input.idempotency_key?.trim()) {
@@ -954,6 +988,9 @@ class PostgresJobsStore implements JobsStore {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.jobId]);
     if (!job) return { ok: false as const, code: "not_found" };
     if (job.source_id !== input.sourceId) return { ok: false as const, code: "wrong_source" };
+    if (job.artifact_type !== input.artifactType) {
+      return { ok: false as const, code: "artifact_type_mismatch" };
+    }
     if (job.status === "submitted" && job.result_run_id && job.result_artifact_id) {
       return { ok: false as const, code: "job_already_submitted", run_id: job.result_run_id, artifact_id: job.result_artifact_id };
     }

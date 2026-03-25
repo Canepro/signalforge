@@ -271,6 +271,96 @@ describe("Phase 6d agent routes", () => {
     expect(dbClient.saveDb).toHaveBeenCalled();
   });
 
+  it("artifact upload returns 409 when uploaded artifact_type mismatches the job", async () => {
+    process.env.SIGNALFORGE_ADMIN_TOKEN = ADMIN;
+
+    db.run(
+      `INSERT INTO sources (
+        id, display_name, target_identifier, target_identifier_norm, source_type, expected_artifact_type,
+        default_collector_type, default_collector_version, capabilities_json, attributes_json, labels_json, enabled,
+        last_seen_at, health_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
+      [
+        "src-mismatch",
+        "Mismatch Source",
+        "mismatch-target",
+        "mismatch-target",
+        "linux_host",
+        "container-diagnostics",
+        "signalforge-collectors",
+        null,
+        JSON.stringify(["collect:container-diagnostics"]),
+        "{}",
+        "{}",
+        1,
+        "2026-03-25T00:00:00.000Z",
+        "2026-03-25T00:00:00.000Z",
+      ]
+    );
+    db.run(
+      `INSERT INTO agent_registrations (
+        id, source_id, token_hash, display_name, created_at, last_capabilities_json, last_heartbeat_at, last_agent_version, last_instance_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        "reg-mismatch",
+        "src-mismatch",
+        sourceJobRepo.hashAgentToken("tok-mismatch"),
+        "Mismatch Agent",
+        "2026-03-25T00:00:00.000Z",
+        JSON.stringify(["collect:container-diagnostics"]),
+        "2026-03-25T00:00:00.000Z",
+        "0.1.0",
+        "proc-mismatch",
+      ]
+    );
+    db.run(
+      `INSERT INTO collection_jobs (
+        id, source_id, artifact_type, status, requested_by, request_reason, priority,
+        idempotency_key, lease_owner_id, lease_owner_instance_id, lease_expires_at, last_heartbeat_at,
+        result_artifact_id, result_run_id, error_code, error_message,
+        created_at, updated_at, queued_at, claimed_at, started_at, submitted_at, finished_at, result_analysis_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL)`,
+      [
+        "job-mismatch",
+        "src-mismatch",
+        "container-diagnostics",
+        "running",
+        "operator",
+        null,
+        0,
+        null,
+        "reg-mismatch",
+        "proc-mismatch",
+        "2999-01-01T00:00:00.000Z",
+        null,
+        "2026-03-25T00:00:00.000Z",
+        "2026-03-25T00:00:00.000Z",
+        "2026-03-25T00:00:00.000Z",
+        "2026-03-25T00:00:00.000Z",
+        "2026-03-25T00:00:00.000Z",
+      ]
+    );
+
+    const form = new FormData();
+    form.append("instance_id", "proc-mismatch");
+    form.append("file", new Blob([SAMPLE_LOG], { type: "text/plain" }), "audit.log");
+
+    const res = await POST_ARTIFACT(
+      new NextRequest("http://localhost/api/collection-jobs/job-mismatch/artifact", {
+        method: "POST",
+        headers: agentAuth("tok-mismatch"),
+        body: form,
+      }),
+      { params: Promise.resolve({ id: "job-mismatch" }) }
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Uploaded artifact_type does not match the requested job artifact_type",
+      code: "artifact_type_mismatch",
+    });
+  });
+
   it("claim wrong source returns 403", async () => {
     const { token } = await createSourceAndAgent(db, "tid-a");
     const { sourceId: s2 } = await createSourceAndAgent(db, "tid-b");

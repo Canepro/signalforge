@@ -20,7 +20,7 @@ Current product shape:
 This is not:
 
 - a chatbot
-- a remediation engine
+- a remediation engine in the current product scope
 - a collector/orchestrator
 - a generic observability platform
 
@@ -187,7 +187,7 @@ Do not expand into these without an explicit plan change:
 - auth
 - chat
 - generalized policy engine
-- remediation
+- remediation in the current product scope
 - multi-tenant/fleet management
 - broad platform abstraction
 

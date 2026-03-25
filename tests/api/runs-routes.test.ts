@@ -5,6 +5,7 @@ import { GET as GET_RUN } from "@/app/api/runs/[id]/route";
 import { GET as GET_REPORT } from "@/app/api/runs/[id]/report/route";
 import * as repository from "@/lib/db/repository";
 import * as dbClient from "@/lib/db/client";
+import * as domainEvents from "@/lib/domain-events";
 import { getTestDb } from "@/lib/db/client";
 import type { Database } from "sql.js";
 
@@ -224,6 +225,62 @@ Linux meta 5.0 x86_64
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("POST JSON returns 400 for unsupported artifact_type", async () => {
+    const req = new NextRequest("http://localhost/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "=== x ===\n",
+        filename: "bad.log",
+        artifact_type: "container-diagnostics",
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'Unsupported artifact_type: "container-diagnostics"',
+      code: "unsupported_artifact_type",
+    });
+  });
+
+  it("POST JSON emits run lifecycle events after persistence", async () => {
+    const emitSpy = vi
+      .spyOn(domainEvents, "emitRunLifecycleEvents")
+      .mockImplementation(() => {});
+
+    const log = `=== signalforge-collectors ===
+hostname: event-host
+=== uname -a ===
+Linux event 5.0 x86_64
+`;
+    const req = new NextRequest("http://localhost/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: log,
+        filename: "event.log",
+        source_type: "api",
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      run_id: string;
+      artifact_id: string;
+      status: string;
+    };
+
+    expect(emitSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        run_id: body.run_id,
+        artifact_id: body.artifact_id,
+        status: body.status,
+      })
+    );
   });
 
   it("POST multipart carries ingestion fields as optional form parts", async () => {

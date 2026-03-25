@@ -368,10 +368,54 @@ for (const backend of backends) {
       expect(child.artifact_id).toBe(src.artifact_id);
     });
 
+    it("same bytes remain distinct across artifact families", async () => {
+      const first = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "same-linux.log",
+          content: "same-bytes-cross-family",
+          ingestion: {
+            target_identifier: "cross-family",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const second = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "same-container.log",
+          content: "same-bytes-cross-family",
+          ingestion: {
+            target_identifier: "cross-family",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      expect(second.artifact_id).not.toBe(first.artifact_id);
+
+      const firstDetail = await storage.runs.getApiDetail(first.run_id);
+      const secondDetail = await storage.runs.getApiDetail(second.run_id);
+      expect(firstDetail?.artifact_type).toBe("linux-audit-log");
+      expect(secondDetail?.artifact_type).toBe("container-diagnostics");
+    });
+
     it("compare finds implicit baseline after reanalyze", async () => {
       const runs = await storage.runs.listSummaries();
-      const latest = runs[0]!;
-      const result = await storage.runs.getComparePayload(latest.id);
+      const child = runs.find((run) => run.filename === "reanalyzed.log");
+      expect(child).toBeTruthy();
+      const result = await storage.runs.getComparePayload(child!.id);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.payload.baseline_missing).toBe(false);
@@ -402,6 +446,19 @@ for (const backend of backends) {
             display_name: "Dup",
             target_identifier: "parity-src-1",
             source_type: "wsl",
+          })
+        )
+      ).rejects.toThrow();
+    });
+
+    it("unsupported expected_artifact_type throws", async () => {
+      await expect(
+        storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Unsupported",
+            target_identifier: "unsupported-artifact-source",
+            source_type: "linux_host",
+            expected_artifact_type: "container-diagnostics",
           })
         )
       ).rejects.toThrow();
@@ -693,6 +750,65 @@ for (const backend of backends) {
       expect(submitted.run_id).toBeTruthy();
       expect(submitted.artifact_id).toBeTruthy();
       expect(submitted.run_status).toBe("complete");
+    });
+
+    it("submitArtifactForAgent rejects artifact_type mismatch", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Mismatch Host",
+          target_identifier: "parity-submit-mismatch",
+          source_type: "linux_host",
+        })
+      );
+      const { row: reg } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(src.id)
+      );
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId: src.id,
+          registrationId: reg.id,
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, {})
+      );
+      await storage.withTransaction((tx) =>
+        tx.jobs.claimForAgent(job.id, src.id, reg.id, "inst-sm", 300)
+      );
+      await storage.withTransaction((tx) =>
+        tx.jobs.startForAgent(job.id, src.id, reg.id, "inst-sm")
+      );
+
+      const submitted = await storage.withTransaction((tx) =>
+        tx.jobs.submitArtifactForAgent({
+          jobId: job.id,
+          sourceId: src.id,
+          registrationId: reg.id,
+          instanceId: "inst-sm",
+          artifactType: "container-diagnostics",
+          sourceType: "agent",
+          filename: "parity.log",
+          content: SAMPLE_LOG,
+          ingestion: {
+            target_identifier: "parity-submit-mismatch",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      expect(submitted).toEqual({
+        ok: false,
+        code: "artifact_type_mismatch",
+      });
     });
 
     it("heartbeat extends lease on active job", async () => {

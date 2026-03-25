@@ -13,7 +13,7 @@ They intentionally do **not** fully duplicate the analyzer’s full `AuditReport
 
 | File | Use |
 |------|-----|
-| `error-response.schema.json` | `{ "error": string }` |
+| `error-response.schema.json` | `{ "error": string, "code"?: string }` |
 | `ingestion-metadata.schema.json` | Optional Phase 5a fields on `POST /api/runs` |
 | `post-runs-response.schema.json` | Success body for `POST /api/runs` |
 | `post-reanalyze-response.schema.json` | Success body for `POST /api/runs/[id]/reanalyze` |

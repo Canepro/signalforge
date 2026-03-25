@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  DEFAULT_EXPECTED_ARTIFACT_TYPE,
+  getArtifactTypeLabel,
+} from "@/lib/source-catalog";
 
 interface CollectEvidenceModalProps {
   open: boolean;
@@ -45,6 +49,7 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
 export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [origin, setOrigin] = useState("http://localhost:3000");
+  const currentArtifactLabel = getArtifactTypeLabel(DEFAULT_EXPECTED_ARTIFACT_TYPE);
 
   useEffect(() => {
     if (open && typeof window !== "undefined") {
@@ -111,7 +116,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `bun run src/cli.ts once`,
   ].join("\n");
 
-  const cliSubmit = `SIGNALFORGE_URL=${origin} ./scripts/analyze.sh /path/to/your-audit.log`;
+  const cliSubmit = `SIGNALFORGE_URL=${origin} ./scripts/analyze.sh /path/to/your-artifact.log`;
 
   const collectorPush = [
     `cd /path/to/signalforge-collectors`,
@@ -142,6 +147,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
               SignalForge analyzes evidence; collection runs outside the app.
               Use the <strong>job-driven</strong> path (Sources + agent) or <strong>push</strong> directly.
+              The current shipped artifact family is <strong>{currentArtifactLabel}</strong>.
             </p>
           </div>
           <button
@@ -208,7 +214,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <div className="border-t border-outline-variant/20 pt-4 space-y-1">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Alternative: direct push</h3>
             <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              If you already have an audit log and don&apos;t need job tracking, push it directly.
+              If you already have a compatible diagnostic artifact and don&apos;t need job tracking, push it directly.
               Use <span className="font-semibold text-on-surface">--target-id</span> so compare can match runs to the same host.
             </p>
           </div>
@@ -218,6 +224,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <CopyBlock label="Reference push (from signalforge-collectors checkout)" text={collectorPush} />
 
           <p className="text-[10px] text-outline-variant leading-snug">
+            Current family: <span className="font-mono">{DEFAULT_EXPECTED_ARTIFACT_TYPE}</span>.{" "}
             Docs: <span className="font-mono">docs/external-submit.md</span>,{" "}
             <span className="font-mono">docs/getting-started.md</span>
           </p>

@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSupportedArtifactType } from "@/lib/adapter/registry";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
 import { getStorage } from "@/lib/storage";
-import type { SourceType } from "@/lib/db/source-job-repository";
-
-function isSourceType(v: string): v is SourceType {
-  return v === "linux_host" || v === "wsl";
-}
+import { isSourceType, listSourceTypeOptions } from "@/lib/source-catalog";
 
 export async function GET(request: NextRequest) {
   const denied = requireAdminBearer(request);
@@ -60,8 +57,23 @@ export async function POST(request: NextRequest) {
       );
     }
     if (!isSourceType(source_type)) {
+      const allowed = listSourceTypeOptions()
+        .map((option) => option.value)
+        .join(" | ");
       return NextResponse.json(
-        { error: "source_type must be linux_host or wsl", code: "validation_error" },
+        { error: `source_type must be one of: ${allowed}`, code: "validation_error" },
+        { status: 400 }
+      );
+    }
+    if (
+      typeof body.expected_artifact_type === "string" &&
+      !isSupportedArtifactType(body.expected_artifact_type)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Unsupported expected_artifact_type: "${body.expected_artifact_type}"`,
+          code: "unsupported_artifact_type",
+        },
         { status: 400 }
       );
     }
@@ -105,7 +117,17 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(row, { status: 201 });
     } catch (e) {
+      const code = (e as Error & { code?: string }).code;
       const msg = e instanceof Error ? e.message : String(e);
+      if (code === "unsupported_artifact_type") {
+        return NextResponse.json(
+          {
+            error: `Unsupported expected_artifact_type: "${body.expected_artifact_type}"`,
+            code: "unsupported_artifact_type",
+          },
+          { status: 400 }
+        );
+      }
       if (msg.includes("UNIQUE") || msg.includes("unique")) {
         return NextResponse.json(
           {

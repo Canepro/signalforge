@@ -9,7 +9,7 @@ import {
   hashAdminSessionCookie,
   verifyAdminSessionCookie,
 } from "@/lib/api/admin-auth";
-import type { SourceType } from "@/lib/db/source-job-repository";
+import { isSourceType, type SourceType } from "@/lib/source-catalog";
 import { getStorage } from "@/lib/storage";
 
 async function assertAdminSession(): Promise<void> {
@@ -61,7 +61,7 @@ export async function createSourceAction(formData: FormData): Promise<void> {
   if (!display_name || !target_identifier || !source_type) {
     redirect("/sources/new?error=missing");
   }
-  if (source_type !== "linux_host" && source_type !== "wsl") {
+  if (!isSourceType(source_type)) {
     redirect("/sources/new?error=type");
   }
 

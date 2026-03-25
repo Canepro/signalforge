@@ -1,9 +1,17 @@
 import type { Database } from "sql.js";
 import { createHash, randomBytes, randomUUID } from "crypto";
+import { isSupportedArtifactType } from "../adapter/registry";
 import { normalizeTargetIdentifier } from "../target-identity";
 import { emitDomainEvent } from "../domain-events";
+import {
+  DEFAULT_EXPECTED_ARTIFACT_TYPE,
+  collectCapabilityForArtifactType,
+  defaultCapabilitiesForArtifactType,
+  type SourceType,
+} from "../source-catalog";
 
-export type SourceType = "linux_host" | "wsl";
+export type { SourceType } from "../source-catalog";
+export { collectCapabilityForArtifactType, defaultCapabilitiesForArtifactType } from "../source-catalog";
 export type JobStatus =
   | "queued"
   | "claimed"
@@ -105,11 +113,10 @@ export function generateAgentToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-const DEFAULT_COLLECT = "collect:linux-audit-log";
-
-export function defaultCapabilitiesForArtifactType(expectedArtifactType: string): string[] {
-  if (expectedArtifactType === "linux-audit-log") return [DEFAULT_COLLECT];
-  return [];
+function codeError(code: string): Error & { code: string } {
+  const err = new Error(code) as Error & { code: string };
+  err.code = code;
+  return err;
 }
 
 export interface CreateSourceInput {
@@ -128,7 +135,10 @@ export interface CreateSourceInput {
 export function insertSource(db: Database, input: CreateSourceInput): SourceRow {
   const id = randomUUID();
   const now = new Date().toISOString();
-  const expected = input.expected_artifact_type ?? "linux-audit-log";
+  const expected = input.expected_artifact_type ?? DEFAULT_EXPECTED_ARTIFACT_TYPE;
+  if (!isSupportedArtifactType(expected)) {
+    throw codeError("unsupported_artifact_type");
+  }
   const caps =
     input.capabilities?.length ?
       input.capabilities
@@ -317,9 +327,11 @@ export function insertCollectionJob(
   input: CreateCollectionJobInput
 ): { row: CollectionJobRow; inserted: boolean } {
   if (!source.enabled) {
-    const err = new Error("source_disabled");
-    (err as Error & { code: string }).code = "source_disabled";
-    throw err;
+    throw codeError("source_disabled");
+  }
+
+  if (!isSupportedArtifactType(source.expected_artifact_type)) {
+    throw codeError("unsupported_artifact_type");
   }
 
   if (input.idempotency_key?.trim()) {
@@ -440,11 +452,6 @@ export function getAgentRegistrationByTokenHash(
     "SELECT * FROM agent_registrations WHERE token_hash = ?",
     [tokenHash]
   );
-}
-
-/** e.g. `linux-audit-log` → `collect:linux-audit-log` */
-export function collectCapabilityForArtifactType(artifactType: string): string {
-  return `collect:${artifactType}`;
 }
 
 function parseJsonArray(raw: string | null | undefined): string[] {
