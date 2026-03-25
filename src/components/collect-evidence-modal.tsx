@@ -72,14 +72,26 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
   if (!open) return null;
 
-  const agentOnce = [
-    `export SIGNALFORGE_URL=${origin}`,
-    `export SIGNALFORGE_AGENT_TOKEN='<token from enrollment>'`,
-    `export SIGNALFORGE_AGENT_INSTANCE_ID="$(hostname)-agent-1"`,
-    `export SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
-    ``,
-    `bun run src/cli.ts once`,
+  const agentEnvFile = [
+    `SIGNALFORGE_URL=${origin}`,
+    `SIGNALFORGE_AGENT_TOKEN=<token from enrollment or reissue>`,
+    `SIGNALFORGE_AGENT_INSTANCE_ID=$(hostname)-agent-1`,
+    `SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
+    `SIGNALFORGE_POLL_INTERVAL_MS=30000`,
+    `SIGNALFORGE_JOBS_WAIT_SECONDS=20`,
   ].join("\n");
+
+  const agentServiceSetup = [
+    `cd /path/to/signalforge-agent`,
+    `git pull origin main`,
+    `bun install`,
+    ``,
+    `cp contrib/systemd/signalforge-agent.env.example contrib/systemd/signalforge-agent.env`,
+    `# edit contrib/systemd/signalforge-agent.env`,
+    `sudo ./scripts/install-systemd-service.sh`,
+  ].join("\n");
+
+  const agentServiceCheck = [`systemctl status signalforge-agent`, `journalctl -u signalforge-agent -f`].join("\n");
 
   const agentRun = [
     `export SIGNALFORGE_URL=${origin}`,
@@ -88,6 +100,15 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `export SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
     ``,
     `bun run src/cli.ts run`,
+  ].join("\n");
+
+  const agentOnce = [
+    `export SIGNALFORGE_URL=${origin}`,
+    `export SIGNALFORGE_AGENT_TOKEN='<token from enrollment>'`,
+    `export SIGNALFORGE_AGENT_INSTANCE_ID="$(hostname)-agent-1"`,
+    `export SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
+    ``,
+    `bun run src/cli.ts once`,
   ].join("\n");
 
   const cliSubmit = `SIGNALFORGE_URL=${origin} ./scripts/analyze.sh /path/to/your-audit.log`;
@@ -138,7 +159,9 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
         <div className="px-5 py-4 space-y-5">
           {/* Job-driven path — lead with this */}
           <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-primary">Recommended: job-driven collection</h3>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-primary">
+              Recommended: installed agent service
+            </h3>
             <ol className="text-[11px] text-on-surface-variant leading-relaxed space-y-1 list-decimal list-inside">
               <li>
                 Open{" "}
@@ -147,22 +170,38 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                 </Link>{" "}
                 and register a target
               </li>
-              <li>Enroll an agent (one token per source)</li>
+              <li>Enroll an agent and copy the one-time token</li>
               <li>
-                Run <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">signalforge-agent run</code>{" "}
-                on the host so it keeps heartbeating and polling in the background
+                Install <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">signalforge-agent</code>{" "}
+                as a background service on the source host
               </li>
               <li>
-                Click <strong>Collect Fresh Evidence</strong> to create a queued job. A running agent claims it on its next poll.
+                Request collection from the UI. The running agent heartbeats, long-polls for work, and claims queued jobs automatically.
               </li>
             </ol>
             <p className="text-[11px] leading-relaxed text-on-surface-variant">
-              Use <span className="font-semibold text-on-surface">run</span> for normal operation.{" "}
-              <span className="font-semibold text-on-surface">once</span> is best for smoke tests, debugging, or cron-style scheduled collection.
+              This is the normal operator setup.{" "}
+              <span className="font-semibold text-on-surface">run</span> stays alive in the background;{" "}
+              <span className="font-semibold text-on-surface">once</span> is only for smoke tests, debugging, or cron-style schedules.
             </p>
           </div>
 
-          <CopyBlock label="Agent continuous mode (recommended)" text={agentRun} />
+          <CopyBlock label="Agent env file" text={agentEnvFile} />
+
+          <CopyBlock label="Install agent service (recommended)" text={agentServiceSetup} />
+
+          <CopyBlock label="Check service status" text={agentServiceCheck} />
+
+          <div className="border-t border-outline-variant/20 pt-4 space-y-1">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Fallback: manual agent commands
+            </h3>
+            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+              Use these only when you are testing or debugging agent behavior directly from a shell.
+            </p>
+          </div>
+
+          <CopyBlock label="Agent continuous mode (manual)" text={agentRun} />
 
           <CopyBlock label="Agent one-shot (debug or cron)" text={agentOnce} />
 
