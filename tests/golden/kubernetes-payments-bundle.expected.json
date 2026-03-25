@@ -39,7 +39,17 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "automatically mounts service account tokens",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "does not enforce runAsNonRoot",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "uses a writable root filesystem",
       "severity": "medium",
       "category": "kubernetes"
     },
@@ -75,6 +85,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 13,
-  "max_findings": 13
+  "min_findings": 15,
+  "max_findings": 15
 }

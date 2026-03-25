@@ -50,6 +50,7 @@ type KubernetesSecurityContext = {
   privileged?: boolean;
   allowPrivilegeEscalation?: boolean;
   runAsNonRoot?: boolean;
+  readOnlyRootFilesystem?: boolean;
   seccompProfile?: {
     type?: string;
   } | null;
@@ -67,6 +68,7 @@ type KubernetesContainerSpec = {
 };
 
 type KubernetesPodSpec = {
+  automountServiceAccountToken?: boolean;
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
 };
@@ -305,12 +307,26 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         for (const workload of workloads) {
           const label = workloadLabel(workload.namespace, workload.name);
           const podSecurityContext = workload.pod_spec?.securityContext;
+
+          if (workload.pod_spec?.automountServiceAccountToken !== false) {
+            findings.push({
+              title: `Kubernetes workload automatically mounts service account tokens: ${label}`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(workload),
+              rule_id: "kubernetes.workload_service_account_token_automount",
+            });
+          }
+
           for (const container of workload.pod_spec?.containers ?? []) {
             const securityContext = container.securityContext ?? {};
             const combinedSeccompType =
               securityContext.seccompProfile?.type ?? podSecurityContext?.seccompProfile?.type;
             const runAsNonRoot =
               securityContext.runAsNonRoot ?? podSecurityContext?.runAsNonRoot;
+            const readOnlyRootFilesystem =
+              securityContext.readOnlyRootFilesystem ?? podSecurityContext?.readOnlyRootFilesystem;
 
             if (securityContext.privileged) {
               findings.push({
@@ -353,6 +369,17 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 section_source: doc.path,
                 evidence: JSON.stringify({ workload, container }),
                 rule_id: "kubernetes.workload_seccomp",
+              });
+            }
+
+            if (readOnlyRootFilesystem !== true) {
+              findings.push({
+                title: `Kubernetes workload uses a writable root filesystem: ${label}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_read_only_rootfs",
               });
             }
 

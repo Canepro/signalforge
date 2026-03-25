@@ -143,7 +143,11 @@ describe("KubernetesBundleAdapter", () => {
     expect(
       findings.some((finding) => finding.title.includes("allows privilege escalation"))
     ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("automatically mounts service account tokens"))
+    ).toBe(true);
     expect(findings.some((finding) => finding.title.includes("does not enforce runAsNonRoot"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("uses a writable root filesystem"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("missing liveness or readiness probes"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("missing resource requests or limits"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("missing a RuntimeDefault seccomp profile"))).toBe(true);

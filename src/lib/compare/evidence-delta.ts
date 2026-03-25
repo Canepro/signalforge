@@ -46,6 +46,7 @@ type ContainerEvidenceSummary = {
   added_capability_count: number;
   secret_mount_count: number;
   runs_as_root: boolean;
+  read_only_rootfs: boolean;
 };
 
 type KubernetesServiceExposure = {
@@ -76,6 +77,7 @@ type KubernetesSecurityContext = {
   privileged?: boolean;
   allowPrivilegeEscalation?: boolean;
   runAsNonRoot?: boolean;
+  readOnlyRootFilesystem?: boolean;
   seccompProfile?: {
     type?: string;
   } | null;
@@ -92,6 +94,7 @@ type KubernetesContainerSpec = {
 };
 
 type KubernetesPodSpec = {
+  automountServiceAccountToken?: boolean;
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
 };
@@ -110,6 +113,8 @@ type KubernetesEvidenceSummary = {
   network_policy_count: number;
   exposed_namespace_without_network_policy_count: number;
   workload_hardening_gap_count: number;
+  service_account_token_automount_count: number;
+  writable_root_filesystem_workload_count: number;
 };
 
 function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
@@ -264,6 +269,9 @@ function summarizeContainerEvidence(content: string): ContainerEvidenceSummary {
     runs_as_root: ["true", "yes", "1", "on"].includes(
       (sections.ran_as_root ?? "").trim().toLowerCase()
     ),
+    read_only_rootfs: ["true", "yes", "1", "on"].includes(
+      (sections.read_only_rootfs ?? "").trim().toLowerCase()
+    ),
   };
 }
 
@@ -283,11 +291,14 @@ function normalizedList(values: string[] | undefined): string[] {
 function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
   let gaps = 0;
   const podSecurityContext = workload.pod_spec?.securityContext;
+  if (workload.pod_spec?.automountServiceAccountToken !== false) gaps += 1;
   for (const container of workload.pod_spec?.containers ?? []) {
     const securityContext = container.securityContext ?? {};
     const combinedSeccompType =
       securityContext.seccompProfile?.type ?? podSecurityContext?.seccompProfile?.type;
     const runAsNonRoot = securityContext.runAsNonRoot ?? podSecurityContext?.runAsNonRoot;
+    const readOnlyRootFilesystem =
+      securityContext.readOnlyRootFilesystem ?? podSecurityContext?.readOnlyRootFilesystem;
 
     if (securityContext.privileged) gaps += 1;
     if (securityContext.allowPrivilegeEscalation) gaps += 1;
@@ -295,6 +306,7 @@ function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): numbe
     if (combinedSeccompType !== "RuntimeDefault" && combinedSeccompType !== "Localhost") {
       gaps += 1;
     }
+    if (readOnlyRootFilesystem !== true) gaps += 1;
     if (!container.livenessProbe || !container.readinessProbe) gaps += 1;
 
     const hasRequests = hasResourceEntries(container.resources?.requests);
@@ -318,6 +330,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       network_policy_count: 0,
       exposed_namespace_without_network_policy_count: 0,
       workload_hardening_gap_count: 0,
+      service_account_token_automount_count: 0,
+      writable_root_filesystem_workload_count: 0,
     };
   }
 
@@ -328,6 +342,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let rbacNodeProxyAccessRoleCount = 0;
   let networkPolicyCount = 0;
   let workloadHardeningGapCount = 0;
+  let serviceAccountTokenAutomountCount = 0;
+  let writableRootFilesystemWorkloadCount = 0;
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
 
@@ -394,6 +410,18 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     if (doc.kind === "workload-specs") {
       for (const workload of parseKubernetesJson<KubernetesWorkloadSpec>(doc)) {
         workloadHardeningGapCount += summarizeWorkloadHardeningGaps(workload);
+        if (workload.pod_spec?.automountServiceAccountToken !== false) {
+          serviceAccountTokenAutomountCount += 1;
+        }
+
+        const podSecurityContext = workload.pod_spec?.securityContext;
+        const hasWritableRootFilesystem = (workload.pod_spec?.containers ?? []).some((container) => {
+          const securityContext = container.securityContext ?? {};
+          const readOnlyRootFilesystem =
+            securityContext.readOnlyRootFilesystem ?? podSecurityContext?.readOnlyRootFilesystem;
+          return readOnlyRootFilesystem !== true;
+        });
+        if (hasWritableRootFilesystem) writableRootFilesystemWorkloadCount += 1;
       }
     }
   }
@@ -415,6 +443,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     network_policy_count: networkPolicyCount,
     exposed_namespace_without_network_policy_count: exposedNamespaceWithoutNetworkPolicyCount,
     workload_hardening_gap_count: workloadHardeningGapCount,
+    service_account_token_automount_count: serviceAccountTokenAutomountCount,
+    writable_root_filesystem_workload_count: writableRootFilesystemWorkloadCount,
   };
 }
 
@@ -468,6 +498,13 @@ function buildFamilyMetrics(
         "Runs as root",
         previous.runs_as_root,
         next.runs_as_root,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "read_only_rootfs",
+        "Read-only root filesystem",
+        previous.read_only_rootfs,
+        next.read_only_rootfs,
         "container-diagnostics"
       ),
     ];
@@ -538,6 +575,20 @@ function buildFamilyMetrics(
         "Workload hardening gaps",
         previous.workload_hardening_gap_count,
         next.workload_hardening_gap_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "service_account_token_automount_count",
+        "Workloads with service account token automount",
+        previous.service_account_token_automount_count,
+        next.service_account_token_automount_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "writable_root_filesystem_workload_count",
+        "Workloads with writable root filesystems",
+        previous.writable_root_filesystem_workload_count,
+        next.writable_root_filesystem_workload_count,
         "kubernetes-bundle"
       ),
     ];

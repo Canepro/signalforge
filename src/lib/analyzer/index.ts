@@ -217,8 +217,8 @@ function containerTitlePriority(title: string): number {
   if (normalized.includes("privileged mode")) return 5;
   if (normalized.includes("host network")) return 4;
   if (normalized.includes("host pid namespace")) return 3;
-  if (normalized.includes("privilege escalation")) return 2;
-  if (normalized.includes("linux capabilities")) return 1;
+  if (normalized.includes("root filesystem is not read-only")) return 2;
+  if (normalized.includes("privilege escalation")) return 1;
   return 0;
 }
 
@@ -230,10 +230,10 @@ function kubernetesTitlePriority(title: string): number {
   if (normalized.includes("grants wildcard access")) return 7;
   if (normalized.includes("without networkpolicy isolation")) return 6;
   if (normalized.includes("service exposed externally")) return 5;
-  if (normalized.includes("runs privileged")) return 4;
-  if (normalized.includes("allows privilege escalation")) return 3;
-  if (normalized.includes("seccomp profile")) return 2;
-  if (normalized.includes("missing liveness or readiness probes")) return 1;
+  if (normalized.includes("automatically mounts service account tokens")) return 4;
+  if (normalized.includes("runs privileged")) return 3;
+  if (normalized.includes("allows privilege escalation")) return 2;
+  if (normalized.includes("writable root filesystem")) return 1;
   return 0;
 }
 
@@ -296,6 +296,9 @@ function summarizeFallbackFinding(finding: Finding): string {
     if (title.includes("runs as root")) {
       return `${finding.title}, which increases the impact of a compromise inside the container.`;
     }
+    if (title.includes("root filesystem is not read-only")) {
+      return `${finding.title}, which makes post-compromise tampering and unexpected state changes easier inside the workload.`;
+    }
     if (title.includes("not pinned")) {
       return `${finding.title}, which makes rollbacks and provenance harder to control over time.`;
     }
@@ -328,6 +331,12 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("allows privilege escalation")) {
       return `${finding.title}, which reduces the process-level guardrails expected in a hardened workload.`;
+    }
+    if (title.includes("automatically mounts service account tokens")) {
+      return `${finding.title}, which increases the chance that in-cluster credentials are exposed to pods that do not actually need them.`;
+    }
+    if (title.includes("writable root filesystem")) {
+      return `${finding.title}, which weakens immutable workload assumptions and makes tampering or persistence inside the pod easier.`;
     }
     if (title.includes("writable mounted volumes")) {
       return `${finding.title}, which can make persistence, tampering, or unexpected state carry-over easier if the container is compromised.`;
@@ -465,6 +474,9 @@ function buildActionForFinding(
     if (tl.includes("runs as root")) {
       return "Run the container as a non-root user where possible, and document the cases that still require root inside the workload.";
     }
+    if (tl.includes("root filesystem is not read-only")) {
+      return "Set the container root filesystem to read-only where possible, then move the small set of writable paths onto explicit writable volumes.";
+    }
     if (tl.includes("not pinned")) {
       return "Pin the image to an immutable version or digest so deploys and rollback behavior stay predictable.";
     }
@@ -498,6 +510,12 @@ function buildActionForFinding(
     }
     if (tl.includes("allows privilege escalation")) {
       return "Set allowPrivilegeEscalation to false unless the workload has a documented exception, and verify the container still starts and serves traffic.";
+    }
+    if (tl.includes("automatically mounts service account tokens")) {
+      return "Set automountServiceAccountToken to false for workloads that do not need direct Kubernetes API access, and use a narrower identity path only where required.";
+    }
+    if (tl.includes("writable root filesystem")) {
+      return "Set readOnlyRootFilesystem to true where possible, then move required writable state onto explicit volumes and confirm the workload still starts cleanly.";
     }
     if (tl.includes("writable mounted volumes")) {
       return "Review which mounted paths truly need write access, switch the rest to read-only, and confirm the workload still functions with the narrower filesystem permissions.";

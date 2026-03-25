@@ -160,6 +160,17 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
       });
     }
 
+    if (!parseContainerBoolean(sections.read_only_rootfs)) {
+      findings.push({
+        title: "Container root filesystem is not read-only",
+        severity_hint: "medium",
+        category: "container",
+        section_source: "read_only_rootfs",
+        evidence: sections.read_only_rootfs || "false",
+        rule_id: "container.read_only_rootfs",
+      });
+    }
+
     if (secrets.length > 0) {
       findings.push({
         title: "Container receives mounted secrets",

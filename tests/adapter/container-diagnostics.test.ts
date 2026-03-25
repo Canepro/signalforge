@@ -15,6 +15,7 @@ added_capabilities: SYS_ADMIN, NET_ADMIN
 allow_privilege_escalation: true
 mounts: /var/run/docker.sock:/var/run/docker.sock,/srv/data:/data
 writable_mounts: /data
+read_only_rootfs: false
 secrets: /run/secrets/db-password
 ran_as_root: true
 `;
@@ -46,5 +47,8 @@ describe("ContainerDiagnosticsAdapter", () => {
     expect(findings.some((finding) => finding.title.includes("writable mounted volumes"))).toBe(
       true
     );
+    expect(
+      findings.some((finding) => finding.title.includes("root filesystem is not read-only"))
+    ).toBe(true);
   });
 });

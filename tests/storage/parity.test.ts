@@ -285,6 +285,7 @@ function containerArtifact(fields: Record<string, string>): string {
     "published_ports",
     "mounts",
     "writable_mounts",
+    "read_only_rootfs",
     "added_capabilities",
     "secrets",
     "ran_as_root",
@@ -483,6 +484,7 @@ for (const backend of backends) {
             published_ports: "8080:80",
             mounts: "/srv/config:/config",
             writable_mounts: "/config",
+            read_only_rootfs: "true",
             added_capabilities: "NET_BIND_SERVICE",
             secrets: "db-password",
             ran_as_root: "false",
@@ -511,6 +513,7 @@ for (const backend of backends) {
             published_ports: "8080:80,8443:443",
             mounts: "/srv/config:/config,/srv/data:/data",
             writable_mounts: "/config,/data",
+            read_only_rootfs: "false",
             added_capabilities: "NET_BIND_SERVICE,SYS_PTRACE",
             secrets: "db-password,api-key",
             ran_as_root: "true",
@@ -575,6 +578,13 @@ for (const backend of backends) {
             family: "container-diagnostics",
             previous: false,
             current: true,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "read_only_rootfs",
+            family: "container-diagnostics",
+            previous: true,
+            current: false,
             status: "changed",
           }),
         ])
@@ -654,13 +664,16 @@ for (const backend of backends) {
                     pod_spec: {
                       securityContext: {
                         runAsNonRoot: true,
+                        readOnlyRootFilesystem: true,
                         seccompProfile: { type: "RuntimeDefault" },
                       },
+                      automountServiceAccountToken: false,
                       containers: [
                         {
                           name: "api",
                           securityContext: {
                             allowPrivilegeEscalation: false,
+                            readOnlyRootFilesystem: true,
                           },
                           readinessProbe: { httpGet: { path: "/ready", port: 8080 } },
                           livenessProbe: { httpGet: { path: "/live", port: 8080 } },
@@ -801,6 +814,7 @@ for (const backend of backends) {
                     name: "payments-api",
                     kind: "Deployment",
                     pod_spec: {
+                      automountServiceAccountToken: true,
                       containers: [
                         {
                           name: "api",
@@ -808,6 +822,7 @@ for (const backend of backends) {
                             privileged: true,
                             allowPrivilegeEscalation: true,
                             runAsNonRoot: false,
+                            readOnlyRootFilesystem: false,
                             seccompProfile: { type: "Unconfined" },
                           },
                           readinessProbe: null,
@@ -873,7 +888,7 @@ for (const backend of backends) {
             key: "workload_hardening_gap_count",
             family: "kubernetes-bundle",
             previous: 0,
-            current: 6,
+            current: 8,
             status: "changed",
           }),
           expect.objectContaining({
@@ -892,6 +907,20 @@ for (const backend of backends) {
           }),
           expect.objectContaining({
             key: "rbac_node_proxy_access_role_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "service_account_token_automount_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "writable_root_filesystem_workload_count",
             family: "kubernetes-bundle",
             previous: 0,
             current: 1,

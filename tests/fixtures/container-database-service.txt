@@ -7,4 +7,5 @@ image: docker.io/library/postgres:16-alpine
 published_ports: 5432:5432/tcp
 mounts: volume:/var/lib/postgresql/data
 writable_mounts: /var/lib/postgresql/data
+read_only_rootfs: false
 ran_as_root: true

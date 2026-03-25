@@ -23,9 +23,19 @@
       "title_contains": "without NetworkPolicy isolation",
       "severity": "high",
       "category": "kubernetes"
+    },
+    {
+      "title_contains": "automatically mounts service account tokens",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "uses a writable root filesystem",
+      "severity": "medium",
+      "category": "kubernetes"
     }
   ],
   "is_incomplete": false,
-  "min_findings": 2,
-  "max_findings": 2
+  "min_findings": 4,
+  "max_findings": 4
 }
