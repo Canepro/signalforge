@@ -535,11 +535,13 @@ describe("API GET /api/runs/[id]/compare", () => {
                         seccompProfile: { type: "RuntimeDefault" },
                       },
                       automountServiceAccountToken: false,
+                  volumes: [],
                   containers: [
                     {
                       name: "api",
                       env: [],
                       envFrom: [],
+                      volumeMounts: [],
                       securityContext: {
                         allowPrivilegeEscalation: false,
                         readOnlyRootFilesystem: true,
@@ -674,6 +676,26 @@ describe("API GET /api/runs/[id]/compare", () => {
                 pod_spec: {
                   serviceAccountName: "default",
                   automountServiceAccountToken: true,
+                  volumes: [
+                    {
+                      name: "payments-api-secrets-volume",
+                      secret: { secretName: "payments-api-secrets" },
+                    },
+                    {
+                      name: "payments-token",
+                      projected: {
+                        sources: [
+                          {
+                            serviceAccountToken: {
+                              audience: "payments-api",
+                              expirationSeconds: 3600,
+                              path: "token",
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
                   containers: [
                     {
                       name: "api",
@@ -694,6 +716,18 @@ describe("API GET /api/runs/[id]/compare", () => {
                       envFrom: [
                         {
                           secretRef: { name: "payments-api-env" },
+                        },
+                      ],
+                      volumeMounts: [
+                        {
+                          name: "payments-api-secrets-volume",
+                          mountPath: "/var/run/secrets/payments",
+                          readOnly: true,
+                        },
+                        {
+                          name: "payments-token",
+                          mountPath: "/var/run/secrets/tokens",
+                          readOnly: true,
                         },
                       ],
                       securityContext: {
@@ -826,6 +860,20 @@ describe("API GET /api/runs/[id]/compare", () => {
         }),
         expect.objectContaining({
           key: "secret_env_from_reference_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "secret_volume_mount_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "projected_service_account_token_volume_count",
           family: "kubernetes-bundle",
           previous: 0,
           current: 1,

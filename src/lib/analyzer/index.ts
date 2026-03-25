@@ -234,6 +234,7 @@ function kubernetesTitlePriority(title: string): number {
   if (normalized.includes("automatically mounts service account tokens")) return 3;
   if (normalized.includes("bulk-imports secret data into environment variables")) return 2;
   if (normalized.includes("injects secret values into environment variables")) return 1;
+  if (normalized.includes("mounts projected service account token volumes")) return 1;
   return 0;
 }
 
@@ -343,6 +344,12 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("bulk-imports secret data into environment variables")) {
       return `${finding.title}, which widens credential exposure because an entire Secret is loaded into the process environment instead of only the required keys.`;
+    }
+    if (title.includes("mounts secret volumes")) {
+      return `${finding.title}, which broadens credential exposure on disk inside the pod and should be narrowed to only the mounts the workload truly needs.`;
+    }
+    if (title.includes("mounts projected service account token volumes")) {
+      return `${finding.title}, which places Kubernetes API credentials directly on disk inside the pod and should be justified against the workload's actual API needs.`;
     }
     if (title.includes("writable root filesystem")) {
       return `${finding.title}, which weakens immutable workload assumptions and makes tampering or persistence inside the pod easier.`;
@@ -531,6 +538,12 @@ function buildActionForFinding(
     }
     if (tl.includes("injects secret values into environment variables")) {
       return "Review whether those secrets need to live in environment variables at all, and prefer narrower file-based mounts or workload identity where that reduces exposure.";
+    }
+    if (tl.includes("mounts secret volumes")) {
+      return "Review each Secret volume mount, remove the ones the workload does not need, and scope the remaining mounts to the narrowest paths and keys possible.";
+    }
+    if (tl.includes("mounts projected service account token volumes")) {
+      return "Remove projected service account token volumes unless the workload genuinely needs direct Kubernetes API access, and prefer narrower identity or audience-scoped tokens where that access is required.";
     }
     if (tl.includes("writable root filesystem")) {
       return "Set readOnlyRootFilesystem to true where possible, then move required writable state onto explicit volumes and confirm the workload still starts cleanly.";

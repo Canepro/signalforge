@@ -59,6 +59,16 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "mounts Secret volumes",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "mounts projected service account token volumes",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "does not enforce runAsNonRoot",
       "severity": "medium",
       "category": "kubernetes"
@@ -100,6 +110,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 18,
-  "max_findings": 18
+  "min_findings": 20,
+  "max_findings": 20
 }

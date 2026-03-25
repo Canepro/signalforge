@@ -53,6 +53,26 @@ const RAW = JSON.stringify(
             pod_spec: {
               serviceAccountName: "default",
               automountServiceAccountToken: true,
+              volumes: [
+                {
+                  name: "payments-api-secrets-volume",
+                  secret: { secretName: "payments-api-secrets" },
+                },
+                {
+                  name: "payments-token",
+                  projected: {
+                    sources: [
+                      {
+                        serviceAccountToken: {
+                          audience: "payments-api",
+                          expirationSeconds: 3600,
+                          path: "token",
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
               containers: [
                 {
                   name: "api",
@@ -72,6 +92,18 @@ const RAW = JSON.stringify(
                       secretRef: {
                         name: "payments-api-env",
                       },
+                    },
+                  ],
+                  volumeMounts: [
+                    {
+                      name: "payments-api-secrets-volume",
+                      mountPath: "/var/run/secrets/payments",
+                      readOnly: true,
+                    },
+                    {
+                      name: "payments-token",
+                      mountPath: "/var/run/secrets/tokens",
+                      readOnly: true,
                     },
                   ],
                   securityContext: {
@@ -174,6 +206,12 @@ describe("KubernetesBundleAdapter", () => {
     ).toBe(true);
     expect(
       findings.some((finding) => finding.title.includes("bulk-imports Secret data into environment variables"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("mounts Secret volumes"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("mounts projected service account token volumes"))
     ).toBe(true);
     expect(findings.some((finding) => finding.title.includes("does not enforce runAsNonRoot"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("uses a writable root filesystem"))).toBe(true);

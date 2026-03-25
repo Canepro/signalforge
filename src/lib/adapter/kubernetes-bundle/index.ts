@@ -72,10 +72,35 @@ type KubernetesEnvFromSource = {
   } | null;
 };
 
+type KubernetesProjectedSource = {
+  serviceAccountToken?: {
+    audience?: string;
+    expirationSeconds?: number;
+    path?: string;
+  } | null;
+};
+
+type KubernetesVolume = {
+  name?: string;
+  secret?: {
+    secretName?: string;
+  } | null;
+  projected?: {
+    sources?: KubernetesProjectedSource[];
+  } | null;
+};
+
+type KubernetesVolumeMount = {
+  name?: string;
+  mountPath?: string;
+  readOnly?: boolean;
+};
+
 type KubernetesContainerSpec = {
   name?: string;
   env?: KubernetesEnvVar[];
   envFrom?: KubernetesEnvFromSource[];
+  volumeMounts?: KubernetesVolumeMount[];
   securityContext?: KubernetesSecurityContext;
   readinessProbe?: unknown;
   livenessProbe?: unknown;
@@ -88,6 +113,7 @@ type KubernetesContainerSpec = {
 type KubernetesPodSpec = {
   automountServiceAccountToken?: boolean;
   serviceAccountName?: string;
+  volumes?: KubernetesVolume[];
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
 };
@@ -136,6 +162,48 @@ function secretEnvRefCount(container: KubernetesContainerSpec): number {
 
 function secretEnvFromRefCount(container: KubernetesContainerSpec): number {
   return (container.envFrom ?? []).filter((item) => item.secretRef != null).length;
+}
+
+function secretVolumeMountCount(workload: KubernetesWorkloadSpec): number {
+  const secretVolumeNames = new Set(
+    (workload.pod_spec?.volumes ?? [])
+      .filter((volume) => volume.secret != null && volume.name?.trim())
+      .map((volume) => volume.name!.trim())
+  );
+  if (secretVolumeNames.size === 0) return 0;
+
+  return (workload.pod_spec?.containers ?? []).reduce(
+    (total, container) =>
+      total +
+      (container.volumeMounts ?? []).filter((mount) => {
+        const name = mount.name?.trim();
+        return Boolean(name && secretVolumeNames.has(name));
+      }).length,
+    0
+  );
+}
+
+function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpec): number {
+  const projectedTokenVolumeNames = new Set(
+    (workload.pod_spec?.volumes ?? [])
+      .filter(
+        (volume) =>
+          volume.name?.trim() &&
+          (volume.projected?.sources ?? []).some((source) => source.serviceAccountToken != null)
+      )
+      .map((volume) => volume.name!.trim())
+  );
+  if (projectedTokenVolumeNames.size === 0) return 0;
+
+  return (workload.pod_spec?.containers ?? []).reduce(
+    (total, container) =>
+      total +
+      (container.volumeMounts ?? []).filter((mount) => {
+        const name = mount.name?.trim();
+        return Boolean(name && projectedTokenVolumeNames.has(name));
+      }).length,
+    0
+  );
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -363,6 +431,8 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
 
           let workloadSecretEnvRefCount = 0;
           let workloadSecretEnvFromRefCount = 0;
+          const workloadSecretVolumeMountCount = secretVolumeMountCount(workload);
+          const workloadProjectedTokenVolumeCount = projectedServiceAccountTokenVolumeCount(workload);
 
           for (const container of workload.pod_spec?.containers ?? []) {
             const securityContext = container.securityContext ?? {};
@@ -480,6 +550,34 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 secret_env_from_reference_count: workloadSecretEnvFromRefCount,
               }),
               rule_id: "kubernetes.workload_secret_env_from_refs",
+            });
+          }
+
+          if (workloadSecretVolumeMountCount > 0) {
+            findings.push({
+              title: `Kubernetes workload mounts Secret volumes: ${label} (${workloadSecretVolumeMountCount} mounts)`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                secret_volume_mount_count: workloadSecretVolumeMountCount,
+              }),
+              rule_id: "kubernetes.workload_secret_volume_mounts",
+            });
+          }
+
+          if (workloadProjectedTokenVolumeCount > 0) {
+            findings.push({
+              title: `Kubernetes workload mounts projected service account token volumes: ${label} (${workloadProjectedTokenVolumeCount} mounts)`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                projected_service_account_token_volume_count: workloadProjectedTokenVolumeCount,
+              }),
+              rule_id: "kubernetes.workload_projected_service_account_token_volumes",
             });
           }
         }
