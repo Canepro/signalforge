@@ -34,6 +34,22 @@ describe("target-identity", () => {
     ).toBeNull();
   });
 
+  it("preferredTargetMatchKey uses container identity before hostname fallback", () => {
+    expect(
+      preferredTargetMatchKey({
+        target_identifier: null,
+        environment_hostname: "node-a",
+        artifact_type: "container-diagnostics",
+        artifact_content: [
+          "=== container-diagnostics ===",
+          "runtime: docker",
+          "container_name: payments",
+          "image: registry.example/payments:1.2.3",
+        ].join("\n"),
+      })
+    ).toBe("container:node-a:payments");
+  });
+
   it("preferredTargetDisplayLabel prefers id string over hostname", () => {
     expect(
       preferredTargetDisplayLabel({
@@ -47,6 +63,21 @@ describe("target-identity", () => {
         environment_hostname: "h",
       })
     ).toBe("h");
+  });
+
+  it("preferredTargetDisplayLabel uses container identity when no target_identifier is present", () => {
+    expect(
+      preferredTargetDisplayLabel({
+        target_identifier: null,
+        environment_hostname: "node-a",
+        artifact_type: "container-diagnostics",
+        artifact_content: [
+          "=== container-diagnostics ===",
+          "runtime: docker",
+          "container_name: payments",
+        ].join("\n"),
+      })
+    ).toBe("payments @ node-a");
   });
 
   it("compareTargetsMismatch matches same id with different hostnames", () => {
@@ -83,5 +114,32 @@ describe("target-identity", () => {
         { target_identifier: null, environment_hostname: null }
       )
     ).toBe(false);
+  });
+
+  it("compareTargetsMismatch detects different containers on the same host", () => {
+    expect(
+      compareTargetsMismatch(
+        {
+          target_identifier: null,
+          environment_hostname: "node-a",
+          artifact_type: "container-diagnostics",
+          artifact_content: [
+            "=== container-diagnostics ===",
+            "runtime: docker",
+            "container_name: payments",
+          ].join("\n"),
+        },
+        {
+          target_identifier: null,
+          environment_hostname: "node-a",
+          artifact_type: "container-diagnostics",
+          artifact_content: [
+            "=== container-diagnostics ===",
+            "runtime: docker",
+            "container_name: search",
+          ].join("\n"),
+        }
+      )
+    ).toBe(true);
   });
 });

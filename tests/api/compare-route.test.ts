@@ -64,6 +64,24 @@ function mkResult(report: AuditReport | null): AnalysisResult {
   };
 }
 
+function containerArtifact(fields: Record<string, string>): string {
+  const orderedKeys = [
+    "hostname",
+    "runtime",
+    "container_name",
+    "image",
+    "published_ports",
+    "added_capabilities",
+    "secrets",
+  ];
+  return [
+    "=== container-diagnostics ===",
+    ...orderedKeys
+      .filter((key) => key in fields)
+      .map((key) => `${key}: ${fields[key]}`),
+  ].join("\n");
+}
+
 describe("API GET /api/runs/[id]/compare", () => {
   let db: Database;
 
@@ -164,6 +182,7 @@ describe("API GET /api/runs/[id]/compare", () => {
       unchanged: 0,
     });
     expect(body.drift.rows).toEqual([]);
+    expect(body.evidence_delta).toBeNull();
   });
 
   it("uses implicit same-target baseline and reports drift severity", async () => {
@@ -208,6 +227,8 @@ describe("API GET /api/runs/[id]/compare", () => {
     expect(body.drift.summary.unchanged).toBe(0);
     expect(body.drift.rows).toHaveLength(1);
     expect(body.drift.rows[0].status).toBe("severity_up");
+    expect(body.evidence_delta).not.toBeNull();
+    expect(body.evidence_delta.summary.artifact_changed).toBe(false);
   });
 
   it("respects explicit against over implicit baseline", async () => {
@@ -245,6 +266,130 @@ describe("API GET /api/runs/[id]/compare", () => {
     expect(body.baseline.run_id).toBe(oldest.id);
     expect(body.against_requested).toBe(oldest.id);
     expect(body.drift.summary.severity_up).toBe(1);
+  });
+
+  it("returns evidence_delta when findings are unchanged but metadata or bytes changed", async () => {
+    const olderArtifact = insertArtifact(db, {
+      artifact_type: "linux-audit-log",
+      source_type: "api",
+      filename: "older.log",
+      content: "older-bytes",
+    });
+    const newerArtifact = insertArtifact(db, {
+      artifact_type: "linux-audit-log",
+      source_type: "api",
+      filename: "newer.log",
+      content: "newer-bytes",
+    });
+    const finding = mkFinding("f1", "Stable", "low");
+    const older = insertRun(db, olderArtifact.id, mkResult(mkReport("same-host", [finding])), {
+      filename: "older.log",
+      source_type: "api",
+      target_identifier: "fleet:same",
+      collector_type: "collector-a",
+      collector_version: "1.0.0",
+      collected_at: "2026-03-01T00:00:00.000Z",
+    });
+    const newer = insertRun(db, newerArtifact.id, mkResult(mkReport("same-host", [finding])), {
+      filename: "newer.log",
+      source_type: "api",
+      target_identifier: "fleet:same",
+      collector_type: "collector-a",
+      collector_version: "1.1.0",
+      collected_at: "2026-03-02T00:00:00.000Z",
+    });
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-01T01:00:00.000Z", older.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-02T01:00:00.000Z", newer.id]);
+
+    const res = await GET_COMPARE(new NextRequest(`http://localhost/api/runs/${newer.id}/compare`), {
+      params: Promise.resolve({ id: newer.id }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.drift.rows).toEqual([]);
+    expect(body.evidence_delta.changed).toBe(true);
+    expect(body.evidence_delta.summary.artifact_changed).toBe(true);
+    expect(body.evidence_delta.metadata.collector_version).toBe("changed");
+    expect(body.evidence_delta.metadata.collected_at).toBe("changed");
+  });
+
+  it("returns container evidence_delta metrics when findings stay the same", async () => {
+    const olderArtifact = insertArtifact(db, {
+      artifact_type: "container-diagnostics",
+      source_type: "api",
+      filename: "payments-before.txt",
+      content: containerArtifact({
+        hostname: "node-a",
+        runtime: "docker",
+        container_name: "payments",
+        image: "registry.example/payments:1.2.3",
+        published_ports: "8080:80",
+        added_capabilities: "NET_BIND_SERVICE",
+        secrets: "db-password",
+      }),
+    });
+    const newerArtifact = insertArtifact(db, {
+      artifact_type: "container-diagnostics",
+      source_type: "api",
+      filename: "payments-after.txt",
+      content: containerArtifact({
+        hostname: "node-a",
+        runtime: "docker",
+        container_name: "payments",
+        image: "registry.example/payments:1.2.4",
+        published_ports: "8080:80,8443:443",
+        added_capabilities: "NET_BIND_SERVICE,SYS_PTRACE",
+        secrets: "db-password,api-key",
+      }),
+    });
+    const finding = mkFinding("f1", "Stable container finding", "medium");
+    const older = insertRun(db, olderArtifact.id, mkResult(mkReport("node-a", [finding])), {
+      filename: "payments-before.txt",
+      source_type: "api",
+      target_identifier: "container:payments",
+    });
+    const newer = insertRun(db, newerArtifact.id, mkResult(mkReport("node-a", [finding])), {
+      filename: "payments-after.txt",
+      source_type: "api",
+      target_identifier: "container:payments",
+    });
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-01T01:00:00.000Z", older.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-02T01:00:00.000Z", newer.id]);
+
+    const res = await GET_COMPARE(new NextRequest(`http://localhost/api/runs/${newer.id}/compare`), {
+      params: Promise.resolve({ id: newer.id }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.drift.rows).toEqual([]);
+    expect(body.evidence_delta.changed).toBe(true);
+    expect(body.evidence_delta.summary.artifact_changed).toBe(true);
+    expect(body.current.target_display_label).toBe("container:payments");
+    expect(body.evidence_delta.metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "published_port_count",
+          family: "container-diagnostics",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "added_capability_count",
+          family: "container-diagnostics",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "secret_mount_count",
+          family: "container-diagnostics",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+      ])
+    );
   });
 
   it("matches implicit baseline by target_identifier across hostnames", async () => {
@@ -288,6 +433,68 @@ describe("API GET /api/runs/[id]/compare", () => {
     expect(body.baseline.run_id).toBe(older.id);
     expect(body.target_mismatch).toBe(false);
     expect(body.current.environment_hostname).not.toBe(body.baseline.environment_hostname);
+  });
+
+  it("matches implicit baseline by container identity before hostname-only fallback", async () => {
+    const artifactA = insertArtifact(db, {
+      artifact_type: "container-diagnostics",
+      source_type: "api",
+      filename: "payments-old.txt",
+      content: containerArtifact({
+        hostname: "node-a",
+        runtime: "docker",
+        container_name: "payments",
+        image: "registry.example/payments:1.2.3",
+      }),
+    });
+    const artifactB = insertArtifact(db, {
+      artifact_type: "container-diagnostics",
+      source_type: "api",
+      filename: "search.txt",
+      content: containerArtifact({
+        hostname: "node-a",
+        runtime: "docker",
+        container_name: "search",
+        image: "registry.example/search:3.4.5",
+      }),
+    });
+    const artifactC = insertArtifact(db, {
+      artifact_type: "container-diagnostics",
+      source_type: "api",
+      filename: "payments-new.txt",
+      content: containerArtifact({
+        hostname: "node-a",
+        runtime: "docker",
+        container_name: "payments",
+        image: "registry.example/payments:1.2.4",
+      }),
+    });
+    const finding = mkFinding("f1", "Stable container finding", "medium");
+    const olderPayments = insertRun(db, artifactA.id, mkResult(mkReport("node-a", [finding])), {
+      filename: "payments-old.txt",
+      source_type: "api",
+    });
+    const newerSearch = insertRun(db, artifactB.id, mkResult(mkReport("node-a", [finding])), {
+      filename: "search.txt",
+      source_type: "api",
+    });
+    const currentPayments = insertRun(db, artifactC.id, mkResult(mkReport("node-a", [finding])), {
+      filename: "payments-new.txt",
+      source_type: "api",
+    });
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-01T01:00:00.000Z", olderPayments.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-02T01:00:00.000Z", newerSearch.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-03T01:00:00.000Z", currentPayments.id]);
+
+    const res = await GET_COMPARE(
+      new NextRequest(`http://localhost/api/runs/${currentPayments.id}/compare`),
+      { params: Promise.resolve({ id: currentPayments.id }) }
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.baseline.id).toBe(olderPayments.id);
+    expect(body.baseline.id).not.toBe(newerSearch.id);
+    expect(body.current.target_display_label).toBe("payments @ node-a");
   });
 
   it("sets target_mismatch when explicit baseline has different target identity (same hostname)", async () => {

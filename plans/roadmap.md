@@ -96,9 +96,10 @@ Clone locally when working across repositories; script paths are relative to you
 
 ## Current State
 
-Current supported artifact family:
+Current supported artifact families:
 
 - `linux-audit-log`
+- `container-diagnostics`
 
 Current provider support:
 
@@ -134,7 +135,7 @@ Published contract/docs:
 
 ## Current Limitations
 
-- only one artifact family is implemented
+- broader multi-artifact support is still early, and only Linux plus first-slice container diagnostics are implemented
 - findings quality is strongest where evidence is explicit
 - recommendations remain bounded by collected evidence
 - external collector model includes reference push path (`signalforge-collectors`) and job-driven agent (`signalforge-agent`)

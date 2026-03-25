@@ -1,4 +1,5 @@
 import type { ArtifactAdapter } from "./types";
+import { ContainerDiagnosticsAdapter } from "./container-diagnostics/index";
 import { LinuxAuditLogAdapter } from "./linux-audit-log/index";
 import {
   DEFAULT_EXPECTED_ARTIFACT_TYPE,
@@ -9,6 +10,7 @@ import {
 
 const adapters: Record<ArtifactType, ArtifactAdapter> = {
   "linux-audit-log": new LinuxAuditLogAdapter(),
+  "container-diagnostics": new ContainerDiagnosticsAdapter(),
 };
 
 export class UnsupportedArtifactTypeError extends Error {
@@ -39,6 +41,12 @@ export function getAdapter(artifactType: string): ArtifactAdapter {
   return adapters[artifactType];
 }
 
-export function detectArtifactType(_content: string): ArtifactType {
+export function detectArtifactType(content: string): ArtifactType {
+  if (
+    /^===\s*container-diagnostics\s*===/im.test(content) ||
+    (/^container_name:/im.test(content) && /^runtime:/im.test(content))
+  ) {
+    return "container-diagnostics";
+  }
   return DEFAULT_EXPECTED_ARTIFACT_TYPE;
 }

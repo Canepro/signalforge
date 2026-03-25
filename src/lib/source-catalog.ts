@@ -19,6 +19,11 @@ export const ARTIFACT_TYPE_OPTIONS = [
     label: "Linux audit log",
     description: "first-audit.sh output or equivalent Linux diagnostics text.",
   },
+  {
+    value: "container-diagnostics",
+    label: "Container diagnostics",
+    description: "Structured text diagnostics for a single container or containerized workload.",
+  },
 ] as const;
 
 export type ArtifactType = (typeof ARTIFACT_TYPE_OPTIONS)[number]["value"];

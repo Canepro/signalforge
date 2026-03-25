@@ -210,9 +210,22 @@ const CATEGORY_TIE_BREAK: Record<string, number> = {
   logs: 1,
 };
 
+function containerTitlePriority(title: string): number {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("docker socket")) return 6;
+  if (normalized.includes("privileged mode")) return 5;
+  if (normalized.includes("host network")) return 4;
+  if (normalized.includes("host pid namespace")) return 3;
+  if (normalized.includes("privilege escalation")) return 2;
+  if (normalized.includes("linux capabilities")) return 1;
+  return 0;
+}
+
 function compareFindingsForFallback(a: Finding, b: Finding): number {
   const bySev = severityWeight(b.severity) - severityWeight(a.severity);
   if (bySev !== 0) return bySev;
+  const byContainerTitle = containerTitlePriority(b.title) - containerTitlePriority(a.title);
+  if (byContainerTitle !== 0) return byContainerTitle;
   return (CATEGORY_TIE_BREAK[b.category] ?? 0) - (CATEGORY_TIE_BREAK[a.category] ?? 0);
 }
 
@@ -236,6 +249,39 @@ function summarizeFallbackFinding(finding: Finding): string {
   if (finding.category === "logs") {
     return `${finding.title}, indicating recent service or platform errors still warrant review after noise filtering.`;
   }
+  if (finding.category === "container") {
+    const title = finding.title.toLowerCase();
+    if (title.includes("privileged mode")) {
+      return `${finding.title}, which gives the workload elevated access to host resources and weakens isolation.`;
+    }
+    if (title.includes("host network")) {
+      return `${finding.title}, which bypasses normal container network isolation and broadens blast radius.`;
+    }
+    if (title.includes("host pid namespace")) {
+      return `${finding.title}, which lets the workload see or interact with host processes beyond normal container isolation.`;
+    }
+    if (title.includes("docker socket")) {
+      return `${finding.title}, which can allow the workload to control other containers or the host runtime.`;
+    }
+    if (title.includes("linux capabilities")) {
+      return `${finding.title}, which expands the workload's privilege surface beyond a default container profile.`;
+    }
+    if (title.includes("privilege escalation")) {
+      return `${finding.title}, which weakens the guardrails that normally limit process privilege growth inside the workload.`;
+    }
+    if (title.includes("host-path mounts")) {
+      return `${finding.title}, which may expose sensitive host data or permit unintended writes.`;
+    }
+    if (title.includes("mounted secrets")) {
+      return `${finding.title}, so secret scope and file exposure should be reviewed for this workload.`;
+    }
+    if (title.includes("runs as root")) {
+      return `${finding.title}, which increases the impact of a compromise inside the container.`;
+    }
+    if (title.includes("not pinned")) {
+      return `${finding.title}, which makes rollbacks and provenance harder to control over time.`;
+    }
+  }
   return `${finding.title}.`;
 }
 
@@ -249,7 +295,7 @@ function buildFallbackSummary(
 ): string[] {
   const summary = [
     `Deterministic analysis completed (LLM unavailable: ${error})`,
-    `Environment: ${env.hostname} / ${env.os}${env.is_wsl ? " (WSL)" : ""}`,
+    `Environment: ${env.hostname} / ${env.os}${env.is_wsl ? " (WSL)" : ""}${env.is_container ? " (container)" : ""}`,
   ];
 
   if (incomplete) {
@@ -327,6 +373,40 @@ function buildActionForFinding(
       : "Review the remaining recent log errors and investigate the service failures that generated them.";
   }
 
+  if (finding.category === "container") {
+    const tl = finding.title.toLowerCase();
+    if (tl.includes("privileged mode")) {
+      return "Drop privileged mode unless the workload has a documented hard requirement for it, and remove any unnecessary elevated capabilities.";
+    }
+    if (tl.includes("host network")) {
+      return "Move the workload off host networking unless it is explicitly required, and re-check which ports need to stay reachable.";
+    }
+    if (tl.includes("host pid namespace")) {
+      return "Disable host PID namespace sharing unless this workload has a documented debugging or runtime need for host-level process visibility.";
+    }
+    if (tl.includes("docker socket")) {
+      return "Remove the Docker socket mount or replace it with a narrower runtime integration so the workload cannot control the host runtime.";
+    }
+    if (tl.includes("linux capabilities")) {
+      return "Drop any added Linux capabilities that are not strictly required by the workload, and keep the runtime profile as close to default as possible.";
+    }
+    if (tl.includes("privilege escalation")) {
+      return "Set the workload to block privilege escalation unless there is a documented need for it, and verify the container still runs with the reduced privilege model.";
+    }
+    if (tl.includes("host-path mounts")) {
+      return "Review each host-path mount, narrow it to the minimum required path, and make it read-only where possible.";
+    }
+    if (tl.includes("mounted secrets")) {
+      return "Review which secrets are mounted into the container and scope them down to only the files and workloads that need them.";
+    }
+    if (tl.includes("runs as root")) {
+      return "Run the container as a non-root user where possible, and document the cases that still require root inside the workload.";
+    }
+    if (tl.includes("not pinned")) {
+      return "Pin the image to an immutable version or digest so deploys and rollback behavior stay predictable.";
+    }
+  }
+
   return finding.title;
 }
 
@@ -355,6 +435,12 @@ function buildFallbackActions(
 
   while (fromFindings.length < 3) {
     fromFindings.push(FILLER_ACTIONS[fromFindings.length]!);
+  }
+
+  if (env.is_container && fromFindings.length < 3) {
+    fromFindings.push(
+      "Capture a fresh container diagnostic after hardening to confirm the workload still exposes only the runtime settings you expect."
+    );
   }
   return fromFindings.slice(0, 3) as [string, string, string];
 }

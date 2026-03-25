@@ -46,6 +46,7 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
       current={current}
       baseline={baseline}
       drift={payload.drift}
+      evidenceDelta={payload.evidence_delta}
       targetMismatch={payload.target_mismatch}
       baselineMissing={payload.baseline_missing}
     />

@@ -7,6 +7,7 @@ import { TopBar } from "@/components/top-bar";
 import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
 import type { FindingsDriftResult } from "@/lib/compare/findings-diff";
+import type { EvidenceDeltaPayload, EvidenceDeltaStatus } from "@/lib/compare/evidence-delta";
 
 export interface CompareRunHeader {
   id: string;
@@ -19,6 +20,7 @@ interface CompareClientProps {
   current: CompareRunHeader;
   baseline: CompareRunHeader | null;
   drift: FindingsDriftResult;
+  evidenceDelta: EvidenceDeltaPayload | null;
   targetMismatch?: boolean;
   baselineMissing?: boolean;
 }
@@ -60,10 +62,41 @@ function evidenceSnippet(text: string | null, max = 160): string {
   return `${t.slice(0, max)}…`;
 }
 
+function evidenceDeltaStatusLabel(status: EvidenceDeltaStatus): string {
+  switch (status) {
+    case "added":
+      return "Added";
+    case "removed":
+      return "Removed";
+    case "changed":
+      return "Changed";
+    default:
+      return "Unchanged";
+  }
+}
+
+function prettyMetadataLabel(key: keyof EvidenceDeltaPayload["metadata"]): string {
+  switch (key) {
+    case "filename":
+      return "Filename";
+    case "target_identifier":
+      return "Target identifier";
+    case "collected_at":
+      return "Collected at";
+    case "collector_type":
+      return "Collector type";
+    case "collector_version":
+      return "Collector version";
+    default:
+      return key;
+  }
+}
+
 export function CompareClient({
   current,
   baseline,
   drift,
+  evidenceDelta,
   targetMismatch,
   baselineMissing,
 }: CompareClientProps) {
@@ -76,6 +109,14 @@ export function CompareClient({
         ? `Drift: ${baseline.filename} → ${current.filename}`
         : "Compare runs",
     [baseline, current.filename]
+  );
+
+  const changedMetadata = useMemo(
+    () =>
+      evidenceDelta
+        ? Object.entries(evidenceDelta.metadata).filter(([, status]) => status !== "unchanged")
+        : [],
+    [evidenceDelta]
   );
 
   return (
@@ -249,7 +290,9 @@ export function CompareClient({
                               colSpan={6}
                               className="px-4 py-8 text-center text-on-surface-variant"
                             >
-                              No finding changes between these two runs.
+                              {evidenceDelta?.changed
+                                ? `Same finding set; evidence changed in ${evidenceDelta.summary.metadata_changed + evidenceDelta.summary.metric_changes + (evidenceDelta.summary.artifact_changed ? 1 : 0)} place${evidenceDelta.summary.metadata_changed + evidenceDelta.summary.metric_changes + (evidenceDelta.summary.artifact_changed ? 1 : 0) === 1 ? "" : "s"}.`
+                                : "No finding changes between these two runs."}
                             </td>
                           </tr>
                         ) : (
@@ -315,6 +358,91 @@ export function CompareClient({
                     </table>
                   </div>
                 </div>
+
+                {evidenceDelta ? (
+                  <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant/15 bg-surface-container-low/60">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                        Evidence delta
+                      </span>
+                      <div className="flex items-center gap-2 text-[10px] text-on-surface-variant">
+                        <span>Metadata: {evidenceDelta.summary.metadata_changed}</span>
+                        <span>Metrics: {evidenceDelta.summary.metric_changes}</span>
+                        <span>Artifact: {evidenceDelta.summary.artifact_changed ? "Changed" : "Same"}</span>
+                      </div>
+                    </div>
+
+                    {!evidenceDelta.changed ? (
+                      <div className="px-4 py-6 text-sm text-on-surface-variant">
+                        Evidence bytes, submission metadata, and stable aggregate metrics were unchanged.
+                      </div>
+                    ) : (
+                      <div className="px-4 py-4 space-y-4">
+                        {changedMetadata.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                              Metadata changes
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {changedMetadata.map(([key, status]) => (
+                                <span
+                                  key={key}
+                                  className="inline-flex items-center rounded-full border border-outline-variant/30 bg-surface px-2 py-1 text-[11px] text-on-surface"
+                                >
+                                  {prettyMetadataLabel(
+                                    key as keyof EvidenceDeltaPayload["metadata"]
+                                  )}
+                                  : {evidenceDeltaStatusLabel(status)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {evidenceDelta.metrics.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                              Stable metric changes
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-outline-variant/15 text-[10px] uppercase tracking-wider text-on-surface-variant">
+                                    <th className="px-3 py-2 font-semibold w-[180px]">Metric</th>
+                                    <th className="px-3 py-2 font-semibold w-[120px]">Status</th>
+                                    <th className="px-3 py-2 font-semibold w-[160px]">Before</th>
+                                    <th className="px-3 py-2 font-semibold w-[160px]">After</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {evidenceDelta.metrics.map((row) => (
+                                    <tr
+                                      key={row.key}
+                                      className="border-b border-outline-variant/10 align-top hover:bg-surface-container-low/40"
+                                    >
+                                      <td className="px-3 py-2 font-semibold text-on-surface">
+                                        {row.label}
+                                      </td>
+                                      <td className="px-3 py-2 text-on-surface-variant">
+                                        {evidenceDeltaStatusLabel(row.status)}
+                                      </td>
+                                      <td className="px-3 py-2 font-mono text-on-surface-variant">
+                                        {String(row.previous)}
+                                      </td>
+                                      <td className="px-3 py-2 font-mono text-on-surface-variant">
+                                        {String(row.current)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </>
             ) : null}
           </div>

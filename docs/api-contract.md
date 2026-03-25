@@ -30,7 +30,7 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | `GET /api/runs` | List known runs |
 | `GET /api/runs/[id]` | Read a run and its stored report |
 | `GET /api/runs/[id]/report` | Read raw report JSON only |
-| `GET /api/runs/[id]/compare` | Read deterministic drift between runs |
+| `GET /api/runs/[id]/compare` | Read deterministic compare data between runs |
 | `POST /api/runs/[id]/reanalyze` | Re-run analysis on the same stored artifact |
 | `POST /api/sources` | Register a **Source** (operator Bearer) |
 | `GET /api/sources` | List sources (`?enabled=true` optional) |
@@ -72,6 +72,11 @@ Submit artifact content as JSON or multipart.
 **200:** `PostRunsResponse` — `run_id`, `artifact_id`, `status`, `report` (parsed audit report).  
 **400:** `{ "error": string, "code"?: string }` (validation). Includes `code: "unsupported_artifact_type"` when the supplied or inferred artifact family is not supported by this SignalForge build.  
 **500:** `{ "error": string, "code"?: string }`
+
+Currently supported artifact families:
+
+- `linux-audit-log`
+- `container-diagnostics`
 
 TypeScript: `PostRunsResponse` in `src/types/api-contract.ts`.  
 Schema: `docs/schemas/post-runs-response.schema.json`, `docs/schemas/ingestion-metadata.schema.json`.
@@ -121,7 +126,7 @@ Deterministic finding drift using the same logic as the UI compare page. No LLM.
 
 **Implicit baseline (omit `against`):** the latest older run for the same logical target as the current run. That baseline is **not guaranteed** to be the reanalyze parent (`parent_run_id`) on a newer run. If you need an exact baseline, use `against=` explicitly.
 
-**200:** `CompareDriftPayload` — `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `against_requested`, `drift` (`summary` + `rows`).  
+**200:** `CompareDriftPayload` — `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `against_requested`, `drift` (`summary` + `rows`), and `evidence_delta`.  
 Each non-null run snapshot includes both `id` and `run_id` with the same UUID, so clients can use `run_id` consistently with `POST /api/runs` and `POST .../reanalyze` bodies.  
 **400:** `against` equals current id.  
 **404:** Run not found or explicit `against` not found.
@@ -159,12 +164,14 @@ Treat these as stable for current integrations:
 - route paths and verbs listed here
 - ingestion metadata field names
 - top-level compare response keys
+- `evidence_delta` field names when present
 
 Treat these as evolving:
 
 - detailed `AuditReport` contents
 - finding titles and recommendations
 - compare `match_key` normalization internals
+- which family-specific metric rows appear inside `evidence_delta.metrics`
 
 Clients should tolerate unknown fields.
 
@@ -181,6 +188,15 @@ Clients should tolerate unknown fields.
 1. `GET /api/runs/[id]/compare`
 2. optionally add `?against=<runId>` when you need a fixed baseline
 
+Successful compare responses always include finding drift plus deterministic `evidence_delta`.
+`drift` remains the finding-level compatibility layer. `evidence_delta` covers:
+
+- whether the underlying artifact bytes changed
+- whether submission metadata changed
+- stable aggregate metric deltas that are safe to compare without LLM logic
+
+When no baseline exists, `baseline_missing` is `true` and `evidence_delta` is `null`.
+
 ### Reanalyze the same artifact
 
 1. `POST /api/runs/[id]/reanalyze`
@@ -191,7 +207,7 @@ Clients should tolerate unknown fields.
 
 All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
 
-**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`), `default_collector_type`, `capabilities`, `labels`, `enabled`.  
+**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics`), `default_collector_type`, `capabilities`, `labels`, `enabled`.  
 **201:** source object. **400** validation, including `code: "unsupported_artifact_type"` when `expected_artifact_type` is not supported. **409** `duplicate_target_identifier`.
 
 **`GET /api/sources`** — **200:** `{ "sources": Source[] }`.

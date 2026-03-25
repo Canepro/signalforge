@@ -2,13 +2,13 @@ import type { Database } from "sql.js";
 import type { Finding } from "@/lib/analyzer/schema";
 import {
   findPreviousRunForSameTarget,
-  getRun,
   getRunWithArtifact,
   parseEnvironmentHostname,
-  type RunRow,
+  type RunWithArtifactRow,
 } from "@/lib/db/repository";
 import { compareTargetsMismatch, preferredTargetDisplayLabel } from "@/lib/target-identity";
 import { compareFindingsDrift, type FindingsDriftResult } from "./findings-diff";
+import { buildEvidenceDelta, type EvidenceDeltaPayload } from "./evidence-delta";
 
 export type BaselineSelection = "implicit_same_target" | "explicit" | "none";
 
@@ -34,6 +34,7 @@ export interface CompareDriftPayload {
   /** Echo of `against` query param when provided. */
   against_requested: string | null;
   drift: FindingsDriftResult;
+  evidence_delta: EvidenceDeltaPayload | null;
 }
 
 export type CompareDriftError =
@@ -64,7 +65,7 @@ function emptyDrift(): FindingsDriftResult {
   };
 }
 
-function snapshotFromRun(row: RunRow): CompareRunSnapshot {
+function snapshotFromRun(row: RunWithArtifactRow): CompareRunSnapshot {
   const host = parseEnvironmentHostname(row.environment_json ?? null);
   return {
     id: row.id,
@@ -76,6 +77,8 @@ function snapshotFromRun(row: RunRow): CompareRunSnapshot {
     target_display_label: preferredTargetDisplayLabel({
       target_identifier: row.target_identifier ?? null,
       environment_hostname: host,
+      artifact_type: row.artifact_type,
+      artifact_content: row.artifact_content,
     }),
   };
 }
@@ -101,7 +104,7 @@ export function buildCompareDriftPayload(
   const current = snapshotFromRun(currentRow);
 
   let baselineRow = against
-    ? getRun(db, against)
+    ? getRunWithArtifact(db, against)
     : findPreviousRunForSameTarget(db, currentRunId);
 
   if (against && !baselineRow) {
@@ -119,12 +122,16 @@ export function buildCompareDriftPayload(
           environment_hostname: parseEnvironmentHostname(
             currentRow.environment_json ?? null
           ),
+          artifact_type: currentRow.artifact_type,
+          artifact_content: currentRow.artifact_content,
         },
         {
           target_identifier: baselineRow.target_identifier ?? null,
           environment_hostname: parseEnvironmentHostname(
             baselineRow.environment_json ?? null
           ),
+          artifact_type: baselineRow.artifact_type,
+          artifact_content: baselineRow.artifact_content,
         }
       )
   );
@@ -152,6 +159,7 @@ export function buildCompareDriftPayload(
       baseline_selection: baselineSelection,
       against_requested: against ?? null,
       drift,
+      evidence_delta: buildEvidenceDelta(baselineRow, currentRow),
     },
   };
 }

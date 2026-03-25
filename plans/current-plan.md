@@ -34,7 +34,7 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 
 ## Product snapshot
 
-- **Artifacts:** `linux-audit-log` only (`first-audit.sh`-style host audit output).
+- **Artifacts:** `linux-audit-log` (`first-audit.sh`-style host audit output) and `container-diagnostics` (text-based container diagnostics for a single container or workload).
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is now available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations. The live Vercel deployment uses Neon Postgres.
@@ -44,7 +44,7 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 
 ## Known limitations
 
-- Single artifact family; quality is best where evidence is explicit (disk, packages, SSH, listeners, incomplete sections).
+- Multi-artifact support is still early; quality is strongest where evidence is explicit (Linux host posture today, first-slice container diagnostics next).
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
 
@@ -53,7 +53,7 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare/export hardening (small, targeted).
-- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Before adapter work, lock the artifact envelope and deterministic `evidence_delta` compare contract, and decide container/Kubernetes scope and source-registration model.
+- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Current branch work has started Phase 0 and the first `container-diagnostics` slice; next, continue targeted container findings tuning and keep Kubernetes behind its explicit artifact-envelope gate.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).
 - Harden agent in real use: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, systemd unit file for `signalforge-agent run`.

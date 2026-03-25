@@ -217,4 +217,28 @@ describe("findings-diff", () => {
     expect(d.summary.unchanged).toBe(1);
     expect(d.rows).toHaveLength(0);
   });
+
+  it("treats container published ports title drift as the same ongoing finding", () => {
+    const baseline: Finding[] = [
+      f({
+        id: "1",
+        title: "Container publishes ports: 8080/tcp",
+        severity: "medium",
+        category: "network",
+        section_source: "published_ports",
+      }),
+    ];
+    const current: Finding[] = [
+      f({
+        id: "2",
+        title: "Container publishes ports: 8443/tcp, 8080/tcp",
+        severity: "medium",
+        category: "network",
+        section_source: "published_ports",
+      }),
+    ];
+    const d = compareFindingsDrift(baseline, current);
+    expect(d.summary.unchanged).toBe(1);
+    expect(d.rows).toHaveLength(0);
+  });
 });

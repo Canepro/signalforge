@@ -29,5 +29,6 @@ describe("source-catalog", () => {
     expect(getSourceTypeLabel("linux_host")).toBe("Linux host");
     expect(getSourceTypeLabel("wsl")).toBe("WSL");
     expect(getArtifactTypeLabel("linux-audit-log")).toBe("Linux audit log");
+    expect(getArtifactTypeLabel("container-diagnostics")).toBe("Container diagnostics");
   });
 });

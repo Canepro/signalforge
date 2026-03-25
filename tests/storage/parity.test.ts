@@ -276,6 +276,24 @@ function fakeAnalysis(): import("@/lib/analyzer/schema").AnalysisResult {
   };
 }
 
+function containerArtifact(fields: Record<string, string>): string {
+  const orderedKeys = [
+    "hostname",
+    "runtime",
+    "container_name",
+    "image",
+    "published_ports",
+    "added_capabilities",
+    "secrets",
+  ];
+  return [
+    "=== container-diagnostics ===",
+    ...orderedKeys
+      .filter((key) => key in fields)
+      .map((key) => `${key}: ${fields[key]}`),
+  ].join("\n");
+}
+
 for (const backend of backends) {
   describe(`storage parity [${backend.name}]`, () => {
     let storage: Storage;
@@ -419,6 +437,165 @@ for (const backend of backends) {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.evidence_delta).not.toBeNull();
+    });
+
+    it("compare exposes container evidence_delta metrics when findings are unchanged", async () => {
+      const older = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-before.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.3",
+            published_ports: "8080:80",
+            added_capabilities: "NET_BIND_SERVICE",
+            secrets: "db-password",
+          }),
+          ingestion: {
+            target_identifier: "container:payments",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const newer = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-after.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.4",
+            published_ports: "8080:80,8443:443",
+            added_capabilities: "NET_BIND_SERVICE,SYS_PTRACE",
+            secrets: "db-password,api-key",
+          }),
+          ingestion: {
+            target_identifier: "container:payments",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(newer.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(older.run_id);
+      expect(result.payload.drift.rows).toEqual([]);
+      expect(result.payload.evidence_delta?.changed).toBe(true);
+      expect(result.payload.evidence_delta?.metrics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "published_port_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "added_capability_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "secret_mount_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+        ])
+      );
+    });
+
+    it("compare prefers matching container identity over hostname-only fallback", async () => {
+      const olderPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-old.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.3",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const newerSearch = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "search.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "search",
+            image: "registry.example/search:3.4.5",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const currentPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-new.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.4",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(currentPayments.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(olderPayments.run_id);
+      expect(result.payload.baseline?.id).not.toBe(newerSearch.run_id);
     });
 
     // --- SOURCES ---
@@ -458,7 +635,7 @@ for (const backend of backends) {
             display_name: "Unsupported",
             target_identifier: "unsupported-artifact-source",
             source_type: "linux_host",
-            expected_artifact_type: "container-diagnostics",
+            expected_artifact_type: "kubernetes-bundle",
           })
         )
       ).rejects.toThrow();

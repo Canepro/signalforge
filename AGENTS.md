@@ -42,7 +42,7 @@ SignalForge lives in its own repo:
 
 Completed through **Phase 6e** (agent repo + Sources UI polish; see `plans/current-plan.md`): analyzer, API/DB, UI, reanalyze, compare (UI + JSON API), CLI submit + **read** helpers, published API contract, **Sources** + **collection jobs** (`/sources`, operator APIs) behind **`SIGNALFORGE_ADMIN_TOKEN`** (Bearer for HTTP; `/sources/login` sets an httpOnly session cookie — not in the client bundle), agent registration API (one token per source), **agent execution routes** with **strict `instance_id`** on start/fail/artifact and on heartbeat when reporting `active_job_id`, and **strict jobs/next** (must heartbeat first with a **non-empty** capability list that includes the job’s `collect:<artifact_type>` via agent∩source caps). Lease reaper: claimed→queued, running→expired per Phase 6b. **Collection job `submitted`** means the artifact was accepted; **`result_analysis_status`** (and artifact-upload **`run_status`**) reflects whether the linked run succeeded analysis (`complete` vs `error`, etc.). Heartbeat **200** includes **`active_job_lease`** so agents see whether the lease was extended. **`signalforge-agent`** repo (Bun + TypeScript) implements the first thin external agent; validated E2E. Sources UI uses unified sidebar+topbar layout matching dashboard, with health dots, job status badges, inline settings (enable/disable, rename), agent enrollment info, action feedback, and cancel confirmation.
 
-**Artifacts:** `linux-audit-log` only.
+**Artifacts:** `linux-audit-log`, `container-diagnostics`.
 
 **Providers:** OpenAI direct; Azure OpenAI Responses with **legacy** (requires `AZURE_OPENAI_API_VERSION`) or **`/openai/v1` base URL** (omit API version — Azure rejects `api-version` on v1). Deterministic fallback if unavailable or misconfigured. See `README.md` env table.
 
@@ -126,6 +126,10 @@ Core directories:
 - Prefer targeted rule improvements over broad abstraction.
 - Preserve evidence grounding for every finding.
 - Keep UI operator-first, table-first, and light-theme by default.
+- After non-trivial changes, run targeted validation by default.
+- In `--yolo` or other high-autonomy workflows, do not skip relevant verification unless the user explicitly says to.
+- Prefer the smallest validation that meaningfully covers the change.
+- After validation, report exactly what ran, what passed, what failed, and any remaining risk.
 
 ## Codex Skills Available
 

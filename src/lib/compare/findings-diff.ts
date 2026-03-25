@@ -41,6 +41,10 @@ export function normalizeFindingTitle(title: string): string {
     return listenerKey;
   }
 
+  if (/^container publishes ports: .+$/.test(normalized)) {
+    return "container publishes ports";
+  }
+
   return normalized;
 }
 

@@ -8,11 +8,12 @@ SignalForge ingests infrastructure evidence, turns it into findings, stores runs
 - what changed since the last run?
 - what should I do now?
 
-Today, the shipped product is strongest on one artifact family:
+Today, the shipped product supports two artifact families:
 
 - `linux-audit-log`
+- `container-diagnostics`
 
-That currently means Linux and WSL audit logs in the `signalforge-collectors` style.
+That currently means Linux and WSL audit logs in the `signalforge-collectors` style, plus text-based container diagnostic artifacts for a single container or workload.
 
 ## What SignalForge Is
 
@@ -213,9 +214,10 @@ Historical background only:
 
 ## Current Scope
 
-Current shipped artifact family:
+Current shipped artifact families:
 
 - `linux-audit-log`
+- `container-diagnostics`
 
 Current strengths:
 

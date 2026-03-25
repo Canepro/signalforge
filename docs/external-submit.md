@@ -36,7 +36,7 @@ This document describes the current `POST /api/runs` submission contract.
 | **Multipart** | `file` (uploaded file). Optionally `artifact_type`, `source_type`. |
 
 If `artifact_type` is omitted, the server infers a type from content.
-Today, the only shipped artifact family is `linux-audit-log`.
+Today, the shipped artifact families are `linux-audit-log` and `container-diagnostics`.
 If the supplied or inferred `artifact_type` is unsupported, the route returns **400** with `code: "unsupported_artifact_type"`.
 
 ## Optional Ingestion Metadata
@@ -125,7 +125,7 @@ That same pattern can later be reused for:
 
 ## Read Back Run / Compare Data
 
-`GET /api/runs/{id}/compare` returns deterministic finding drift for programmatic use using the same logic as `/runs/{id}/compare`. Optional query: `?against=<otherRunId>` pins the baseline. Response includes `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, and `drift` (`summary` + `rows`). Each run snapshot includes `id` and `run_id` (same UUID) for consistency with POST responses. No LLM.
+`GET /api/runs/{id}/compare` returns deterministic compare data for programmatic use using the same logic as `/runs/{id}/compare`. Optional query: `?against=<otherRunId>` pins the baseline. Response includes `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `drift` (`summary` + `rows`), and `evidence_delta` for stable metadata and aggregate evidence changes. Each run snapshot includes `id` and `run_id` (same UUID) for consistency with POST responses. No LLM.
 
 From the shell, `scripts/signalforge-read.sh compare <run-id>` prints the same JSON, with optional `--against <id>`. `signalforge-read.sh run` and `report` call `GET /api/runs/{id}` and `GET /api/runs/{id}/report` respectively. These are the read-side complements to `scripts/analyze.sh`.
 

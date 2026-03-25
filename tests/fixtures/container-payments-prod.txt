@@ -1,0 +1,17 @@
+=== container-diagnostics ===
+hostname: prod-node-a
+runtime: docker
+kernel: 6.8.0
+uptime: 3d
+container_name: payments-api
+container_id: 7f3a21b9
+image: ghcr.io/acme/payments:latest
+published_ports: 8080/tcp, 8443/tcp
+privileged: true
+host_network: false
+host_pid: true
+added_capabilities: SYS_ADMIN, NET_ADMIN
+allow_privilege_escalation: true
+mounts: /var/run/docker.sock:/var/run/docker.sock,/srv/payments:/app/data
+secrets: /run/secrets/db-password,/run/secrets/jwt-signing-key
+ran_as_root: true
