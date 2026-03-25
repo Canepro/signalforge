@@ -78,6 +78,9 @@ type KubernetesSecurityContext = {
   allowPrivilegeEscalation?: boolean;
   runAsNonRoot?: boolean;
   readOnlyRootFilesystem?: boolean;
+  capabilities?: {
+    add?: string[];
+  } | null;
   seccompProfile?: {
     type?: string;
   } | null;
@@ -111,6 +114,9 @@ type KubernetesVolume = {
   secret?: {
     secretName?: string;
   } | null;
+  hostPath?: {
+    path?: string;
+  } | null;
   projected?: {
     sources?: KubernetesProjectedSource[];
   } | null;
@@ -138,9 +144,13 @@ type KubernetesContainerSpec = {
 type KubernetesPodSpec = {
   automountServiceAccountToken?: boolean;
   serviceAccountName?: string;
+  hostNetwork?: boolean;
+  hostPID?: boolean;
+  hostIPC?: boolean;
   volumes?: KubernetesVolume[];
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
+  initContainers?: KubernetesContainerSpec[];
 };
 
 type KubernetesWorkloadSpec = {
@@ -164,6 +174,12 @@ type KubernetesEvidenceSummary = {
   secret_env_from_reference_count: number;
   secret_volume_mount_count: number;
   projected_service_account_token_volume_count: number;
+  host_network_workload_count: number;
+  host_pid_workload_count: number;
+  host_ipc_workload_count: number;
+  host_path_volume_mount_count: number;
+  added_capability_count: number;
+  privileged_init_container_count: number;
 };
 
 function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
@@ -387,10 +403,50 @@ function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpe
   );
 }
 
+function hostPathVolumeMountCount(workload: KubernetesWorkloadSpec): number {
+  const hostPathVolumeNames = new Set(
+    (workload.pod_spec?.volumes ?? [])
+      .filter((volume) => volume.hostPath != null && volume.name?.trim())
+      .map((volume) => volume.name!.trim())
+  );
+  if (hostPathVolumeNames.size === 0) return 0;
+
+  return (workload.pod_spec?.containers ?? []).reduce(
+    (total, container) =>
+      total +
+      (container.volumeMounts ?? []).filter((mount) => {
+        const name = mount.name?.trim();
+        return Boolean(name && hostPathVolumeNames.has(name));
+      }).length,
+    0
+  );
+}
+
+function addedCapabilityCount(workload: KubernetesWorkloadSpec): number {
+  return (workload.pod_spec?.containers ?? []).reduce(
+    (total, container) =>
+      total +
+      normalizedList(container.securityContext?.capabilities?.add).length,
+    0
+  );
+}
+
+function privilegedInitContainerCount(workload: KubernetesWorkloadSpec): number {
+  return (workload.pod_spec?.initContainers ?? []).filter(
+    (container) => container.securityContext?.privileged === true
+  ).length;
+}
+
 function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
   let gaps = 0;
   const podSecurityContext = workload.pod_spec?.securityContext;
   if (workload.pod_spec?.automountServiceAccountToken !== false) gaps += 1;
+  if (workload.pod_spec?.hostNetwork) gaps += 1;
+  if (workload.pod_spec?.hostPID) gaps += 1;
+  if (workload.pod_spec?.hostIPC) gaps += 1;
+  if (hostPathVolumeMountCount(workload) > 0) gaps += 1;
+  if (addedCapabilityCount(workload) > 0) gaps += 1;
+  if (privilegedInitContainerCount(workload) > 0) gaps += 1;
   for (const container of workload.pod_spec?.containers ?? []) {
     const securityContext = container.securityContext ?? {};
     const combinedSeccompType =
@@ -436,6 +492,12 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       secret_env_from_reference_count: 0,
       secret_volume_mount_count: 0,
       projected_service_account_token_volume_count: 0,
+      host_network_workload_count: 0,
+      host_pid_workload_count: 0,
+      host_ipc_workload_count: 0,
+      host_path_volume_mount_count: 0,
+      added_capability_count: 0,
+      privileged_init_container_count: 0,
     };
   }
 
@@ -453,6 +515,12 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let secretEnvFromReferenceCount = 0;
   let secretVolumeMountCountTotal = 0;
   let projectedServiceAccountTokenVolumeCountTotal = 0;
+  let hostNetworkWorkloadCount = 0;
+  let hostPidWorkloadCount = 0;
+  let hostIpcWorkloadCount = 0;
+  let hostPathVolumeMountCountTotal = 0;
+  let addedCapabilityCountTotal = 0;
+  let privilegedInitContainerCountTotal = 0;
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
 
@@ -522,6 +590,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (workload.pod_spec?.automountServiceAccountToken !== false) {
           serviceAccountTokenAutomountCount += 1;
         }
+        if (workload.pod_spec?.hostNetwork) hostNetworkWorkloadCount += 1;
+        if (workload.pod_spec?.hostPID) hostPidWorkloadCount += 1;
+        if (workload.pod_spec?.hostIPC) hostIpcWorkloadCount += 1;
         const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
         if (
           workload.pod_spec?.automountServiceAccountToken !== false &&
@@ -549,6 +620,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         secretVolumeMountCountTotal += secretVolumeMountCount(workload);
         projectedServiceAccountTokenVolumeCountTotal +=
           projectedServiceAccountTokenVolumeCount(workload);
+        hostPathVolumeMountCountTotal += hostPathVolumeMountCount(workload);
+        addedCapabilityCountTotal += addedCapabilityCount(workload);
+        privilegedInitContainerCountTotal += privilegedInitContainerCount(workload);
       }
     }
   }
@@ -577,6 +651,12 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     secret_env_from_reference_count: secretEnvFromReferenceCount,
     secret_volume_mount_count: secretVolumeMountCountTotal,
     projected_service_account_token_volume_count: projectedServiceAccountTokenVolumeCountTotal,
+    host_network_workload_count: hostNetworkWorkloadCount,
+    host_pid_workload_count: hostPidWorkloadCount,
+    host_ipc_workload_count: hostIpcWorkloadCount,
+    host_path_volume_mount_count: hostPathVolumeMountCountTotal,
+    added_capability_count: addedCapabilityCountTotal,
+    privileged_init_container_count: privilegedInitContainerCountTotal,
   };
 }
 
@@ -756,6 +836,48 @@ function buildFamilyMetrics(
         "Mounted projected service account token volumes",
         previous.projected_service_account_token_volume_count,
         next.projected_service_account_token_volume_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "host_network_workload_count",
+        "Workloads sharing the host network namespace",
+        previous.host_network_workload_count,
+        next.host_network_workload_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "host_pid_workload_count",
+        "Workloads sharing the host PID namespace",
+        previous.host_pid_workload_count,
+        next.host_pid_workload_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "host_ipc_workload_count",
+        "Workloads sharing the host IPC namespace",
+        previous.host_ipc_workload_count,
+        next.host_ipc_workload_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "host_path_volume_mount_count",
+        "Mounted hostPath volumes",
+        previous.host_path_volume_mount_count,
+        next.host_path_volume_mount_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "added_capability_count",
+        "Added Linux capabilities",
+        previous.added_capability_count,
+        next.added_capability_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "privileged_init_container_count",
+        "Privileged init containers",
+        previous.privileged_init_container_count,
+        next.privileged_init_container_count,
         "kubernetes-bundle"
       ),
     ];

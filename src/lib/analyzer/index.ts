@@ -228,11 +228,16 @@ function kubernetesTitlePriority(title: string): number {
   if (normalized.includes("grants privilege-escalation verbs")) return 9;
   if (normalized.includes("node proxy apis")) return 8;
   if (normalized.includes("grants wildcard access")) return 7;
-  if (normalized.includes("without networkpolicy isolation")) return 6;
-  if (normalized.includes("service exposed externally")) return 5;
-  if (normalized.includes("uses the default service account with token automount")) return 4;
-  if (normalized.includes("automatically mounts service account tokens")) return 3;
-  if (normalized.includes("bulk-imports secret data into environment variables")) return 2;
+  if (normalized.includes("shares the host network namespace")) return 6;
+  if (normalized.includes("shares the host pid namespace")) return 6;
+  if (normalized.includes("shares the host ipc namespace")) return 6;
+  if (normalized.includes("mounts hostpath volumes")) return 6;
+  if (normalized.includes("uses privileged init containers")) return 6;
+  if (normalized.includes("without networkpolicy isolation")) return 5;
+  if (normalized.includes("service exposed externally")) return 4;
+  if (normalized.includes("uses the default service account with token automount")) return 3;
+  if (normalized.includes("automatically mounts service account tokens")) return 2;
+  if (normalized.includes("bulk-imports secret data into environment variables")) return 1;
   if (normalized.includes("injects secret values into environment variables")) return 1;
   if (normalized.includes("mounts projected service account token volumes")) return 1;
   return 0;
@@ -241,9 +246,13 @@ function kubernetesTitlePriority(title: string): number {
 function compareFindingsForFallback(a: Finding, b: Finding): number {
   const bySev = severityWeight(b.severity) - severityWeight(a.severity);
   if (bySev !== 0) return bySev;
-  const byContainerTitle = containerTitlePriority(b.title) - containerTitlePriority(a.title);
+  const byContainerTitle =
+    (b.category === "container" ? containerTitlePriority(b.title) : 0) -
+    (a.category === "container" ? containerTitlePriority(a.title) : 0);
   if (byContainerTitle !== 0) return byContainerTitle;
-  const byKubernetesTitle = kubernetesTitlePriority(b.title) - kubernetesTitlePriority(a.title);
+  const byKubernetesTitle =
+    (b.category === "kubernetes" ? kubernetesTitlePriority(b.title) : 0) -
+    (a.category === "kubernetes" ? kubernetesTitlePriority(a.title) : 0);
   if (byKubernetesTitle !== 0) return byKubernetesTitle;
   return (CATEGORY_TIE_BREAK[b.category] ?? 0) - (CATEGORY_TIE_BREAK[a.category] ?? 0);
 }
@@ -350,6 +359,24 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("mounts projected service account token volumes")) {
       return `${finding.title}, which places Kubernetes API credentials directly on disk inside the pod and should be justified against the workload's actual API needs.`;
+    }
+    if (title.includes("shares the host network namespace")) {
+      return `${finding.title}, which bypasses normal pod network isolation and can expose host-level interfaces or routing paths to the workload.`;
+    }
+    if (title.includes("shares the host pid namespace")) {
+      return `${finding.title}, which gives the workload visibility into host-level processes and weakens isolation boundaries.`;
+    }
+    if (title.includes("shares the host ipc namespace")) {
+      return `${finding.title}, which exposes host IPC resources to the pod and should be reserved for tightly reviewed exceptions.`;
+    }
+    if (title.includes("mounts hostpath volumes")) {
+      return `${finding.title}, which can expose node-local filesystems to the pod and turn a workload issue into host-level data exposure.`;
+    }
+    if (title.includes("adds linux capabilities")) {
+      return `${finding.title}, which widens the pod's effective privilege surface beyond a default least-privilege profile.`;
+    }
+    if (title.includes("uses privileged init containers")) {
+      return `${finding.title}, which means the workload starts with elevated node-facing privileges even before the main container becomes ready.`;
     }
     if (title.includes("writable root filesystem")) {
       return `${finding.title}, which weakens immutable workload assumptions and makes tampering or persistence inside the pod easier.`;
@@ -544,6 +571,24 @@ function buildActionForFinding(
     }
     if (tl.includes("mounts projected service account token volumes")) {
       return "Remove projected service account token volumes unless the workload genuinely needs direct Kubernetes API access, and prefer narrower identity or audience-scoped tokens where that access is required.";
+    }
+    if (tl.includes("shares the host network namespace")) {
+      return "Disable hostNetwork unless the workload has a documented platform-level need for direct node networking, then confirm the remaining exposed ports and policies still match intent.";
+    }
+    if (tl.includes("shares the host pid namespace")) {
+      return "Disable hostPID unless the workload has a reviewed operational need for host process visibility, and verify the pod still functions with normal namespace isolation.";
+    }
+    if (tl.includes("shares the host ipc namespace")) {
+      return "Disable hostIPC unless there is a tightly reviewed requirement for shared host IPC resources, and keep that exception narrow and documented.";
+    }
+    if (tl.includes("mounts hostpath volumes")) {
+      return "Replace hostPath usage with safer Kubernetes storage primitives where possible, or narrow the node path and mount mode so the workload gets only the minimum host access it actually needs.";
+    }
+    if (tl.includes("adds linux capabilities")) {
+      return "Drop added Linux capabilities such as NET_ADMIN unless the workload has a documented requirement, and rerun the pod with the narrowest possible capability set.";
+    }
+    if (tl.includes("uses privileged init containers")) {
+      return "Remove privileged init containers unless they are truly required, and move any remaining bootstrap work to a narrower security context or a separately reviewed operational path.";
     }
     if (tl.includes("writable root filesystem")) {
       return "Set readOnlyRootFilesystem to true where possible, then move required writable state onto explicit volumes and confirm the workload still starts cleanly.";

@@ -51,6 +51,9 @@ type KubernetesSecurityContext = {
   allowPrivilegeEscalation?: boolean;
   runAsNonRoot?: boolean;
   readOnlyRootFilesystem?: boolean;
+  capabilities?: {
+    add?: string[];
+  } | null;
   seccompProfile?: {
     type?: string;
   } | null;
@@ -85,6 +88,9 @@ type KubernetesVolume = {
   secret?: {
     secretName?: string;
   } | null;
+  hostPath?: {
+    path?: string;
+  } | null;
   projected?: {
     sources?: KubernetesProjectedSource[];
   } | null;
@@ -113,9 +119,13 @@ type KubernetesContainerSpec = {
 type KubernetesPodSpec = {
   automountServiceAccountToken?: boolean;
   serviceAccountName?: string;
+  hostNetwork?: boolean;
+  hostPID?: boolean;
+  hostIPC?: boolean;
   volumes?: KubernetesVolume[];
   securityContext?: KubernetesSecurityContext;
   containers?: KubernetesContainerSpec[];
+  initContainers?: KubernetesContainerSpec[];
 };
 
 type KubernetesWorkloadSpec = {
@@ -204,6 +214,40 @@ function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpe
       }).length,
     0
   );
+}
+
+function hostPathVolumeMountCount(workload: KubernetesWorkloadSpec): number {
+  const hostPathVolumeNames = new Set(
+    (workload.pod_spec?.volumes ?? [])
+      .filter((volume) => volume.hostPath != null && volume.name?.trim())
+      .map((volume) => volume.name!.trim())
+  );
+  if (hostPathVolumeNames.size === 0) return 0;
+
+  return (workload.pod_spec?.containers ?? []).reduce(
+    (total, container) =>
+      total +
+      (container.volumeMounts ?? []).filter((mount) => {
+        const name = mount.name?.trim();
+        return Boolean(name && hostPathVolumeNames.has(name));
+      }).length,
+    0
+  );
+}
+
+function addedCapabilityCount(workload: KubernetesWorkloadSpec): number {
+  return (workload.pod_spec?.containers ?? []).reduce(
+    (total, container) =>
+      total +
+      normalizedList(container.securityContext?.capabilities?.add).length,
+    0
+  );
+}
+
+function privilegedInitContainerCount(workload: KubernetesWorkloadSpec): number {
+  return (workload.pod_spec?.initContainers ?? []).filter(
+    (container) => container.securityContext?.privileged === true
+  ).length;
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -433,6 +477,42 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           let workloadSecretEnvFromRefCount = 0;
           const workloadSecretVolumeMountCount = secretVolumeMountCount(workload);
           const workloadProjectedTokenVolumeCount = projectedServiceAccountTokenVolumeCount(workload);
+          const workloadHostPathVolumeMountCount = hostPathVolumeMountCount(workload);
+          const workloadAddedCapabilityCount = addedCapabilityCount(workload);
+          const workloadPrivilegedInitContainerCount = privilegedInitContainerCount(workload);
+
+          if (workload.pod_spec?.hostNetwork) {
+            findings.push({
+              title: `Kubernetes workload shares the host network namespace: ${label}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(workload),
+              rule_id: "kubernetes.workload_host_network",
+            });
+          }
+
+          if (workload.pod_spec?.hostPID) {
+            findings.push({
+              title: `Kubernetes workload shares the host PID namespace: ${label}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(workload),
+              rule_id: "kubernetes.workload_host_pid",
+            });
+          }
+
+          if (workload.pod_spec?.hostIPC) {
+            findings.push({
+              title: `Kubernetes workload shares the host IPC namespace: ${label}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(workload),
+              rule_id: "kubernetes.workload_host_ipc",
+            });
+          }
 
           for (const container of workload.pod_spec?.containers ?? []) {
             const securityContext = container.securityContext ?? {};
@@ -578,6 +658,48 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 projected_service_account_token_volume_count: workloadProjectedTokenVolumeCount,
               }),
               rule_id: "kubernetes.workload_projected_service_account_token_volumes",
+            });
+          }
+
+          if (workloadHostPathVolumeMountCount > 0) {
+            findings.push({
+              title: `Kubernetes workload mounts hostPath volumes: ${label} (${workloadHostPathVolumeMountCount} mounts)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                host_path_volume_mount_count: workloadHostPathVolumeMountCount,
+              }),
+              rule_id: "kubernetes.workload_host_path_mounts",
+            });
+          }
+
+          if (workloadAddedCapabilityCount > 0) {
+            findings.push({
+              title: `Kubernetes workload adds Linux capabilities: ${label} (${workloadAddedCapabilityCount} capabilities)`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                added_capability_count: workloadAddedCapabilityCount,
+              }),
+              rule_id: "kubernetes.workload_added_capabilities",
+            });
+          }
+
+          if (workloadPrivilegedInitContainerCount > 0) {
+            findings.push({
+              title: `Kubernetes workload uses privileged init containers: ${label} (${workloadPrivilegedInitContainerCount} containers)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                privileged_init_container_count: workloadPrivilegedInitContainerCount,
+              }),
+              rule_id: "kubernetes.workload_privileged_init_containers",
             });
           }
         }
