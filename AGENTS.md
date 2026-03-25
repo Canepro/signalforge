@@ -144,6 +144,8 @@ Core directories:
 - For Kubernetes, container, and platform-security work, prefer official upstream guidance and cloud-provider best practices over ad hoc heuristics when choosing rules, priorities, and wording.
 - Use relevant local skills proactively when the task matches them, especially `kubernetes-platform-architecture`, `k8s-sre-triage`, `gitops-workflow`, `observability-architecture`, `grill-me`, and `tdd`.
 - When realistic validation or fixture quality would materially improve the result, use the available local runtime tools and environments instead of staying purely synthetic. This machine may provide `kubectl`, `podman`, Docker-compatible commands, local clusters, and cloud-cluster access.
+- Use richer platform examples when they help widen coverage, but keep the product model rooted in plain Kubernetes primitives. Rules, docs, labels, and fixtures should still make sense to operators who do not run Argo CD, Grafana, external-secrets, or any other optional platform layer.
+- Prefer detections that map back to broadly available Kubernetes surfaces such as workload specs, Services, RBAC, probes, volumes, securityContext, and NetworkPolicy. Platform-specific examples are evidence sources, not the product boundary.
 - Be careful with live infrastructure: inspect first, prefer read-only commands by default, avoid changing cluster state unless explicitly requested, and report clearly which environment was used.
 - After non-trivial changes, run targeted validation by default.
 - In `--yolo` or other high-autonomy workflows, do not skip relevant verification unless the user explicitly says to.

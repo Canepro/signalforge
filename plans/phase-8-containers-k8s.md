@@ -21,6 +21,7 @@ Durable decisions that apply across all phases:
   - Kubernetes should prefer explicit `target_identifier` values such as `cluster:<cluster-name>` or `cluster:<cluster-name>:namespace:<scope>`
 - **Operator UX**: containers and Kubernetes must feel like first-class evidence types in upload, run detail, compare, and docs before any orchestration work is considered.
 - **Quality bar**: Phase 8 should not stop at the weakest demo that proves the plumbing. Container and Kubernetes slices should aim for credible operator value, using official platform guidance, realistic fixtures, and real read-only cluster/runtime inspection when that materially improves rule quality.
+- **Kubernetes breadth without tool lock-in**: richer platform examples such as Argo CD, Grafana, ingress controllers, or secrets operators are useful evidence sources, but the product should still describe and detect plain Kubernetes primitives first. A cluster without those optional tools should still recognize the rule set as relevant.
 - **Trust model**: collection and remediation are different trust classes. Remediation is deferred for now, but not forbidden as a future product direction.
 
 ---
