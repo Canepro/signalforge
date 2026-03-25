@@ -57,6 +57,7 @@ The live site uses:
 - `DATABASE_DRIVER=postgres`
 - Neon-hosted Postgres: set `DATABASE_URL` to the connection string from Neon (direct or pooled hostname). The app uses the [`pg`](https://node-postgres.com/) driver with a connection pool (`src/lib/storage/postgres.ts`); there is no Neon-specific JavaScript driver in this repo.
 - Vercel serverless functions for all API routes
+- Vercel preview deployments for branches and pull requests, so feature work can be reviewed live before anything is pushed or merged to remote `main`
 
 Local development defaults to SQLite. The production deployment uses Postgres exclusively.
 

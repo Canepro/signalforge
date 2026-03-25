@@ -80,6 +80,8 @@ Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` an
 
 The live SignalForge instance runs on Vercel with a Neon Postgres backend. Local development defaults to SQLite.
 
+Vercel preview deployments are also available for branches and pull requests, so product and UI changes can be reviewed on a live preview before merging to remote `main`.
+
 ## CI
 
 GitHub Actions runs typecheck, tests, build, and a Postgres parity job on every push to `main` and on pull requests. See [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).

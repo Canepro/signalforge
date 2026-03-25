@@ -48,7 +48,7 @@ Completed through **Phase 6e** (agent repo + Sources UI polish; see `plans/curre
 
 **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js (SQLite local), Postgres/Neon (production), Vitest, GitHub Actions CI.
 
-**Deployment:** Vercel with Neon Postgres. The live site uses `DATABASE_DRIVER=postgres`.
+**Deployment:** Vercel with Neon Postgres. The live site uses `DATABASE_DRIVER=postgres`. Branches and PRs can also use Vercel preview deployments, which is often the safest way to review live behavior before merging to remote `main`.
 
 **CI:** GitHub Actions (`.github/workflows/ci.yml`): typecheck, test, build on every push to `main` and on PRs; a separate Postgres parity job starts `postgres:16-alpine`, applies migrations, and runs `bun run test:parity`. Postgres schema changes follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
 
