@@ -65,7 +65,6 @@ These should be settled quickly before writing implementation code:
 
 - **Container artifact shape**: one plain-text collector output vs a small structured bundle normalized to text or JSON before ingestion.
 - **Kubernetes scope**: cluster-wide support bundle first vs namespace-scoped evidence first.
-- **Kubernetes artifact envelope**: normalized text or JSON export first vs raw archive support as a prerequisite ingestion change.
 - **Compare delta contract**: whether `evidence_delta` is a sibling summary block or a new row status family, and what exact API payload carries it.
 - **Reference collectors**: whether the first container and Kubernetes push paths live only in `signalforge-collectors` or begin as documented external contracts with fixtures first.
 - **Target identity defaults**:
@@ -80,6 +79,92 @@ These should be settled quickly before writing implementation code:
   - higher-trust remediation later, with explicit approvals and auditability
 
 If any of these stay fuzzy, compare and fixtures will get reworked later.
+
+---
+
+## Kubernetes Envelope Decision For v1
+
+This decision is now locked for the first Kubernetes implementation slice.
+
+- **Envelope**: `kubernetes-bundle` v1 will use a **UTF-8 JSON manifest submitted through the existing text upload path**.
+- **No raw archives in v1**: `.zip`, `.tar`, `.tar.gz`, binary blobs, or base64-packed bundle uploads are explicitly out of scope for the first slice.
+- **Producer responsibility**: collectors must unpack, normalize, and select relevant Kubernetes evidence **before** upload.
+- **Analyzer responsibility**: SignalForge consumes one JSON document that contains stable metadata plus a set of named text documents.
+
+### Why this shape wins
+
+Three viable designs were considered:
+
+1. **Raw archive ingestion**
+   - Best fidelity, but it immediately forces binary upload, archive parsing, storage changes, and new failure modes before any Kubernetes finding value exists.
+2. **Single flattened text export**
+   - Fits today’s ingestion path, but it loses document boundaries too aggressively and makes deterministic parsing, fixture review, and compare metrics harder.
+3. **Structured JSON manifest carrying named text documents**
+   - Keeps the current ingestion/storage model, preserves internal document boundaries, and is easy to fixture, diff, and parse deterministically.
+
+Recommendation: choose option 3 for v1 and defer raw archive support until there is clear evidence that the normalized manifest loses necessary diagnostic value.
+
+### Required manifest properties
+
+- One uploaded artifact is one UTF-8 JSON string.
+- The manifest must carry stable cluster and scope metadata at the top level.
+- Each embedded document must be UTF-8 text, not binary content.
+- Each embedded document must keep a stable `path` or logical name so deterministic parsing and compare metrics can stay document-aware.
+- The first scope model should support:
+  - cluster-wide bundles
+  - namespace-scoped bundles
+- The intended compare anchor should be explicit in submission metadata:
+  - cluster scope: `target_identifier=cluster:<cluster-name>`
+  - namespace scope: `target_identifier=cluster:<cluster-name>:namespace:<namespace>`
+
+### Recommended manifest shape
+
+```json
+{
+  "schema_version": "kubernetes-bundle.v1",
+  "cluster": {
+    "name": "prod-eu-1",
+    "provider": "aks"
+  },
+  "scope": {
+    "level": "cluster",
+    "namespace": null
+  },
+  "collected_at": "2026-03-25T10:15:00Z",
+  "collector": {
+    "type": "signalforge-collectors",
+    "version": "0.1.0"
+  },
+  "documents": [
+    {
+      "path": "kubectl/get-nodes.json",
+      "kind": "kubectl-resource-list",
+      "media_type": "application/json",
+      "content": "{...json text...}"
+    },
+    {
+      "path": "kubectl/get-pods-all-namespaces.txt",
+      "kind": "kubectl-table",
+      "media_type": "text/plain",
+      "content": "NAMESPACE NAME READY STATUS ..."
+    },
+    {
+      "path": "events/warning-events.txt",
+      "kind": "events",
+      "media_type": "text/plain",
+      "content": "..."
+    }
+  ]
+}
+```
+
+### Guardrails
+
+- Keep `documents[*].content` text-only in v1.
+- Do not add nested tarballs, screenshots, or opaque binary attachments.
+- Do not require SignalForge to understand every possible support-bundle layout.
+- Prefer a narrow reference export with a small set of explicit document kinds first.
+- If later evidence shows that critical value is lost during normalization, treat raw archive support as a separate ingestion/storage phase, not a quiet extension of the same adapter.
 
 ---
 
@@ -305,10 +390,11 @@ Container quality work should stay narrow at first:
 
 Introduce `kubernetes-bundle` as a third artifact family. Start with support-bundle style evidence that is easy to export and upload, rather than live-cluster access from SignalForge. Focus the first slice on cluster or namespace configuration and health evidence that can be analyzed deterministically.
 
-Before implementation starts, explicitly choose the artifact envelope:
+For v1, the artifact envelope is already chosen:
 
-- If v1 uses normalized text or JSON evidence, keep the current ingestion path and document the export shape.
-- If v1 requires raw archive uploads, create a prerequisite ingestion/storage phase and do not treat Kubernetes as only an adapter addition.
+- use a UTF-8 JSON manifest submitted through the current text upload path
+- carry stable top-level cluster and scope metadata plus named embedded text documents
+- keep raw archive or binary support out of scope for this phase
 
 ### Acceptance criteria
 
@@ -316,6 +402,7 @@ Before implementation starts, explicitly choose the artifact envelope:
 - [ ] A dedicated adapter handles Kubernetes environment detection, noise suppression, deterministic findings, and incomplete-bundle detection.
 - [ ] At least one real fixture and one golden expected-output contract exist for Kubernetes evidence.
 - [ ] Upload, run detail, and compare work end-to-end for Kubernetes runs.
+- [ ] The first implementation consumes the locked `kubernetes-bundle.v1` JSON manifest shape rather than a raw archive.
 - [ ] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
 - [ ] The implementation makes scope explicit so cluster-wide and namespace-scoped bundles do not compare accidentally.
 

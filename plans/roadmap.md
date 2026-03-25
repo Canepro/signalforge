@@ -211,6 +211,8 @@ Possible scope:
 
 Phase 8 starts from the hardened single-family base and must first lock: artifact envelope compatibility, the deterministic `evidence_delta` compare model, target-identity scope, and source/registration assumptions.
 
+The first Kubernetes gate is now decided: use a UTF-8 JSON manifest over the existing text ingestion path for `kubernetes-bundle` v1, and defer raw archive support to a separate ingestion/storage phase if it is ever needed.
+
 Important:
 
 - do not implement a generalized collector framework first
