@@ -812,6 +812,13 @@ describe("API GET /api/runs/[id]/compare", () => {
           status: "changed",
         }),
         expect.objectContaining({
+          key: "workload_cluster_admin_binding_count",
+          family: "kubernetes-bundle",
+          previous: 1,
+          current: 0,
+          status: "changed",
+        }),
+        expect.objectContaining({
           key: "network_policy_count",
           family: "kubernetes-bundle",
           previous: 0,

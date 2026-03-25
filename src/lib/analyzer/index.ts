@@ -224,6 +224,7 @@ function containerTitlePriority(title: string): number {
 
 function kubernetesTitlePriority(title: string): number {
   const normalized = title.toLowerCase();
+  if (normalized.includes("service account is bound to cluster-admin")) return 11;
   if (normalized.includes("cluster-admin binding")) return 10;
   if (normalized.includes("grants privilege-escalation verbs")) return 9;
   if (normalized.includes("node proxy apis")) return 8;
@@ -323,6 +324,9 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("cluster-admin binding")) {
       return `${finding.title}, which grants broad control over cluster resources and should be tightly limited.`;
+    }
+    if (title.includes("service account is bound to cluster-admin")) {
+      return `${finding.title}, which means this specific workload identity can act with cluster-admin privileges if its pod credential is used or exposed.`;
     }
     if (title.includes("grants privilege-escalation verbs")) {
       return `${finding.title}, which can let a principal hand out or assume broader RBAC than intended.`;
@@ -535,6 +539,9 @@ function buildActionForFinding(
     }
     if (tl.includes("cluster-admin binding")) {
       return "Remove the cluster-admin binding or replace it with the narrowest RBAC role that still meets the workload or operator need.";
+    }
+    if (tl.includes("service account is bound to cluster-admin")) {
+      return "Move this workload onto a narrower service account and remove the cluster-admin grant so the pod identity only has the Kubernetes permissions it actually needs.";
     }
     if (tl.includes("grants privilege-escalation verbs")) {
       return "Remove bind, escalate, or impersonate from the RBAC role unless a tightly controlled break-glass path truly requires them, and document any exception.";

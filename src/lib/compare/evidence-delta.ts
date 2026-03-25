@@ -56,6 +56,7 @@ type KubernetesServiceExposure = {
 };
 
 type KubernetesRbacBinding = {
+  subject?: string;
   roleRef?: string;
 };
 
@@ -154,6 +155,7 @@ type KubernetesPodSpec = {
 };
 
 type KubernetesWorkloadSpec = {
+  namespace?: string;
   pod_spec?: KubernetesPodSpec;
 };
 
@@ -161,6 +163,7 @@ type KubernetesEvidenceSummary = {
   document_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
+  workload_cluster_admin_binding_count: number;
   rbac_wildcard_role_count: number;
   rbac_privilege_escalation_role_count: number;
   rbac_node_proxy_access_role_count: number;
@@ -353,6 +356,29 @@ function normalizedList(values: string[] | undefined): string[] {
   return (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
 }
 
+function serviceAccountKey(namespace: string | undefined, name: string | undefined): string | null {
+  const trimmedNamespace = namespace?.trim();
+  const trimmedName = name?.trim();
+  if (!trimmedNamespace || !trimmedName) return null;
+  return `${trimmedNamespace}/${trimmedName}`;
+}
+
+function parseServiceAccountSubjectKey(subject: string | undefined): string | null {
+  const trimmedSubject = subject?.trim();
+  if (!trimmedSubject) return null;
+  if (trimmedSubject.startsWith("system:serviceaccount:")) {
+    const [, , namespace, name, ...rest] = trimmedSubject.split(":");
+    if (!namespace || !name || rest.length > 0) return null;
+    return serviceAccountKey(namespace, name);
+  }
+  if (trimmedSubject.includes("/")) {
+    const [namespace, name, ...rest] = trimmedSubject.split("/");
+    if (!namespace || !name || rest.length > 0) return null;
+    return serviceAccountKey(namespace, name);
+  }
+  return null;
+}
+
 function secretEnvRefCount(container: KubernetesContainerSpec): number {
   return (container.env ?? []).filter((item) => item.valueFrom?.secretKeyRef != null).length;
 }
@@ -479,6 +505,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       document_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
+      workload_cluster_admin_binding_count: 0,
       rbac_wildcard_role_count: 0,
       rbac_privilege_escalation_role_count: 0,
       rbac_node_proxy_access_role_count: 0,
@@ -503,6 +530,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
 
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
+  let workloadClusterAdminBindingCount = 0;
   let rbacWildcardRoleCount = 0;
   let rbacPrivilegeEscalationRoleCount = 0;
   let rbacNodeProxyAccessRoleCount = 0;
@@ -523,6 +551,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let privilegedInitContainerCountTotal = 0;
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
+  const clusterAdminServiceAccounts = new Set<string>();
 
   for (const doc of manifest.documents) {
     if (doc.kind === "service-exposure") {
@@ -541,7 +570,11 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
 
     if (doc.kind === "rbac-bindings") {
       for (const binding of parseKubernetesJson<KubernetesRbacBinding>(doc)) {
-        if (binding.roleRef?.trim() === "cluster-admin") clusterAdminBindingCount += 1;
+        if (binding.roleRef?.trim() === "cluster-admin") {
+          clusterAdminBindingCount += 1;
+          const subjectKey = parseServiceAccountSubjectKey(binding.subject);
+          if (subjectKey) clusterAdminServiceAccounts.add(subjectKey);
+        }
       }
       continue;
     }
@@ -594,11 +627,18 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (workload.pod_spec?.hostPID) hostPidWorkloadCount += 1;
         if (workload.pod_spec?.hostIPC) hostIpcWorkloadCount += 1;
         const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
+        const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
         if (
           workload.pod_spec?.automountServiceAccountToken !== false &&
           serviceAccountName === "default"
         ) {
           defaultServiceAccountAutomountWorkloadCount += 1;
+        }
+        if (
+          workloadServiceAccountKey &&
+          clusterAdminServiceAccounts.has(workloadServiceAccountKey)
+        ) {
+          workloadClusterAdminBindingCount += 1;
         }
 
         const podSecurityContext = workload.pod_spec?.securityContext;
@@ -638,6 +678,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     document_count: manifest.documents.length,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
+    workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
     rbac_wildcard_role_count: rbacWildcardRoleCount,
     rbac_privilege_escalation_role_count: rbacPrivilegeEscalationRoleCount,
     rbac_node_proxy_access_role_count: rbacNodeProxyAccessRoleCount,
@@ -745,6 +786,13 @@ function buildFamilyMetrics(
         "Cluster-admin bindings",
         previous.cluster_admin_binding_count,
         next.cluster_admin_binding_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_cluster_admin_binding_count",
+        "Workloads bound to cluster-admin",
+        previous.workload_cluster_admin_binding_count,
+        next.workload_cluster_admin_binding_count,
         "kubernetes-bundle"
       ),
       metricRow(

@@ -158,6 +158,29 @@ function roleLabel(
   return trimmedName || trimmedNamespace || trimmedScope || "unknown-role";
 }
 
+function serviceAccountKey(namespace: string | undefined, name: string | undefined): string | null {
+  const trimmedNamespace = namespace?.trim();
+  const trimmedName = name?.trim();
+  if (!trimmedNamespace || !trimmedName) return null;
+  return `${trimmedNamespace}/${trimmedName}`;
+}
+
+function parseServiceAccountSubjectKey(subject: string | undefined): string | null {
+  const trimmedSubject = subject?.trim();
+  if (!trimmedSubject) return null;
+  if (trimmedSubject.startsWith("system:serviceaccount:")) {
+    const [, , namespace, name, ...rest] = trimmedSubject.split(":");
+    if (!namespace || !name || rest.length > 0) return null;
+    return serviceAccountKey(namespace, name);
+  }
+  if (trimmedSubject.includes("/")) {
+    const [namespace, name, ...rest] = trimmedSubject.split("/");
+    if (!namespace || !name || rest.length > 0) return null;
+    return serviceAccountKey(namespace, name);
+  }
+  return null;
+}
+
 function hasResourceEntries(resources: Record<string, string> | undefined): boolean {
   return Boolean(resources && Object.keys(resources).length > 0);
 }
@@ -313,6 +336,18 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     const findings: PreFinding[] = [];
     const externalServiceNamespaces = new Set<string>();
     const namespacesWithNetworkPolicy = new Set<string>();
+    const clusterAdminServiceAccounts = new Set<string>();
+
+    for (const doc of manifest.documents) {
+      if (doc.kind !== "rbac-bindings") continue;
+      const bindings = parseKubernetesDocumentJson<KubernetesRbacBinding[]>(doc) ?? [];
+      for (const binding of bindings) {
+        const roleRef = binding.roleRef?.trim().toLowerCase();
+        if (roleRef !== "cluster-admin") continue;
+        const subjectKey = parseServiceAccountSubjectKey(binding.subject);
+        if (subjectKey) clusterAdminServiceAccounts.add(subjectKey);
+      }
+    }
 
     for (const doc of manifest.documents) {
       if (doc.kind === "service-exposure") {
@@ -470,6 +505,25 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
               section_source: doc.path,
               evidence: JSON.stringify(workload),
               rule_id: "kubernetes.workload_default_service_account_automount",
+            });
+          }
+
+          const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
+          if (
+            workloadServiceAccountKey &&
+            clusterAdminServiceAccounts.has(workloadServiceAccountKey)
+          ) {
+            findings.push({
+              title: `Kubernetes workload service account is bound to cluster-admin: ${label} (${workloadServiceAccountKey})`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                cluster_admin_binding: true,
+              }),
+              rule_id: "kubernetes.workload_cluster_admin_service_account",
             });
           }
 

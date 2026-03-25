@@ -222,6 +222,9 @@ describe("KubernetesBundleAdapter", () => {
       findings.some((finding) => finding.title.includes("uses the default service account with token automount"))
     ).toBe(true);
     expect(
+      findings.some((finding) => finding.title.includes("service account is bound to cluster-admin"))
+    ).toBe(true);
+    expect(
       findings.some((finding) => finding.title.includes("injects Secret values into environment variables"))
     ).toBe(true);
     expect(
