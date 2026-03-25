@@ -20,6 +20,7 @@ Durable decisions that apply across all phases:
   - containers should prefer explicit `target_identifier` values that reflect the intended compare scope, for example `container-workload:<host>:<runtime>:<service>` or `container-instance:<host>:<runtime>:<container-id>`
   - Kubernetes should prefer explicit `target_identifier` values such as `cluster:<cluster-name>` or `cluster:<cluster-name>:namespace:<scope>`
 - **Operator UX**: containers and Kubernetes must feel like first-class evidence types in upload, run detail, compare, and docs before any orchestration work is considered.
+- **Quality bar**: Phase 8 should not stop at the weakest demo that proves the plumbing. Container and Kubernetes slices should aim for credible operator value, using official platform guidance, realistic fixtures, and real read-only cluster/runtime inspection when that materially improves rule quality.
 - **Trust model**: collection and remediation are different trust classes. Remediation is deferred for now, but not forbidden as a future product direction.
 
 ---
@@ -422,12 +423,15 @@ A single Kubernetes bundle can be submitted end-to-end and produces a credible r
 
 Improve the Kubernetes adapter around RBAC exposure, control-plane or workload misconfiguration, public service exposure, secret/config drift, workload health, and noisy-but-expected platform conditions. Tune summaries and actions around cluster operators and platform engineers rather than host admins.
 
+The implementation should use real platform guidance rather than improvised severity lore. Recommended sources include upstream Kubernetes security guidance, Pod Security Standards, RBAC least-privilege guidance, Service/networking docs, probe guidance, and provider-specific operational guidance where it affects realistic defaults or wording.
+
 ### Acceptance criteria
 
 - [ ] Deterministic rules cover a first credible Kubernetes-specific risk set.
 - [ ] Expected platform noise is documented and suppressed deterministically where appropriate.
 - [ ] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
 - [ ] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
+- [ ] At least part of the Kubernetes rule and fixture set is informed by realistic bundle content or live read-only cluster inspection rather than purely invented synthetic examples.
 
 ### Notes
 
@@ -437,6 +441,13 @@ Kubernetes quality work should start with high-signal areas only:
 - workload health and crash patterns
 - secret/config drift that is explicit in the evidence
 - noisy control-plane or system add-on conditions filtered as expected where justified
+
+Guardrails for execution:
+
+- prefer read-only cluster inspection when generating or validating realistic fixtures
+- use local tools such as `kubectl`, `podman`, or Docker-compatible commands when they materially improve fixture realism
+- do not mutate live clusters unless the user explicitly asks for that
+- document which cluster/runtime context informed a rule or fixture when that context meaningfully shaped the result
 
 ---
 

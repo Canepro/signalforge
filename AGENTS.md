@@ -126,6 +126,11 @@ Core directories:
 - Prefer targeted rule improvements over broad abstraction.
 - Preserve evidence grounding for every finding.
 - Keep UI operator-first, table-first, and light-theme by default.
+- Do not optimize Kubernetes or container work for the weakest demo that happens to pass tests. Prefer slices that feel credible to a real platform engineer.
+- For Kubernetes, container, and platform-security work, prefer official upstream guidance and cloud-provider best practices over ad hoc heuristics when choosing rules, priorities, and wording.
+- Use relevant local skills proactively when the task matches them, especially `kubernetes-platform-architecture`, `k8s-sre-triage`, `gitops-workflow`, `observability-architecture`, `grill-me`, and `tdd`.
+- When realistic validation or fixture quality would materially improve the result, use the available local runtime tools and environments instead of staying purely synthetic. This machine may provide `kubectl`, `podman`, Docker-compatible commands, local clusters, and cloud-cluster access.
+- Be careful with live infrastructure: inspect first, prefer read-only commands by default, avoid changing cluster state unless explicitly requested, and report clearly which environment was used.
 - After non-trivial changes, run targeted validation by default.
 - In `--yolo` or other high-autonomy workflows, do not skip relevant verification unless the user explicitly says to.
 - Prefer the smallest validation that meaningfully covers the change.
@@ -180,6 +185,7 @@ This environment usually provides a Codex skill catalog at runtime. Agents shoul
 - For UI critique or layout cleanup, use `frontend-review` and `responsive-design`.
 - For behavior changes, prefer `tdd`.
 - For architectural cleanup or reshaping module boundaries, use `improve-codebase-architecture` or `design-an-interface`.
+- For Kubernetes and platform work, do not stop at toy examples when better evidence is available. Use official documentation, realistic fixtures, and live read-only inspection when that materially improves rule quality or operator trust.
 - Treat skill availability as session-dependent. Re-check the runtime skill list if a named skill is missing.
 
 ## Non-Goals
