@@ -13,10 +13,12 @@ Durable decisions that apply across all phases:
 - **Acquisition model**: ship both families as **push-first** submission patterns first. Do not block on job-driven collection or agent orchestration.
 - **Reuse path**: preserve the existing ingestion contract (`POST /api/runs` and job-bound artifact upload) and extend adapter selection by `artifact_type`.
 - **Compare model**: keep deterministic finding-key drift as the base layer, but add a second read model for “same findings, changed evidence/metadata” so compare remains useful when systems are stable.
+- **Execution-plane shape**: prefer one SignalForge agent product over many unrelated agents, but let it ship in different deployment forms and advertise bounded capabilities based on environment and trust level.
 - **Identity**:
   - containers should prefer explicit `target_identifier` values such as `container:<host>:<runtime>:<name-or-id>`
   - Kubernetes should prefer explicit `target_identifier` values such as `cluster:<cluster-name>` or `cluster:<cluster-name>:namespace:<scope>`
 - **Operator UX**: containers and Kubernetes must feel like first-class evidence types in upload, run detail, compare, and docs before any orchestration work is considered.
+- **Trust model**: collection and remediation are different trust classes. Remediation is deferred for now, but not forbidden as a future product direction.
 
 ---
 
@@ -43,6 +45,13 @@ These should be settled quickly before writing implementation code:
 - **Target identity defaults**:
   - containers: prefer container name + runtime + host, with container ID as supporting metadata
   - Kubernetes: prefer cluster identifier + optional namespace scope, not pod names
+- **Kubernetes capability scope**:
+  - namespace-scoped collection for workload-local diagnostics
+  - cluster-scoped collection for real cluster diagnostics
+  - do not force namespace-only scope where the diagnostic value depends on cluster-level evidence
+- **Future execution tiers**:
+  - read-only collection
+  - higher-trust remediation later, with explicit approvals and auditability
 
 If any of these stay fuzzy, compare and fixtures will get reworked later.
 
@@ -58,6 +67,31 @@ These are out of scope for the first implementation pass:
 - multi-artifact fleet management
 - scheduling and notification work for new artifact families
 - extending the current host agent to handle Kubernetes or containers before push-first flows are proven
+- remediation implementation in this phase
+
+---
+
+## Longer-Term Execution Direction
+
+These are not first-pass implementation items, but they should shape the architecture now:
+
+- **One agent product, multiple deployment modes**
+  - host / VM / WSL service
+  - containerized deployment for container-host environments
+  - in-cluster deployment for Kubernetes environments
+- **Capability-scoped behavior**
+  - examples:
+    - `collect:linux-audit-log`
+    - `collect:container-diagnostics`
+    - `collect:kubernetes-bundle:namespace`
+    - `collect:kubernetes-bundle:cluster`
+- **Trust-tier separation**
+  - read-only collection capabilities should not automatically imply write/remediation authority
+  - future remediation should be modeled as a separate capability class, not just “another collector”
+- **Auditability**
+  - any future remediation path should support explicit approvals, action logging, and reviewable blast radius
+
+This keeps the door open for a broader execution-plane product later without muddying the current evidence-first boundary.
 
 ---
 
@@ -209,6 +243,11 @@ Extend Sources and collection setup so container and Kubernetes evidence types b
 
 This phase should follow real submissions, not lead them. SignalForge needs the artifact contracts and findings shape first.
 
+When this phase happens, the UI should be honest about scope:
+- push-first flows remain valid even if no agent is present
+- some future capabilities may require cluster-scoped collection, not just namespace-scoped collection
+- remediation, if ever added, must be represented as a higher-trust mode than read-only diagnostics
+
 ---
 
 ## Phase 6: Optional Orchestration Decision
@@ -225,3 +264,10 @@ Make an explicit product decision after real submissions: keep both families pus
 - [ ] Real usage data exists for both container and Kubernetes submissions.
 - [ ] The team can point to concrete operator pain that justifies orchestration work.
 - [ ] Any proposed agent or collection workflow preserves the current product boundary and blast-radius constraints.
+
+### Notes
+
+If orchestration is added later, choose capability scope based on diagnostic need:
+- container hosts may need local runtime visibility
+- Kubernetes may need cluster-scoped read access for meaningful diagnostics
+- future remediation should be a separate decision and trust tier, not bundled into the first orchestration step
