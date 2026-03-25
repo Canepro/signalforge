@@ -20,6 +20,47 @@ Durable decisions that apply across all phases:
 
 ---
 
+## Tomorrow Start Here
+
+If implementation starts tomorrow, the recommended first three slices are:
+
+1. **Phase 0 first**: improve compare so stable systems still produce useful output.
+2. **Container slice before Kubernetes**: prove the second artifact-family pattern on the smaller surface first.
+3. **Push-first before job-driven**: do not extend the agent until container and Kubernetes evidence can already be uploaded, analyzed, and compared cleanly.
+
+That gives the fastest route to a demoable result without reopening the product boundary.
+
+---
+
+## Open Decisions To Lock Before Coding
+
+These should be settled quickly before writing implementation code:
+
+- **Container artifact shape**: one plain-text collector output vs a small structured bundle rendered to text for ingestion.
+- **Kubernetes scope**: cluster-wide support bundle first vs namespace-scoped evidence first.
+- **Compare delta contract**: whether “same findings, changed evidence” is a sibling summary block or a new row status family.
+- **Reference collectors**: whether the first container and Kubernetes push paths live only in `signalforge-collectors` or begin as documented external contracts with fixtures first.
+- **Target identity defaults**:
+  - containers: prefer container name + runtime + host, with container ID as supporting metadata
+  - Kubernetes: prefer cluster identifier + optional namespace scope, not pod names
+
+If any of these stay fuzzy, compare and fixtures will get reworked later.
+
+---
+
+## Explicit Near-Term Non-Goals
+
+These are out of scope for the first implementation pass:
+
+- live `kubectl` access from SignalForge
+- live `docker` or `podman` execution from SignalForge
+- a generalized collector plugin system
+- multi-artifact fleet management
+- scheduling and notification work for new artifact families
+- extending the current host agent to handle Kubernetes or containers before push-first flows are proven
+
+---
+
 ## Phase 0: Compare Becomes Useful
 
 **User stories**:
@@ -36,6 +77,10 @@ Add a deterministic “stability and evidence delta” layer to compare so runs 
 - [ ] Compare exposes stable deltas such as evidence changes, package-count changes, listener count changes, metadata differences, or collection-time differences when findings remain matched.
 - [ ] The compare UI shows a useful empty-state alternative such as “same finding set; evidence changed in X places”.
 - [ ] Existing deterministic finding drift remains unchanged as the primary compatibility layer.
+
+### Notes
+
+This is not optional polish. If compare remains dead when findings are unchanged, both container and Kubernetes adoption will inherit the same low-value operator experience.
 
 ---
 
@@ -57,6 +102,10 @@ Introduce `container-diagnostics` as the second artifact family. Define a narrow
 - [ ] Upload, run detail, and compare work end-to-end for container runs.
 - [ ] Docs describe the reference submission pattern and required metadata for stable compare.
 
+### Tracer-bullet success condition
+
+A single container artifact can be submitted end-to-end and produces a credible run page, not just parser output in isolation.
+
 ---
 
 ## Phase 2: Container Findings Quality
@@ -75,6 +124,15 @@ Improve the container adapter until it produces a narrow, credible set of determ
 - [ ] Summary/action wording is container-aware and not phrased like a generic VM audit.
 - [ ] Compare normalization handles volatile container identifiers where the underlying issue is the same.
 - [ ] The product can demonstrate at least one resolved issue and one unchanged issue across two container runs.
+
+### Notes
+
+Container quality work should stay narrow at first:
+- exposed ports
+- privileged or host-network/container settings
+- mounted secrets or broad host-path access
+- image/runtime hygiene signals that are explicit in the artifact
+- noisy-but-expected container runtime chatter
 
 ---
 
@@ -96,6 +154,10 @@ Introduce `kubernetes-bundle` as a third artifact family. Start with support-bun
 - [ ] Upload, run detail, and compare work end-to-end for Kubernetes runs.
 - [ ] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
 
+### Tracer-bullet success condition
+
+A single Kubernetes bundle can be submitted end-to-end and produces a credible run page, with compare anchored to a stable cluster identifier instead of volatile pod-level names.
+
 ---
 
 ## Phase 4: Kubernetes Findings Quality
@@ -114,6 +176,15 @@ Improve the Kubernetes adapter around RBAC exposure, control-plane or workload m
 - [ ] Expected platform noise is documented and suppressed deterministically where appropriate.
 - [ ] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
 - [ ] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
+
+### Notes
+
+Kubernetes quality work should start with high-signal areas only:
+- public service exposure
+- RBAC over-breadth that is explicit in the bundle
+- workload health and crash patterns
+- secret/config drift that is explicit in the evidence
+- noisy control-plane or system add-on conditions filtered as expected where justified
 
 ---
 
@@ -134,6 +205,10 @@ Extend Sources and collection setup so container and Kubernetes evidence types b
 - [ ] The UI clearly distinguishes push-first submission patterns from job-driven host collection.
 - [ ] No live-cluster or container-runtime remote execution is introduced into the web app.
 
+### Notes
+
+This phase should follow real submissions, not lead them. SignalForge needs the artifact contracts and findings shape first.
+
 ---
 
 ## Phase 6: Optional Orchestration Decision
@@ -150,4 +225,3 @@ Make an explicit product decision after real submissions: keep both families pus
 - [ ] Real usage data exists for both container and Kubernetes submissions.
 - [ ] The team can point to concrete operator pain that justifies orchestration work.
 - [ ] Any proposed agent or collection workflow preserves the current product boundary and blast-radius constraints.
-
