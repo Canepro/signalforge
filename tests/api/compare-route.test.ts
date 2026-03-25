@@ -418,6 +418,233 @@ describe("API GET /api/runs/[id]/compare", () => {
     );
   });
 
+  it("returns kubernetes evidence_delta metrics when findings stay the same", async () => {
+    const olderArtifact = insertArtifact(db, {
+      artifact_type: "kubernetes-bundle",
+      source_type: "api",
+      filename: "payments-before.json",
+      content: kubernetesBundleArtifact({
+        clusterName: "aks-prod-eu-1",
+        scopeLevel: "namespace",
+        namespace: "payments",
+        documents: [
+          {
+            path: "network/services.json",
+            kind: "service-exposure",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "payments-api",
+                type: "LoadBalancer",
+                external: true,
+              },
+            ]),
+          },
+          {
+            path: "rbac/bindings.json",
+            kind: "rbac-bindings",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                scope: "cluster",
+                subject: "system:serviceaccount:payments:payments-api",
+                roleRef: "cluster-admin",
+              },
+            ]),
+          },
+          {
+            path: "network/network-policies.json",
+            kind: "network-policies",
+            media_type: "application/json",
+            content: JSON.stringify([]),
+          },
+          {
+            path: "workloads/specs.json",
+            kind: "workload-specs",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "payments-api",
+                kind: "Deployment",
+                pod_spec: {
+                  securityContext: {
+                    runAsNonRoot: true,
+                    seccompProfile: { type: "RuntimeDefault" },
+                  },
+                  containers: [
+                    {
+                      name: "api",
+                      securityContext: {
+                        allowPrivilegeEscalation: false,
+                      },
+                      readinessProbe: { httpGet: { path: "/ready", port: 8080 } },
+                      livenessProbe: { httpGet: { path: "/live", port: 8080 } },
+                      resources: {
+                        requests: { cpu: "100m", memory: "128Mi" },
+                        limits: { cpu: "500m", memory: "256Mi" },
+                      },
+                    },
+                  ],
+                },
+              },
+            ]),
+          },
+        ],
+      }),
+    });
+    const newerArtifact = insertArtifact(db, {
+      artifact_type: "kubernetes-bundle",
+      source_type: "api",
+      filename: "payments-after.json",
+      content: kubernetesBundleArtifact({
+        clusterName: "aks-prod-eu-1",
+        scopeLevel: "namespace",
+        namespace: "payments",
+        documents: [
+          {
+            path: "network/services.json",
+            kind: "service-exposure",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "payments-api",
+                type: "LoadBalancer",
+                external: true,
+              },
+              {
+                namespace: "payments",
+                name: "payments-metrics",
+                type: "NodePort",
+                external: false,
+              },
+            ]),
+          },
+          {
+            path: "rbac/bindings.json",
+            kind: "rbac-bindings",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                scope: "cluster",
+                subject: "system:serviceaccount:payments:payments-api",
+                roleRef: "cluster-admin",
+              },
+              {
+                scope: "cluster",
+                subject: "system:serviceaccount:payments:payments-jobs",
+                roleRef: "cluster-admin",
+              },
+            ]),
+          },
+          {
+            path: "network/network-policies.json",
+            kind: "network-policies",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "default-deny",
+              },
+            ]),
+          },
+          {
+            path: "workloads/specs.json",
+            kind: "workload-specs",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "payments-api",
+                kind: "Deployment",
+                pod_spec: {
+                  containers: [
+                    {
+                      name: "api",
+                      securityContext: {
+                        privileged: true,
+                        allowPrivilegeEscalation: true,
+                        runAsNonRoot: false,
+                        seccompProfile: { type: "Unconfined" },
+                      },
+                      readinessProbe: null,
+                      livenessProbe: null,
+                      resources: {},
+                    },
+                  ],
+                },
+              },
+            ]),
+          },
+        ],
+      }),
+    });
+    const finding = mkFinding("f1", "Stable Kubernetes finding", "medium");
+    const older = insertRun(db, olderArtifact.id, mkResult(mkReport("aks-prod-eu-1", [finding])), {
+      filename: "payments-before.json",
+      source_type: "api",
+      target_identifier: "cluster:aks-prod-eu-1:namespace:payments",
+    });
+    const newer = insertRun(db, newerArtifact.id, mkResult(mkReport("aks-prod-eu-1", [finding])), {
+      filename: "payments-after.json",
+      source_type: "api",
+      target_identifier: "cluster:aks-prod-eu-1:namespace:payments",
+    });
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-01T01:00:00.000Z", older.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-02T01:00:00.000Z", newer.id]);
+
+    const res = await GET_COMPARE(new NextRequest(`http://localhost/api/runs/${newer.id}/compare`), {
+      params: Promise.resolve({ id: newer.id }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.drift.rows).toEqual([]);
+    expect(body.evidence_delta.changed).toBe(true);
+    expect(body.evidence_delta.summary.artifact_changed).toBe(true);
+    expect(body.current.target_display_label).toBe("cluster:aks-prod-eu-1:namespace:payments");
+    expect(body.evidence_delta.metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "external_service_count",
+          family: "kubernetes-bundle",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "cluster_admin_binding_count",
+          family: "kubernetes-bundle",
+          previous: 1,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "network_policy_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "exposed_namespace_without_network_policy_count",
+          family: "kubernetes-bundle",
+          previous: 1,
+          current: 0,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "workload_hardening_gap_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 6,
+          status: "changed",
+        }),
+      ])
+    );
+  });
+
   it("matches implicit baseline by target_identifier across hostnames", async () => {
     const a1 = insertArtifact(db, {
       artifact_type: "linux-audit-log",

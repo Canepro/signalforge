@@ -22,9 +22,59 @@
       "title_contains": "CrashLoopBackOff",
       "severity": "medium",
       "category": "kubernetes"
+    },
+    {
+      "title_contains": "without NetworkPolicy isolation",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "runs privileged",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "allows privilege escalation",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "does not enforce runAsNonRoot",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "missing liveness or readiness probes",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "missing resource requests or limits",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "missing a RuntimeDefault seccomp profile",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "grants wildcard access",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "grants privilege-escalation verbs",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "can access kubelet or node proxy APIs",
+      "severity": "high",
+      "category": "kubernetes"
     }
   ],
   "is_incomplete": false,
-  "min_findings": 3,
-  "max_findings": 3
+  "min_findings": 13,
+  "max_findings": 13
 }

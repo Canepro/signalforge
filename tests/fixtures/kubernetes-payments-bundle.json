@@ -26,6 +26,24 @@
       "kind": "workload-status",
       "media_type": "application/json",
       "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api\",\"status\":\"CrashLoopBackOff\",\"restarts\":12}]"
+    },
+    {
+      "path": "workloads/specs.json",
+      "kind": "workload-specs",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api\",\"kind\":\"Deployment\",\"pod_spec\":{\"containers\":[{\"name\":\"api\",\"securityContext\":{\"privileged\":true,\"allowPrivilegeEscalation\":true,\"runAsNonRoot\":false,\"seccompProfile\":{\"type\":\"Unconfined\"}},\"readinessProbe\":null,\"livenessProbe\":null,\"resources\":{}}]}}]"
+    },
+    {
+      "path": "network/network-policies.json",
+      "kind": "network-policies",
+      "media_type": "application/json",
+      "content": "[]"
+    },
+    {
+      "path": "rbac/roles.json",
+      "kind": "rbac-roles",
+      "media_type": "application/json",
+      "content": "[{\"scope\":\"namespace\",\"namespace\":\"payments\",\"name\":\"payments-ops\",\"rules\":[{\"apiGroups\":[\"*\"],\"resources\":[\"*\"],\"verbs\":[\"*\"]}]},{\"scope\":\"cluster\",\"name\":\"payments-breakglass\",\"rules\":[{\"apiGroups\":[\"rbac.authorization.k8s.io\"],\"resources\":[\"clusterroles\"],\"verbs\":[\"bind\",\"escalate\",\"impersonate\"]},{\"apiGroups\":[\"\"],\"resources\":[\"nodes/proxy\"],\"verbs\":[\"get\"]}]}]"
     }
   ]
 }

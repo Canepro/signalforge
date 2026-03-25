@@ -405,7 +405,12 @@ ran_as_root: true
       ).toBe(true);
       expect(
         result.report!.top_actions_now.some((action) =>
-          action.toLowerCase().includes("loadbalancer")
+          action.toLowerCase().includes("wildcard") ||
+          action.toLowerCase().includes("explicit apigroups") ||
+          action.toLowerCase().includes("bind, escalate") ||
+          action.toLowerCase().includes("networkpolicy") ||
+          action.toLowerCase().includes("privileged mode") ||
+          action.toLowerCase().includes("public reachability")
         )
       ).toBe(true);
     } finally {

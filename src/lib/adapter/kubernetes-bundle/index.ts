@@ -21,11 +21,61 @@ type KubernetesRbacBinding = {
   roleRef?: string;
 };
 
+type KubernetesRbacRule = {
+  apiGroups?: string[];
+  resources?: string[];
+  verbs?: string[];
+};
+
+type KubernetesRbacRole = {
+  scope?: string;
+  namespace?: string;
+  name?: string;
+  rules?: KubernetesRbacRule[];
+};
+
 type KubernetesWorkloadStatus = {
   namespace?: string;
   name?: string;
   status?: string;
   restarts?: number;
+};
+
+type KubernetesNetworkPolicy = {
+  namespace?: string;
+  name?: string;
+};
+
+type KubernetesSecurityContext = {
+  privileged?: boolean;
+  allowPrivilegeEscalation?: boolean;
+  runAsNonRoot?: boolean;
+  seccompProfile?: {
+    type?: string;
+  } | null;
+};
+
+type KubernetesContainerSpec = {
+  name?: string;
+  securityContext?: KubernetesSecurityContext;
+  readinessProbe?: unknown;
+  livenessProbe?: unknown;
+  resources?: {
+    requests?: Record<string, string>;
+    limits?: Record<string, string>;
+  };
+};
+
+type KubernetesPodSpec = {
+  securityContext?: KubernetesSecurityContext;
+  containers?: KubernetesContainerSpec[];
+};
+
+type KubernetesWorkloadSpec = {
+  namespace?: string;
+  name?: string;
+  kind?: string;
+  pod_spec?: KubernetesPodSpec;
 };
 
 function manifestFromSections(sections: Record<string, string>): KubernetesBundleManifest | null {
@@ -35,6 +85,28 @@ function manifestFromSections(sections: Record<string, string>): KubernetesBundl
 function workloadLabel(namespace: string | undefined, name: string | undefined): string {
   if (namespace && name) return `${namespace}/${name}`;
   return name || namespace || "unknown-workload";
+}
+
+function roleLabel(
+  scope: string | undefined,
+  namespace: string | undefined,
+  name: string | undefined
+): string {
+  const trimmedScope = scope?.trim();
+  const trimmedNamespace = namespace?.trim();
+  const trimmedName = name?.trim();
+  if (trimmedScope === "namespace" && trimmedNamespace && trimmedName) {
+    return `${trimmedNamespace}/${trimmedName}`;
+  }
+  return trimmedName || trimmedNamespace || trimmedScope || "unknown-role";
+}
+
+function hasResourceEntries(resources: Record<string, string> | undefined): boolean {
+  return Boolean(resources && Object.keys(resources).length > 0);
+}
+
+function normalizedList(values: string[] | undefined): string[] {
+  return (values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -98,15 +170,21 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     if (!manifest) return [];
 
     const findings: PreFinding[] = [];
+    const externalServiceNamespaces = new Set<string>();
+    const namespacesWithNetworkPolicy = new Set<string>();
 
     for (const doc of manifest.documents) {
       if (doc.kind === "service-exposure") {
         const services = parseKubernetesDocumentJson<KubernetesServiceExposure[]>(doc) ?? [];
         for (const service of services) {
           const serviceType = service.type?.trim();
-          const isExternal = service.external === true || serviceType === "LoadBalancer";
+          const isExternal =
+            service.external === true ||
+            serviceType === "LoadBalancer" ||
+            serviceType === "NodePort";
           if (!isExternal) continue;
           const label = workloadLabel(service.namespace, service.name);
+          if (service.namespace) externalServiceNamespaces.add(service.namespace);
           findings.push({
             title: `Kubernetes Service exposed externally: ${label} (${serviceType ?? "external"})`,
             severity_hint: "high",
@@ -115,6 +193,13 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             evidence: JSON.stringify(service),
             rule_id: "kubernetes.service_external",
           });
+        }
+      }
+
+      if (doc.kind === "network-policies") {
+        const policies = parseKubernetesDocumentJson<KubernetesNetworkPolicy[]>(doc) ?? [];
+        for (const policy of policies) {
+          if (policy.namespace?.trim()) namespacesWithNetworkPolicy.add(policy.namespace.trim());
         }
       }
 
@@ -134,6 +219,71 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         }
       }
 
+      if (doc.kind === "rbac-roles") {
+        const roles = parseKubernetesDocumentJson<KubernetesRbacRole[]>(doc) ?? [];
+        for (const role of roles) {
+          const label = roleLabel(role.scope, role.namespace, role.name);
+          let hasWildcardAccess = false;
+          let hasNodeProxyAccess = false;
+          const escalationVerbs = new Set<string>();
+
+          for (const rule of role.rules ?? []) {
+            const apiGroups = normalizedList(rule.apiGroups);
+            const resources = normalizedList(rule.resources);
+            const verbs = normalizedList(rule.verbs);
+
+            if (
+              apiGroups.includes("*") ||
+              resources.includes("*") ||
+              verbs.includes("*")
+            ) {
+              hasWildcardAccess = true;
+            }
+
+            for (const verb of ["bind", "escalate", "impersonate"] as const) {
+              if (verbs.includes(verb)) escalationVerbs.add(verb);
+            }
+
+            if (resources.includes("nodes/proxy")) {
+              hasNodeProxyAccess = true;
+            }
+          }
+
+          if (hasWildcardAccess) {
+            findings.push({
+              title: `Kubernetes RBAC role grants wildcard access: ${label}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(role),
+              rule_id: "kubernetes.rbac_wildcard_access",
+            });
+          }
+
+          if (escalationVerbs.size > 0) {
+            findings.push({
+              title: `Kubernetes RBAC role grants privilege-escalation verbs: ${label} (${Array.from(escalationVerbs).join(", ")})`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(role),
+              rule_id: "kubernetes.rbac_privilege_escalation_verbs",
+            });
+          }
+
+          if (hasNodeProxyAccess) {
+            findings.push({
+              title: `Kubernetes RBAC role can access kubelet or node proxy APIs: ${label}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(role),
+              rule_id: "kubernetes.rbac_node_proxy_access",
+            });
+          }
+        }
+      }
+
       if (doc.kind === "workload-status") {
         const workloads = parseKubernetesDocumentJson<KubernetesWorkloadStatus[]>(doc) ?? [];
         for (const workload of workloads) {
@@ -149,6 +299,101 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           });
         }
       }
+
+      if (doc.kind === "workload-specs") {
+        const workloads = parseKubernetesDocumentJson<KubernetesWorkloadSpec[]>(doc) ?? [];
+        for (const workload of workloads) {
+          const label = workloadLabel(workload.namespace, workload.name);
+          const podSecurityContext = workload.pod_spec?.securityContext;
+          for (const container of workload.pod_spec?.containers ?? []) {
+            const securityContext = container.securityContext ?? {};
+            const combinedSeccompType =
+              securityContext.seccompProfile?.type ?? podSecurityContext?.seccompProfile?.type;
+            const runAsNonRoot =
+              securityContext.runAsNonRoot ?? podSecurityContext?.runAsNonRoot;
+
+            if (securityContext.privileged) {
+              findings.push({
+                title: `Kubernetes workload runs privileged: ${label}`,
+                severity_hint: "high",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_privileged",
+              });
+            }
+
+            if (securityContext.allowPrivilegeEscalation) {
+              findings.push({
+                title: `Kubernetes workload allows privilege escalation: ${label}`,
+                severity_hint: "high",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_privilege_escalation",
+              });
+            }
+
+            if (runAsNonRoot !== true) {
+              findings.push({
+                title: `Kubernetes workload does not enforce runAsNonRoot: ${label}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_run_as_non_root",
+              });
+            }
+
+            if (combinedSeccompType !== "RuntimeDefault" && combinedSeccompType !== "Localhost") {
+              findings.push({
+                title: `Kubernetes workload is missing a RuntimeDefault seccomp profile: ${label}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_seccomp",
+              });
+            }
+
+            if (!container.livenessProbe || !container.readinessProbe) {
+              findings.push({
+                title: `Kubernetes workload missing liveness or readiness probes: ${label}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_probes",
+              });
+            }
+
+            const hasRequests = hasResourceEntries(container.resources?.requests);
+            const hasLimits = hasResourceEntries(container.resources?.limits);
+            if (!hasRequests || !hasLimits) {
+              findings.push({
+                title: `Kubernetes workload missing resource requests or limits: ${label}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({ workload, container }),
+                rule_id: "kubernetes.workload_resources",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    for (const namespace of externalServiceNamespaces) {
+      if (namespacesWithNetworkPolicy.has(namespace)) continue;
+      findings.push({
+        title: `Kubernetes namespace exposed externally without NetworkPolicy isolation: ${namespace}`,
+        severity_hint: "high",
+        category: "kubernetes",
+        section_source: "network/network-policies.json",
+        evidence: JSON.stringify({ namespace, has_network_policy: false }),
+        rule_id: "kubernetes.namespace_without_network_policy",
+      });
     }
 
     return findings;

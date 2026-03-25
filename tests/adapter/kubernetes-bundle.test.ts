@@ -41,6 +41,75 @@ const RAW = JSON.stringify(
           },
         ]),
       },
+      {
+        path: "workloads/specs.json",
+        kind: "workload-specs",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-api",
+            kind: "Deployment",
+            pod_spec: {
+              containers: [
+                {
+                  name: "api",
+                  securityContext: {
+                    privileged: true,
+                    allowPrivilegeEscalation: true,
+                    runAsNonRoot: false,
+                    seccompProfile: { type: "Unconfined" },
+                  },
+                  readinessProbe: null,
+                  livenessProbe: null,
+                  resources: {},
+                },
+              ],
+            },
+          },
+        ]),
+      },
+      {
+        path: "network/network-policies.json",
+        kind: "network-policies",
+        media_type: "application/json",
+        content: JSON.stringify([]),
+      },
+      {
+        path: "rbac/roles.json",
+        kind: "rbac-roles",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            scope: "namespace",
+            namespace: "payments",
+            name: "payments-ops",
+            rules: [
+              {
+                apiGroups: ["*"],
+                resources: ["*"],
+                verbs: ["*"],
+              },
+            ],
+          },
+          {
+            scope: "cluster",
+            name: "payments-breakglass",
+            rules: [
+              {
+                apiGroups: ["rbac.authorization.k8s.io"],
+                resources: ["clusterroles"],
+                verbs: ["bind", "escalate", "impersonate"],
+              },
+              {
+                apiGroups: [""],
+                resources: ["nodes/proxy"],
+                verbs: ["get"],
+              },
+            ],
+          },
+        ]),
+      },
     ],
   },
   null,
@@ -67,5 +136,19 @@ describe("KubernetesBundleAdapter", () => {
       true
     );
     expect(findings.some((finding) => finding.title.includes("CrashLoopBackOff"))).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("without NetworkPolicy isolation"))
+    ).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("runs privileged"))).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("allows privilege escalation"))
+    ).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("does not enforce runAsNonRoot"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("missing liveness or readiness probes"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("missing resource requests or limits"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("missing a RuntimeDefault seccomp profile"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("grants wildcard access"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("grants privilege-escalation verbs"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("can access kubelet or node proxy APIs"))).toBe(true);
   });
 });

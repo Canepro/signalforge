@@ -222,11 +222,28 @@ function containerTitlePriority(title: string): number {
   return 0;
 }
 
+function kubernetesTitlePriority(title: string): number {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("cluster-admin binding")) return 10;
+  if (normalized.includes("grants privilege-escalation verbs")) return 9;
+  if (normalized.includes("node proxy apis")) return 8;
+  if (normalized.includes("grants wildcard access")) return 7;
+  if (normalized.includes("without networkpolicy isolation")) return 6;
+  if (normalized.includes("service exposed externally")) return 5;
+  if (normalized.includes("runs privileged")) return 4;
+  if (normalized.includes("allows privilege escalation")) return 3;
+  if (normalized.includes("seccomp profile")) return 2;
+  if (normalized.includes("missing liveness or readiness probes")) return 1;
+  return 0;
+}
+
 function compareFindingsForFallback(a: Finding, b: Finding): number {
   const bySev = severityWeight(b.severity) - severityWeight(a.severity);
   if (bySev !== 0) return bySev;
   const byContainerTitle = containerTitlePriority(b.title) - containerTitlePriority(a.title);
   if (byContainerTitle !== 0) return byContainerTitle;
+  const byKubernetesTitle = kubernetesTitlePriority(b.title) - kubernetesTitlePriority(a.title);
+  if (byKubernetesTitle !== 0) return byKubernetesTitle;
   return (CATEGORY_TIE_BREAK[b.category] ?? 0) - (CATEGORY_TIE_BREAK[a.category] ?? 0);
 }
 
@@ -288,11 +305,41 @@ function summarizeFallbackFinding(finding: Finding): string {
     if (title.includes("service exposed externally")) {
       return `${finding.title}, which may expose the workload beyond the intended cluster or namespace boundary.`;
     }
+    if (title.includes("without networkpolicy isolation")) {
+      return `${finding.title}, so east-west and ingress traffic boundaries may be weaker than intended for an externally reachable namespace.`;
+    }
     if (title.includes("cluster-admin binding")) {
       return `${finding.title}, which grants broad control over cluster resources and should be tightly limited.`;
     }
+    if (title.includes("grants privilege-escalation verbs")) {
+      return `${finding.title}, which can let a principal hand out or assume broader RBAC than intended.`;
+    }
+    if (title.includes("node proxy apis")) {
+      return `${finding.title}, which can open a path to kubelet-level access that bypasses weaker workload boundaries.`;
+    }
+    if (title.includes("grants wildcard access")) {
+      return `${finding.title}, which makes least-privilege review much harder and can silently widen access as the cluster evolves.`;
+    }
     if (title.includes("crashloopbackoff")) {
       return `${finding.title}, indicating the workload is failing to stay healthy and may be degraded for operators or callers.`;
+    }
+    if (title.includes("runs privileged")) {
+      return `${finding.title}, which weakens workload isolation and raises the blast radius of a compromise.`;
+    }
+    if (title.includes("allows privilege escalation")) {
+      return `${finding.title}, which reduces the process-level guardrails expected in a hardened workload.`;
+    }
+    if (title.includes("runasnonroot")) {
+      return `${finding.title}, so the workload may still execute as root unless the image and pod settings are tightened together.`;
+    }
+    if (title.includes("seccomp profile")) {
+      return `${finding.title}, which leaves the workload without a tighter syscall baseline such as RuntimeDefault.`;
+    }
+    if (title.includes("missing liveness or readiness probes")) {
+      return `${finding.title}, so Kubernetes may not detect failed or unready containers quickly enough.`;
+    }
+    if (title.includes("missing resource requests or limits")) {
+      return `${finding.title}, which makes scheduling fairness and noisy-neighbor control harder to enforce.`;
     }
   }
   return `${finding.title}.`;
@@ -425,11 +472,41 @@ function buildActionForFinding(
     if (tl.includes("service exposed externally")) {
       return "Review whether the LoadBalancer service truly needs public reachability, and switch it to ClusterIP or an internal load balancer if broad exposure is not required.";
     }
+    if (tl.includes("without networkpolicy isolation")) {
+      return "Add namespace-appropriate NetworkPolicy rules before treating the externally reachable workload as isolated, and verify ingress and egress are limited to the intended paths.";
+    }
     if (tl.includes("cluster-admin binding")) {
       return "Remove the cluster-admin binding or replace it with the narrowest RBAC role that still meets the workload or operator need.";
     }
+    if (tl.includes("grants privilege-escalation verbs")) {
+      return "Remove bind, escalate, or impersonate from the RBAC role unless a tightly controlled break-glass path truly requires them, and document any exception.";
+    }
+    if (tl.includes("node proxy apis")) {
+      return "Remove access to nodes/proxy unless there is a reviewed operational requirement, because kubelet-adjacent access expands the blast radius of credential misuse.";
+    }
+    if (tl.includes("grants wildcard access")) {
+      return "Replace wildcard RBAC rules with explicit apiGroups, resources, and verbs so the role stays least-privilege as the cluster surface changes over time.";
+    }
     if (tl.includes("crashloopbackoff")) {
       return "Inspect pod events and workload logs for the crashing deployment, fix the startup or configuration failure, and confirm the workload stabilizes.";
+    }
+    if (tl.includes("runs privileged")) {
+      return "Drop privileged mode from the workload unless there is a documented hard requirement, and retest the pod with the narrower security context.";
+    }
+    if (tl.includes("allows privilege escalation")) {
+      return "Set allowPrivilegeEscalation to false unless the workload has a documented exception, and verify the container still starts and serves traffic.";
+    }
+    if (tl.includes("runasnonroot")) {
+      return "Set runAsNonRoot to true and align the image user so the workload does not rely on root execution.";
+    }
+    if (tl.includes("seccomp profile")) {
+      return "Apply a RuntimeDefault or reviewed Localhost seccomp profile so the workload runs with a tighter syscall boundary.";
+    }
+    if (tl.includes("missing liveness or readiness probes")) {
+      return "Add readiness and liveness probes for the workload so failed or unready pods are detected and handled by Kubernetes.";
+    }
+    if (tl.includes("missing resource requests or limits")) {
+      return "Define CPU and memory requests and limits for the workload so scheduling, autoscaling, and noisy-neighbor protection behave predictably.";
     }
   }
 

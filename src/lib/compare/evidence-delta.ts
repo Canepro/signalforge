@@ -4,6 +4,11 @@ import {
   parseContainerList,
   parseContainerSections,
 } from "@/lib/adapter/container-diagnostics/parse";
+import {
+  parseKubernetesBundle,
+  parseKubernetesDocumentJson,
+  type KubernetesBundleDocument,
+} from "@/lib/adapter/kubernetes-bundle/parse";
 
 export type EvidenceDeltaStatus = "changed" | "unchanged" | "added" | "removed";
 
@@ -38,6 +43,57 @@ type ContainerEvidenceSummary = {
   published_port_count: number;
   added_capability_count: number;
   secret_mount_count: number;
+};
+
+type KubernetesServiceExposure = {
+  namespace?: string;
+  type?: string;
+  external?: boolean;
+};
+
+type KubernetesRbacBinding = {
+  roleRef?: string;
+};
+
+type KubernetesNetworkPolicy = {
+  namespace?: string;
+};
+
+type KubernetesSecurityContext = {
+  privileged?: boolean;
+  allowPrivilegeEscalation?: boolean;
+  runAsNonRoot?: boolean;
+  seccompProfile?: {
+    type?: string;
+  } | null;
+};
+
+type KubernetesContainerSpec = {
+  securityContext?: KubernetesSecurityContext;
+  readinessProbe?: unknown;
+  livenessProbe?: unknown;
+  resources?: {
+    requests?: Record<string, string>;
+    limits?: Record<string, string>;
+  };
+};
+
+type KubernetesPodSpec = {
+  securityContext?: KubernetesSecurityContext;
+  containers?: KubernetesContainerSpec[];
+};
+
+type KubernetesWorkloadSpec = {
+  pod_spec?: KubernetesPodSpec;
+};
+
+type KubernetesEvidenceSummary = {
+  document_count: number;
+  external_service_count: number;
+  cluster_admin_binding_count: number;
+  network_policy_count: number;
+  exposed_namespace_without_network_policy_count: number;
+  workload_hardening_gap_count: number;
 };
 
 function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
@@ -190,6 +246,115 @@ function summarizeContainerEvidence(content: string): ContainerEvidenceSummary {
   };
 }
 
+function hasResourceEntries(resources: Record<string, string> | undefined): boolean {
+  return Boolean(resources && Object.keys(resources).length > 0);
+}
+
+function parseKubernetesJson<T>(doc: KubernetesBundleDocument): T[] {
+  const parsed = parseKubernetesDocumentJson<T[]>(doc);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
+  let gaps = 0;
+  const podSecurityContext = workload.pod_spec?.securityContext;
+  for (const container of workload.pod_spec?.containers ?? []) {
+    const securityContext = container.securityContext ?? {};
+    const combinedSeccompType =
+      securityContext.seccompProfile?.type ?? podSecurityContext?.seccompProfile?.type;
+    const runAsNonRoot = securityContext.runAsNonRoot ?? podSecurityContext?.runAsNonRoot;
+
+    if (securityContext.privileged) gaps += 1;
+    if (securityContext.allowPrivilegeEscalation) gaps += 1;
+    if (runAsNonRoot !== true) gaps += 1;
+    if (combinedSeccompType !== "RuntimeDefault" && combinedSeccompType !== "Localhost") {
+      gaps += 1;
+    }
+    if (!container.livenessProbe || !container.readinessProbe) gaps += 1;
+
+    const hasRequests = hasResourceEntries(container.resources?.requests);
+    const hasLimits = hasResourceEntries(container.resources?.limits);
+    if (!hasRequests || !hasLimits) gaps += 1;
+  }
+
+  return gaps;
+}
+
+function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary {
+  const manifest = parseKubernetesBundle(content);
+  if (!manifest) {
+    return {
+      document_count: 0,
+      external_service_count: 0,
+      cluster_admin_binding_count: 0,
+      network_policy_count: 0,
+      exposed_namespace_without_network_policy_count: 0,
+      workload_hardening_gap_count: 0,
+    };
+  }
+
+  let externalServiceCount = 0;
+  let clusterAdminBindingCount = 0;
+  let networkPolicyCount = 0;
+  let workloadHardeningGapCount = 0;
+  const externalServiceNamespaces = new Set<string>();
+  const namespacesWithNetworkPolicy = new Set<string>();
+
+  for (const doc of manifest.documents) {
+    if (doc.kind === "service-exposure") {
+      for (const service of parseKubernetesJson<KubernetesServiceExposure>(doc)) {
+        const serviceType = service.type?.trim();
+        const isExternal =
+          service.external === true ||
+          serviceType === "LoadBalancer" ||
+          serviceType === "NodePort";
+        if (!isExternal) continue;
+        externalServiceCount += 1;
+        if (service.namespace?.trim()) externalServiceNamespaces.add(service.namespace.trim());
+      }
+      continue;
+    }
+
+    if (doc.kind === "rbac-bindings") {
+      for (const binding of parseKubernetesJson<KubernetesRbacBinding>(doc)) {
+        if (binding.roleRef?.trim() === "cluster-admin") clusterAdminBindingCount += 1;
+      }
+      continue;
+    }
+
+    if (doc.kind === "network-policies") {
+      const policies = parseKubernetesJson<KubernetesNetworkPolicy>(doc);
+      networkPolicyCount += policies.length;
+      for (const policy of policies) {
+        if (policy.namespace?.trim()) namespacesWithNetworkPolicy.add(policy.namespace.trim());
+      }
+      continue;
+    }
+
+    if (doc.kind === "workload-specs") {
+      for (const workload of parseKubernetesJson<KubernetesWorkloadSpec>(doc)) {
+        workloadHardeningGapCount += summarizeWorkloadHardeningGaps(workload);
+      }
+    }
+  }
+
+  let exposedNamespaceWithoutNetworkPolicyCount = 0;
+  for (const namespace of externalServiceNamespaces) {
+    if (!namespacesWithNetworkPolicy.has(namespace)) {
+      exposedNamespaceWithoutNetworkPolicyCount += 1;
+    }
+  }
+
+  return {
+    document_count: manifest.documents.length,
+    external_service_count: externalServiceCount,
+    cluster_admin_binding_count: clusterAdminBindingCount,
+    network_policy_count: networkPolicyCount,
+    exposed_namespace_without_network_policy_count: exposedNamespaceWithoutNetworkPolicyCount,
+    workload_hardening_gap_count: workloadHardeningGapCount,
+  };
+}
+
 function buildFamilyMetrics(
   baseline: RunWithArtifactRow,
   current: RunWithArtifactRow
@@ -220,6 +385,55 @@ function buildFamilyMetrics(
         previous.secret_mount_count,
         next.secret_mount_count,
         "container-diagnostics"
+      ),
+    ];
+  }
+
+  if (current.artifact_type === "kubernetes-bundle") {
+    const previous = summarizeKubernetesEvidence(baseline.artifact_content);
+    const next = summarizeKubernetesEvidence(current.artifact_content);
+    return [
+      metricRow(
+        "document_count",
+        "Bundle documents",
+        previous.document_count,
+        next.document_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "external_service_count",
+        "External services",
+        previous.external_service_count,
+        next.external_service_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "cluster_admin_binding_count",
+        "Cluster-admin bindings",
+        previous.cluster_admin_binding_count,
+        next.cluster_admin_binding_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "network_policy_count",
+        "NetworkPolicies",
+        previous.network_policy_count,
+        next.network_policy_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "exposed_namespace_without_network_policy_count",
+        "Externally exposed namespaces without NetworkPolicy",
+        previous.exposed_namespace_without_network_policy_count,
+        next.exposed_namespace_without_network_policy_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_hardening_gap_count",
+        "Workload hardening gaps",
+        previous.workload_hardening_gap_count,
+        next.workload_hardening_gap_count,
+        "kubernetes-bundle"
       ),
     ];
   }
