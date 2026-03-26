@@ -36,7 +36,7 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 | 8a | Multi-artifact compare uplift: shared `evidence_delta`, family-aware metrics, target-aware compare support for stable evidence drift | Done on branch |
 | 8b | `container-diagnostics`: adapter, ingestion, compare, fixtures/golden tests, container-aware fallback wording and metrics | Done on branch |
 | 8c | `kubernetes-bundle` push path: locked `kubernetes-bundle.v1` manifest, adapter, ingestion, compare, fixtures/golden tests, scope-aware target identity | Done on branch |
-| 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, and exposure-plus-identity joins | In progress on branch |
+| 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, compare normalization, deterministic platform noise, and exposure-plus-identity joins | Done on branch |
 
 ## Product snapshot
 
@@ -69,7 +69,7 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare/export hardening (small, targeted).
 - Sync release-facing docs and handoff notes to the current branch reality before more Phase 8 slices land, so future threads do not underestimate what is already implemented.
-- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Current branch work has completed Phase 0, the container slices, and the Kubernetes push path, with Kubernetes findings quality now in progress. The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
+- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Current branch work has completed Phase 0, the container slices, the Kubernetes push path, and the first substantial Kubernetes findings-quality pass. The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
 - For Kubernetes specifically, prefer a higher quality bar over the smallest possible demo: use official upstream guidance, relevant local skills, realistic fixtures, and read-only live-cluster inspection when that materially improves rule credibility. Use richer platform examples when helpful, but keep the actual detections and wording anchored in plain Kubernetes primitives so the product still fits operators with simpler clusters.
 - Best next implementation move: stay in Phase 4 and deepen Kubernetes quality with more identity, exposure, and noise-quality joins before reopening Sources or orchestration design.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).

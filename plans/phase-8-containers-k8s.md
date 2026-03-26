@@ -434,8 +434,8 @@ The implementation should use real platform guidance rather than improvised seve
 ### Acceptance criteria
 
 - [x] Deterministic rules cover a first credible Kubernetes-specific risk set.
-- [ ] Expected platform noise is documented and suppressed deterministically where appropriate.
-- [ ] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
+- [x] Expected platform noise is documented and suppressed deterministically where appropriate.
+- [x] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
 - [x] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
 - [x] At least part of the Kubernetes rule and fixture set is informed by realistic bundle content or live read-only cluster inspection rather than purely invented synthetic examples.
 
@@ -457,7 +457,8 @@ Guardrails for execution:
 
 Current branch status:
 - public exposure, namespace isolation gaps, workload health, secret handling, workload hardening, host-escape settings, RBAC over-breadth, workload-to-identity joins, and exposed-workload-to-identity joins are already implemented
-- the main remaining quality gaps are noise suppression depth and stronger stable issue normalization across changing bundle exports
+- deterministic platform noise now suppresses clearly healthy zero-restart workload status records instead of treating them as actionable findings
+- compare normalization now keeps several Kubernetes workload findings stable when only trailing counts change across bundle exports
 
 ---
 

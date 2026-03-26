@@ -340,7 +340,46 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
   }
 
   classifyNoise(_sections: Record<string, string>, _env: EnvironmentContext): NoiseItem[] {
-    return [];
+    const manifest = manifestFromSections(_sections);
+    if (!manifest) return [];
+
+    const noise: NoiseItem[] = [];
+
+    for (const doc of manifest.documents) {
+      if (doc.kind !== "workload-status") continue;
+      const workloads = parseKubernetesDocumentJson<KubernetesWorkloadStatus[]>(doc) ?? [];
+      for (const workload of workloads) {
+        const status = workload.status?.trim();
+        const normalizedStatus = status?.toLowerCase();
+        const restarts = workload.restarts ?? 0;
+        const label = workloadLabel(workload.namespace, workload.name);
+
+        if (
+          status &&
+          restarts === 0 &&
+          ["healthy", "running", "ready"].includes(normalizedStatus ?? "")
+        ) {
+          noise.push({
+            observation: `Kubernetes workload healthy: ${label} (${status})`,
+            reason_expected:
+              "Healthy zero-restart workload status is expected platform state and does not need a diagnostic finding.",
+            related_environment: "Kubernetes",
+          });
+          continue;
+        }
+
+        if (status && ["succeeded", "completed"].includes(normalizedStatus ?? "")) {
+          noise.push({
+            observation: `Kubernetes workload completed successfully: ${label} (${status})`,
+            reason_expected:
+              "Completed workload status is expected for finished jobs and should not be treated as an active platform problem by itself.",
+            related_environment: "Kubernetes",
+          });
+        }
+      }
+    }
+
+    return noise;
   }
 
   extractPreFindings(

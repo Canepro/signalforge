@@ -5,7 +5,9 @@
     "ran_as_root": false,
     "os_contains": "Kubernetes"
   },
-  "must_be_noise": [],
+  "must_be_noise": [
+    "Kubernetes workload healthy"
+  ],
   "must_not_be_findings": [
     "privileged",
     "privilege escalation",

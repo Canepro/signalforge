@@ -303,4 +303,46 @@ describe("KubernetesBundleAdapter", () => {
     expect(findings.some((finding) => finding.title.includes("grants privilege-escalation verbs"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("can access kubelet or node proxy APIs"))).toBe(true);
   });
+
+  it("classifies healthy zero-restart workload status as Kubernetes noise", () => {
+    const adapter = new KubernetesBundleAdapter();
+    const noise = adapter.classifyNoise(
+      adapter.parseSections(
+        JSON.stringify({
+          schema_version: "kubernetes-bundle.v1",
+          cluster: { name: "oke-edge-prod", provider: "oke" },
+          scope: { level: "namespace", namespace: "ingress-nginx" },
+          documents: [
+            {
+              path: "workloads/status.json",
+              kind: "workload-status",
+              media_type: "application/json",
+              content: JSON.stringify([
+                {
+                  namespace: "ingress-nginx",
+                  name: "nginx-ingress-controller",
+                  status: "Healthy",
+                  restarts: 0,
+                },
+              ]),
+            },
+          ],
+        })
+      ),
+      {
+        hostname: "oke-edge-prod",
+        os: "Kubernetes (oke)",
+        kernel: "namespace:ingress-nginx",
+        is_wsl: false,
+        is_container: false,
+        is_virtual_machine: false,
+        ran_as_root: false,
+        uptime: "unknown",
+      }
+    );
+
+    expect(
+      noise.some((item) => item.observation.includes("Kubernetes workload healthy"))
+    ).toBe(true);
+  });
 });
