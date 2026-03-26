@@ -80,6 +80,11 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
   - source detail and dashboard request flows can send typed per-job `collection_scope` overrides
   - operator UI now shows stored source default scope and resolved job scope
   - the remaining Phase 9 work is cross-repo: `signalforge-agent` and `signalforge-collectors` still need to consume the same typed scope contract end to end
+- The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
+  - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
+  - richer container runtime-health diagnostics such as health, restart, OOM, and one-shot stats
+  - findings and dashboard presentation that surfaces this evidence instead of burying it
+  - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
 - Preferred deployment stance for `signalforge-agent`: long-running hardened service near the execution surface. Today that means a host `systemd` service is the first-class path. Container and Kubernetes-native packaging remain follow-on work after the scoped job contract and trust boundaries are explicit.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).

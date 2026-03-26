@@ -428,6 +428,19 @@ Phase 9 is done only when all of the following are true:
 5. the preferred deployment form and security posture are documented well enough that operators do not default back to laptops or ambient shell context
 6. the cross-repo flow is documented well enough that a future thread can pick it up without reconstructing intent from chat history
 
+## Follow-on planning note
+
+Phase 9 solves the execution-scope contract. It does not, by itself, make the collected diagnostics richer or make the UI surface richer runtime evidence well.
+
+The documented next follow-on after this phase is:
+
+- [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
+
+That file is the source of truth for:
+
+- richer operational diagnostics collection, especially for Kubernetes and containers
+- findings-page and dashboard enrichment so the added evidence is visible and useful
+
 ## Guardrails
 
 Do not accept an untyped free-form parameter bag.
