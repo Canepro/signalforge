@@ -659,6 +659,25 @@ for (const backend of backends) {
                 content: JSON.stringify([]),
               },
               {
+                path: "cluster/node-health.json",
+                kind: "node-health",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    name: "aks-system-000001",
+                    ready: true,
+                    unschedulable: false,
+                    pressure_conditions: [],
+                  },
+                ]),
+              },
+              {
+                path: "events/warning-events.json",
+                kind: "warning-events",
+                media_type: "application/json",
+                content: JSON.stringify([]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -838,6 +857,50 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "cluster/node-health.json",
+                kind: "node-health",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    name: "aks-system-000001",
+                    ready: false,
+                    unschedulable: false,
+                    pressure_conditions: ["MemoryPressure"],
+                  },
+                  {
+                    name: "aks-user-000002",
+                    ready: true,
+                    unschedulable: false,
+                    pressure_conditions: [],
+                  },
+                ]),
+              },
+              {
+                path: "events/warning-events.json",
+                kind: "warning-events",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    involved_kind: "Pod",
+                    involved_name: "payments-api-abc123",
+                    reason: "FailedScheduling",
+                    message: "0/3 nodes are available: 3 Insufficient memory.",
+                    count: 4,
+                    last_timestamp: "2026-03-26T10:00:00Z",
+                  },
+                  {
+                    namespace: "payments",
+                    involved_kind: "Pod",
+                    involved_name: "payments-api-abc123",
+                    reason: "ImagePullBackOff",
+                    message: "Back-off pulling image ghcr.io/acme/payments:bad",
+                    count: 2,
+                    last_timestamp: "2026-03-26T10:05:00Z",
+                  },
+                ]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -959,6 +1022,27 @@ for (const backend of backends) {
       expect(result.payload.evidence_delta?.changed).toBe(true);
       expect(result.payload.evidence_delta?.metrics).toEqual(
         expect.arrayContaining([
+          expect.objectContaining({
+            key: "warning_event_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 6,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "node_not_ready_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "node_pressure_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
           expect.objectContaining({
             key: "external_service_count",
             family: "kubernetes-bundle",

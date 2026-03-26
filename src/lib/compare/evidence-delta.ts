@@ -8,6 +8,8 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleDocument,
+  type KubernetesNodeHealth,
+  type KubernetesWarningEvent,
 } from "@/lib/adapter/kubernetes-bundle/parse";
 
 export type EvidenceDeltaStatus = "changed" | "unchanged" | "added" | "removed";
@@ -166,6 +168,9 @@ type KubernetesWorkloadSpec = {
 
 type KubernetesEvidenceSummary = {
   document_count: number;
+  warning_event_count: number;
+  node_not_ready_count: number;
+  node_pressure_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
   workload_cluster_admin_binding_count: number;
@@ -493,6 +498,50 @@ function privilegedInitContainerCount(workload: KubernetesWorkloadSpec): number 
   ).length;
 }
 
+function normalizedValue(value: string | undefined | null): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function warningEventWeight(event: KubernetesWarningEvent): number {
+  return Math.max(1, event.count ?? 1);
+}
+
+function isOperationalWarningEvent(event: KubernetesWarningEvent): boolean {
+  const reason = normalizedValue(event.reason);
+  const message = normalizedValue(event.message);
+  return (
+    [
+      "failedscheduling",
+      "notscaleup",
+      "notscalesup",
+      "errimagepull",
+      "imagepullbackoff",
+      "failedpull",
+      "inspectfailed",
+      "failedmount",
+      "failedattachvolume",
+      "failedmapvolume",
+      "backoff",
+      "unhealthy",
+      "failed",
+      "failedcreatepodsandbox",
+      "evicted",
+      "oomkilled",
+      "preempted",
+    ].includes(reason) ||
+    message.includes("insufficient") ||
+    message.includes("taint") ||
+    message.includes("pull image") ||
+    message.includes("mountvolume") ||
+    message.includes("unable to attach or mount volumes") ||
+    message.includes("back-off") ||
+    message.includes("readiness probe failed") ||
+    message.includes("liveness probe failed") ||
+    message.includes("evict") ||
+    message.includes("oom")
+  );
+}
+
 function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
   let gaps = 0;
   const podSecurityContext = workload.pod_spec?.securityContext;
@@ -533,6 +582,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   if (!manifest) {
     return {
       document_count: 0,
+      warning_event_count: 0,
+      node_not_ready_count: 0,
+      node_pressure_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
       workload_cluster_admin_binding_count: 0,
@@ -567,6 +619,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     };
   }
 
+  let warningEventCount = 0;
+  let nodeNotReadyCount = 0;
+  let nodePressureCount = 0;
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
   let workloadClusterAdminBindingCount = 0;
@@ -606,6 +661,24 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   const serviceAccountRoleBindings = new Map<string, Set<string>>();
 
   for (const doc of manifest.documents) {
+    if (doc.kind === "warning-events") {
+      for (const event of parseKubernetesJson<KubernetesWarningEvent>(doc)) {
+        if (!isOperationalWarningEvent(event)) continue;
+        warningEventCount += warningEventWeight(event);
+      }
+      continue;
+    }
+
+    if (doc.kind === "node-health") {
+      for (const node of parseKubernetesJson<KubernetesNodeHealth>(doc)) {
+        if (node.ready === false) nodeNotReadyCount += 1;
+        if ((node.pressure_conditions ?? []).some((value) => value.trim())) {
+          nodePressureCount += 1;
+        }
+      }
+      continue;
+    }
+
     if (doc.kind !== "service-exposure") continue;
     for (const service of parseKubernetesJson<KubernetesServiceExposure>(doc)) {
       const serviceType = service.type?.trim();
@@ -793,6 +866,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
 
   return {
     document_count: manifest.documents.length,
+    warning_event_count: warningEventCount,
+    node_not_ready_count: nodeNotReadyCount,
+    node_pressure_count: nodePressureCount,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
     workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
@@ -905,6 +981,27 @@ function buildFamilyMetrics(
         "Bundle documents",
         previous.document_count,
         next.document_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "warning_event_count",
+        "Operational warning events",
+        previous.warning_event_count,
+        next.warning_event_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "node_not_ready_count",
+        "Nodes not Ready",
+        previous.node_not_ready_count,
+        next.node_not_ready_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "node_pressure_count",
+        "Nodes with pressure conditions",
+        previous.node_pressure_count,
+        next.node_pressure_count,
         "kubernetes-bundle"
       ),
       metricRow(

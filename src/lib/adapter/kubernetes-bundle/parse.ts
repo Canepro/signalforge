@@ -5,6 +5,23 @@ export interface KubernetesBundleDocument {
   content: string;
 }
 
+export interface KubernetesNodeHealth {
+  name?: string;
+  ready?: boolean;
+  unschedulable?: boolean;
+  pressure_conditions?: string[];
+}
+
+export interface KubernetesWarningEvent {
+  namespace?: string | null;
+  involved_kind?: string | null;
+  involved_name?: string | null;
+  reason?: string | null;
+  message?: string | null;
+  count?: number | null;
+  last_timestamp?: string | null;
+}
+
 export interface KubernetesBundleManifest {
   schema_version: "kubernetes-bundle.v1";
   cluster: {

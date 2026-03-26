@@ -4,6 +4,8 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleManifest,
+  type KubernetesNodeHealth,
+  type KubernetesWarningEvent,
 } from "./parse";
 
 const MANIFEST_KEY = "__manifest_json";
@@ -134,6 +136,13 @@ type KubernetesWorkloadSpec = {
   name?: string;
   kind?: string;
   pod_spec?: KubernetesPodSpec;
+};
+
+type WarningEventCategory = {
+  key: string;
+  title: string;
+  severity_hint: "high" | "medium";
+  rule_id: string;
 };
 
 function manifestFromSections(sections: Record<string, string>): KubernetesBundleManifest | null {
@@ -288,6 +297,86 @@ function privilegedInitContainerCount(workload: KubernetesWorkloadSpec): number 
   return (workload.pod_spec?.initContainers ?? []).filter(
     (container) => container.securityContext?.privileged === true
   ).length;
+}
+
+function normalizedValue(value: string | undefined | null): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function warningEventCategory(event: KubernetesWarningEvent): WarningEventCategory | null {
+  const reason = normalizedValue(event.reason);
+  const message = normalizedValue(event.message);
+
+  if (
+    ["failedscheduling", "notscaleup", "notscalesup"].includes(reason) ||
+    message.includes("insufficient") ||
+    message.includes("didn't match pod affinity") ||
+    message.includes("taint")
+  ) {
+    return {
+      key: "scheduling",
+      title: "Kubernetes warning events indicate scheduling failures",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_scheduling",
+    };
+  }
+
+  if (
+    ["errimagepull", "imagepullbackoff", "failedpull", "inspectfailed"].includes(reason) ||
+    message.includes("pull image") ||
+    message.includes("imagepullbackoff")
+  ) {
+    return {
+      key: "image-pull",
+      title: "Kubernetes warning events indicate image pull failures",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_image_pull",
+    };
+  }
+
+  if (
+    ["failedmount", "failedattachvolume", "failedmapvolume"].includes(reason) ||
+    message.includes("mountvolume") ||
+    message.includes("unmounted volumes") ||
+    message.includes("unable to attach or mount volumes")
+  ) {
+    return {
+      key: "mounts",
+      title: "Kubernetes warning events indicate mount or volume failures",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_mounts",
+    };
+  }
+
+  if (
+    ["backoff", "unhealthy", "failed", "failedcreatepodsandbox"].includes(reason) ||
+    message.includes("back-off") ||
+    message.includes("crashloopbackoff") ||
+    message.includes("readiness probe failed") ||
+    message.includes("liveness probe failed")
+  ) {
+    return {
+      key: "runtime",
+      title: "Kubernetes warning events indicate runtime instability",
+      severity_hint: "medium",
+      rule_id: "kubernetes.warning_events_runtime",
+    };
+  }
+
+  if (
+    ["evicted", "oomkilled", "preempted"].includes(reason) ||
+    message.includes("evict") ||
+    message.includes("oom")
+  ) {
+    return {
+      key: "pressure",
+      title: "Kubernetes warning events indicate eviction or OOM pressure",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_pressure",
+    };
+  }
+
+  return null;
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -591,6 +680,95 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             section_source: doc.path,
             evidence: JSON.stringify(workload),
             rule_id: "kubernetes.crash_loop",
+          });
+        }
+      }
+
+      if (doc.kind === "node-health") {
+        const nodes = parseKubernetesDocumentJson<KubernetesNodeHealth[]>(doc) ?? [];
+        for (const node of nodes) {
+          const nodeName = node.name?.trim() || "unknown-node";
+          const pressureConditions = (node.pressure_conditions ?? []).filter((value) =>
+            value.trim()
+          );
+
+          if (node.ready === false) {
+            findings.push({
+              title: `Kubernetes node is not Ready: ${nodeName}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_not_ready",
+            });
+          }
+
+          if (pressureConditions.length > 0) {
+            findings.push({
+              title: `Kubernetes node reports pressure conditions: ${nodeName} (${pressureConditions.join(", ")})`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_pressure",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "warning-events") {
+        const events = parseKubernetesDocumentJson<KubernetesWarningEvent[]>(doc) ?? [];
+        const grouped = new Map<
+          string,
+          {
+            category: WarningEventCategory;
+            totalCount: number;
+            namespaces: Set<string>;
+            affectedObjects: Set<string>;
+            samples: KubernetesWarningEvent[];
+          }
+        >();
+
+        for (const event of events) {
+          const category = warningEventCategory(event);
+          if (!category) continue;
+
+          let bucket = grouped.get(category.key);
+          if (!bucket) {
+            bucket = {
+              category,
+              totalCount: 0,
+              namespaces: new Set<string>(),
+              affectedObjects: new Set<string>(),
+              samples: [],
+            };
+            grouped.set(category.key, bucket);
+          }
+
+          bucket.totalCount += Math.max(1, event.count ?? 1);
+          if (event.namespace?.trim()) bucket.namespaces.add(event.namespace.trim());
+          const objectLabel =
+            [event.involved_kind?.trim(), event.involved_name?.trim()]
+              .filter(Boolean)
+              .join("/")
+              .trim() || "unknown-object";
+          bucket.affectedObjects.add(objectLabel);
+          if (bucket.samples.length < 3) bucket.samples.push(event);
+        }
+
+        for (const bucket of grouped.values()) {
+          findings.push({
+            title: `${bucket.category.title} (${bucket.totalCount} events)`,
+            severity_hint: bucket.category.severity_hint,
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify({
+              warning_event_count: bucket.totalCount,
+              namespaces: Array.from(bucket.namespaces).sort(),
+              affected_objects: Array.from(bucket.affectedObjects).sort(),
+              samples: bucket.samples,
+            }),
+            rule_id: bucket.category.rule_id,
           });
         }
       }

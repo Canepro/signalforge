@@ -53,6 +53,44 @@ const RAW = JSON.stringify(
         ]),
       },
       {
+        path: "cluster/node-health.json",
+        kind: "node-health",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            name: "aks-nodepool1-12345678-vmss000001",
+            ready: false,
+            unschedulable: false,
+            pressure_conditions: ["MemoryPressure"],
+          },
+        ]),
+      },
+      {
+        path: "events/warning-events.json",
+        kind: "warning-events",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            involved_kind: "Pod",
+            involved_name: "payments-api-abc123",
+            reason: "FailedScheduling",
+            message: "0/3 nodes are available: 3 Insufficient memory.",
+            count: 4,
+            last_timestamp: "2026-03-26T10:00:00Z",
+          },
+          {
+            namespace: "payments",
+            involved_kind: "Pod",
+            involved_name: "payments-api-abc123",
+            reason: "ImagePullBackOff",
+            message: "Back-off pulling image ghcr.io/acme/payments:bad",
+            count: 2,
+            last_timestamp: "2026-03-26T10:05:00Z",
+          },
+        ]),
+      },
+      {
         path: "workloads/specs.json",
         kind: "workload-specs",
         media_type: "application/json",
@@ -219,6 +257,20 @@ describe("KubernetesBundleAdapter", () => {
       true
     );
     expect(findings.some((finding) => finding.title.includes("CrashLoopBackOff"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("node is not Ready"))).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("node reports pressure conditions"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("warning events indicate scheduling failures")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("warning events indicate image pull failures")
+      )
+    ).toBe(true);
     expect(
       findings.some((finding) => finding.title.includes("without NetworkPolicy isolation"))
     ).toBe(true);

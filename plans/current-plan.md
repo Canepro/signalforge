@@ -53,6 +53,7 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 
 - `container-diagnostics` is a shipped artifact family in this checkout with credible first-slice findings around exposure, privilege, mounts, secrets, identity, and runtime hardening.
 - `kubernetes-bundle` is a shipped artifact family in this checkout using the text-carried `kubernetes-bundle.v1` JSON manifest shape, not raw archive ingestion.
+- the Kubernetes bundle now accepts optional operational diagnostics documents for warning events and node health in addition to the original posture-focused docs
 - Kubernetes analysis on this branch currently covers public Service exposure, namespace isolation gaps, RBAC over-breadth, workload-to-identity joins, exposed-workload-to-identity joins, token/Secret usage, workload hardening, host-escape style settings, probes, and resource governance.
 - The strongest remaining Phase 8 architectural risk is unchanged: the current execution model is still effectively one registration per source, which may be too narrow for future Kubernetes or mixed-scope execution forms.
 
