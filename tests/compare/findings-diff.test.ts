@@ -241,4 +241,83 @@ describe("findings-diff", () => {
     expect(d.summary.unchanged).toBe(1);
     expect(d.rows).toHaveLength(0);
   });
+
+  it("normalizes Kubernetes workload titles when only trailing count suffixes change", () => {
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes workload service account is bound to wildcard RBAC roles: payments/payments-api (1 roles)"
+      )
+    ).toBe(
+      "kubernetes workload service account is bound to wildcard rbac roles: payments/payments-api"
+    );
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes externally exposed workload service account is bound to wildcard RBAC roles: payments/payments-api (2 roles)"
+      )
+    ).toBe(
+      "kubernetes externally exposed workload service account is bound to wildcard rbac roles: payments/payments-api"
+    );
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes workload injects Secret values into environment variables: payments/payments-api (3 refs)"
+      )
+    ).toBe(
+      "kubernetes workload injects secret values into environment variables: payments/payments-api"
+    );
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes workload mounts Secret volumes: payments/payments-api (2 mounts)"
+      )
+    ).toBe("kubernetes workload mounts secret volumes: payments/payments-api");
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes workload adds Linux capabilities: payments/payments-api (4 capabilities)"
+      )
+    ).toBe("kubernetes workload adds linux capabilities: payments/payments-api");
+  });
+
+  it("treats Kubernetes count-only title drift as the same ongoing finding", () => {
+    const baseline: Finding[] = [
+      f({
+        id: "1",
+        title:
+          "Kubernetes workload service account is bound to wildcard RBAC roles: payments/payments-api (1 roles)",
+        severity: "high",
+        category: "kubernetes",
+        section_source: "workloads/specs.json",
+      }),
+      f({
+        id: "2",
+        title:
+          "Kubernetes workload mounts Secret volumes: payments/payments-api (1 mounts)",
+        severity: "medium",
+        category: "kubernetes",
+        section_source: "workloads/specs.json",
+      }),
+    ];
+    const current: Finding[] = [
+      f({
+        id: "3",
+        title:
+          "Kubernetes workload service account is bound to wildcard RBAC roles: payments/payments-api (2 roles)",
+        severity: "high",
+        category: "kubernetes",
+        section_source: "workloads/specs.json",
+      }),
+      f({
+        id: "4",
+        title:
+          "Kubernetes workload mounts Secret volumes: payments/payments-api (3 mounts)",
+        severity: "medium",
+        category: "kubernetes",
+        section_source: "workloads/specs.json",
+      }),
+    ];
+
+    const d = compareFindingsDrift(baseline, current);
+    expect(d.summary.unchanged).toBe(2);
+    expect(d.summary.new).toBe(0);
+    expect(d.summary.resolved).toBe(0);
+    expect(d.rows).toHaveLength(0);
+  });
 });
