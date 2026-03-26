@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { KpiCard } from "@/components/kpi-card";
+import { CollectionPulse, type CollectionPulseData } from "@/components/collection-pulse";
 import { RunTable } from "@/components/run-table";
 import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
@@ -23,7 +24,7 @@ interface DashboardClientProps {
   environmentsAnalyzed: number;
   suppressedNoise: number;
   severityDistribution: Record<string, number>;
-  environmentMix: Record<string, number>;
+  collectionPulse: CollectionPulseData;
 }
 
 const sevColors: Record<string, string> = {
@@ -41,7 +42,7 @@ export function DashboardClient({
   environmentsAnalyzed,
   suppressedNoise,
   severityDistribution,
-  environmentMix,
+  collectionPulse,
 }: DashboardClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
@@ -334,9 +335,9 @@ export function DashboardClient({
           </div>
 
           {/* Lower Supporting Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+          <div className="grid grid-cols-1 gap-6 pb-6 md:grid-cols-2 lg:grid-cols-12">
             {/* Severity Distribution */}
-            <div className="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
+            <div className="rounded-lg bg-surface-container-lowest p-5 shadow-sm lg:col-span-3">
               <h4 className="font-headline font-bold text-on-surface mb-5 text-sm">
                 Severity Distribution
               </h4>
@@ -368,41 +369,12 @@ export function DashboardClient({
               </div>
             </div>
 
-            {/* Environment Mix */}
-            <div className="bg-surface-container-lowest p-5 rounded-lg shadow-sm">
-              <h4 className="font-headline font-bold text-on-surface mb-5 text-sm">
-                Environment Mix
-              </h4>
-              {Object.keys(environmentMix).length > 0 ? (
-                <div className="space-y-2">
-                  {Object.entries(environmentMix)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([tag, count]) => (
-                      <div
-                        key={tag}
-                        className="flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-primary" />
-                          <span className="text-[10px] font-medium text-on-surface-variant">
-                            {tag}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-bold text-on-surface-variant">
-                          {count} {count === 1 ? "run" : "runs"}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <p className="text-[10px] text-outline-variant">
-                  No environments yet.
-                </p>
-              )}
+            <div className="md:col-span-2 lg:col-span-6">
+              <CollectionPulse pulse={collectionPulse} />
             </div>
 
             {/* Diagnostics Feed */}
-            <div className="bg-surface-container-lowest p-5 rounded-lg shadow-sm border-l-4 border-primary">
+            <div className="rounded-lg border-l-4 border-primary bg-surface-container-lowest p-5 shadow-sm md:col-span-2 lg:col-span-3">
               <h4 className="font-headline font-bold text-on-surface mb-4 text-sm">
                 Diagnostics Feed
               </h4>
