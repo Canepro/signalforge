@@ -145,6 +145,7 @@ function migrate(db: Database): void {
     capabilities_json TEXT NOT NULL DEFAULT '[]',
     attributes_json TEXT NOT NULL DEFAULT '{}',
     labels_json TEXT NOT NULL DEFAULT '{}',
+    default_collection_scope_json TEXT,
     enabled INTEGER NOT NULL DEFAULT 1,
     last_seen_at TEXT,
     health_status TEXT NOT NULL DEFAULT 'unknown',
@@ -161,6 +162,9 @@ function migrate(db: Database): void {
      SET target_identifier_norm = lower(trim(target_identifier))
      WHERE target_identifier_norm IS NULL OR target_identifier_norm = ''`
   );
+  if (!sourceCols.includes("default_collection_scope_json")) {
+    db.run(`ALTER TABLE sources ADD COLUMN default_collection_scope_json TEXT`);
+  }
 
   db.run(
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_target_enabled ON sources(target_identifier) WHERE enabled = 1`
@@ -193,7 +197,8 @@ function migrate(db: Database): void {
     claimed_at TEXT,
     started_at TEXT,
     submitted_at TEXT,
-    finished_at TEXT
+    finished_at TEXT,
+    collection_scope_json TEXT
   )`);
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_collection_jobs_source ON collection_jobs(source_id)`);
@@ -204,6 +209,9 @@ function migrate(db: Database): void {
   const jobCols = tableColumnNames(db, "collection_jobs");
   if (!jobCols.includes("result_analysis_status")) {
     db.run(`ALTER TABLE collection_jobs ADD COLUMN result_analysis_status TEXT`);
+  }
+  if (!jobCols.includes("collection_scope_json")) {
+    db.run(`ALTER TABLE collection_jobs ADD COLUMN collection_scope_json TEXT`);
   }
 
   db.run(`CREATE TABLE IF NOT EXISTS agent_registrations (

@@ -208,16 +208,16 @@ When no baseline exists, `baseline_missing` is `true` and `evidence_delta` is `n
 
 All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
 
-**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics` and `kubernetes-bundle`), `default_collector_type`, `capabilities`, `labels`, `enabled`.
+**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics` and `kubernetes-bundle`), `default_collector_type`, optional typed `default_collection_scope` (`linux_host` / `container_target` / `kubernetes_scope`) validated against `expected_artifact_type`, `capabilities`, `labels`, `enabled`.
 **201:** source object. **400** validation, including `code: "unsupported_artifact_type"` when `expected_artifact_type` is not supported. **409** `duplicate_target_identifier`.
 
 **`GET /api/sources`** — **200:** `{ "sources": Source[] }`.
 
 **`GET /api/sources/[id]`** — **200** source. **404** if missing.
 
-**`PATCH /api/sources/[id]`** — partial JSON; **cannot** change `target_identifier`, `source_type`, `expected_artifact_type` in v1. **200** source.
+**`PATCH /api/sources/[id]`** — partial JSON; **cannot** change `target_identifier`, `source_type`, `expected_artifact_type` in v1. Accepts `default_collection_scope` (or `null` to clear) with the same artifact-family validation as create. **200** source.
 
-**`POST /api/sources/[id]/collection-jobs`** — optional JSON: `request_reason`, `priority`, `idempotency_key` (24h dedupe per source). **201** new job, **200** same job on idempotent replay. **409** `source_disabled`.
+**`POST /api/sources/[id]/collection-jobs`** — optional JSON: `request_reason`, `priority`, `idempotency_key` (24h dedupe per source), and typed `collection_scope` (`linux_host` / `container_target` / `kubernetes_scope`). Scope shape must match `source.expected_artifact_type`; mismatch returns **400** `invalid_collection_scope`. **201** new job, **200** same job on idempotent replay. **409** `source_disabled`.
 
 **`GET /api/sources/[id]/collection-jobs`** — optional `?status=`. Runs a small **lease reaper** before listing. **200:** `{ "jobs": CollectionJob[] }`.
 
@@ -237,7 +237,7 @@ All routes below require `Authorization: Bearer <agent_token>` (from registratio
 
 **200 body:** `{ "ok": true, "active_job_lease": null }` when no `active_job_id` was sent. When `active_job_id` was sent and preconditions passed: either `{ "ok": true, "active_job_lease": { "job_id", "extended": true, "lease_expires_at" } }` if the lease row was extended, or `{ "ok": true, "active_job_lease": { "job_id", "extended": false, "code": "lease_not_extended" } }` if the server did not apply an extension (e.g. concurrent lease change). Invalid active-job requests still yield **4xx** — they do not return `ok: true` with a hidden skip.
 
-**`GET /api/agent/jobs/next`** — optional `?limit=` (default small) and optional `?wait_seconds=` (bounded long-poll; max 20s). **200:** `{ "jobs": JobSummary[], "gate": string | null }`. **Reject** `source_id` query with **400**. **Strict capability gating:** no successful heartbeat yet → `jobs: []`, `gate: "heartbeat_required"`. After heartbeat, **empty** capability list → `gate: "capabilities_empty"`. Otherwise each job requires `collect:<job.artifact_type>` in the intersection of (last heartbeated agent capabilities ∩ source `capabilities`). If queued jobs exist but none qualify → `gate: "capability_mismatch"`. When there are no queued rows, `gate` is **null**. Disabled source → `gate: "source_disabled"`. Long-poll waiting only applies when the initial result is `jobs: []` and `gate: null`; gate failures still return immediately.
+**`GET /api/agent/jobs/next`** — optional `?limit=` (default small) and optional `?wait_seconds=` (bounded long-poll; max 20s). **200:** `{ "jobs": JobSummary[], "gate": string | null }`. `JobSummary` always includes `collection_scope`; it is `null` when no scope was set at queue time. **Reject** `source_id` query with **400**. **Strict capability gating:** no successful heartbeat yet → `jobs: []`, `gate: "heartbeat_required"`. After heartbeat, **empty** capability list → `gate: "capabilities_empty"`. Otherwise each job requires `collect:<job.artifact_type>` in the intersection of (last heartbeated agent capabilities ∩ source `capabilities`). If queued jobs exist but none qualify → `gate: "capability_mismatch"`. When there are no queued rows, `gate` is **null**. Disabled source → `gate: "source_disabled"`. Long-poll waiting only applies when the initial result is `jobs: []` and `gate: null`; gate failures still return immediately.
 
 **`POST /api/collection-jobs/{id}/claim`** — JSON `instance_id`, `lease_ttl_seconds` (clamped). Atomic **queued** → **claimed** (establishes lease instance). **403** wrong source. **409** if not queued / already claimed.
 

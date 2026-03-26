@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/agent-next-jobs-response.schema.json",
+  "title": "GET /api/agent/jobs/next response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "source_id": { "type": "string" },
+          "artifact_type": { "type": "string" },
+          "status": { "type": "string" },
+          "created_at": { "type": "string" },
+          "request_reason": { "type": ["string", "null"] },
+          "collection_scope": {
+            "anyOf": [
+              { "$ref": "./collection-scope.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": ["id", "source_id", "artifact_type", "status", "created_at", "request_reason", "collection_scope"]
+      }
+    },
+    "gate": {
+      "anyOf": [
+        { "enum": ["source_disabled", "heartbeat_required", "capabilities_empty", "capability_mismatch"] },
+        { "type": "null" }
+      ]
+    }
+  },
+  "required": ["jobs", "gate"]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/collection-scope.schema.json",
+  "title": "CollectionScope",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "linux_host" }
+      },
+      "required": ["kind"]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "container_target" },
+        "runtime": { "enum": ["docker", "podman"] },
+        "container_ref": { "type": "string", "minLength": 1 },
+        "host_hint": { "type": "string" }
+      },
+      "required": ["kind", "container_ref"]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "kubernetes_scope" },
+        "scope_level": { "enum": ["cluster", "namespace"] },
+        "namespace": { "type": "string", "minLength": 1 },
+        "kubectl_context": { "type": "string" },
+        "cluster_name": { "type": "string" },
+        "provider": { "type": "string" }
+      },
+      "required": ["kind", "scope_level"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "scope_level": { "const": "namespace" } },
+            "required": ["scope_level"]
+          },
+          "then": { "required": ["namespace"] }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/collection-job-response.schema.json",
+  "title": "CollectionJob response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "source_id": { "type": "string" },
+    "artifact_type": { "type": "string" },
+    "status": { "type": "string" },
+    "requested_by": { "type": "string" },
+    "request_reason": { "type": ["string", "null"] },
+    "priority": { "type": "integer" },
+    "idempotency_key": { "type": ["string", "null"] },
+    "lease_owner_id": { "type": ["string", "null"] },
+    "lease_owner_instance_id": { "type": ["string", "null"] },
+    "lease_expires_at": { "type": ["string", "null"] },
+    "last_heartbeat_at": { "type": ["string", "null"] },
+    "result_artifact_id": { "type": ["string", "null"] },
+    "result_run_id": { "type": ["string", "null"] },
+    "error_code": { "type": ["string", "null"] },
+    "error_message": { "type": ["string", "null"] },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "queued_at": { "type": ["string", "null"] },
+    "claimed_at": { "type": ["string", "null"] },
+    "started_at": { "type": ["string", "null"] },
+    "submitted_at": { "type": ["string", "null"] },
+    "finished_at": { "type": ["string", "null"] },
+    "result_analysis_status": { "type": ["string", "null"] },
+    "collection_scope": {
+      "anyOf": [
+        { "$ref": "./collection-scope.schema.json" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "required": [
+    "id", "source_id", "artifact_type", "status", "requested_by", "request_reason", "priority", "idempotency_key",
+    "lease_owner_id", "lease_owner_instance_id", "lease_expires_at", "last_heartbeat_at", "result_artifact_id", "result_run_id",
+    "error_code", "error_message", "created_at", "updated_at", "queued_at", "claimed_at", "started_at", "submitted_at",
+    "finished_at", "result_analysis_status", "collection_scope"
+  ]
+}

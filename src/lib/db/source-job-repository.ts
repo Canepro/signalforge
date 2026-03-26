@@ -1,6 +1,11 @@
 import type { Database } from "sql.js";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { isSupportedArtifactType } from "../adapter/registry";
+import {
+  parseCollectionScopeJson,
+  validateCollectionScopeForArtifactType,
+  type CollectionScope,
+} from "../collection-scope";
 import { normalizeTargetIdentifier } from "../target-identity";
 import { emitDomainEvent } from "../domain-events";
 import {
@@ -33,6 +38,7 @@ export interface SourceRow {
   capabilities_json: string;
   attributes_json: string;
   labels_json: string;
+  default_collection_scope_json?: string | null;
   enabled: number;
   last_seen_at: string | null;
   health_status: string;
@@ -66,6 +72,7 @@ export interface CollectionJobRow {
   finished_at: string | null;
   /** Run `status` after artifact submit (`complete` \| `error`, …). Null for jobs not yet submitted or legacy rows. */
   result_analysis_status?: string | null;
+  collection_scope_json?: string | null;
 }
 
 export interface AgentRegistrationRow {
@@ -129,6 +136,7 @@ export interface CreateSourceInput {
   capabilities?: string[];
   attributes?: Record<string, unknown>;
   labels?: Record<string, string>;
+  default_collection_scope?: CollectionScope | null;
   enabled?: boolean;
 }
 
@@ -143,6 +151,14 @@ export function insertSource(db: Database, input: CreateSourceInput): SourceRow 
     input.capabilities?.length ?
       input.capabilities
     : defaultCapabilitiesForArtifactType(expected);
+  const defaultCollectionScope = input.default_collection_scope ?? null;
+  const defaultScopeValidation = validateCollectionScopeForArtifactType(
+    defaultCollectionScope,
+    expected
+  );
+  if (!defaultScopeValidation.ok) {
+    throw codeError("invalid_default_collection_scope");
+  }
   const targetNorm = normalizeTargetIdentifier(input.target_identifier);
   if (!targetNorm) {
     throw new Error("target_identifier is required");
@@ -153,9 +169,9 @@ export function insertSource(db: Database, input: CreateSourceInput): SourceRow 
     `INSERT INTO sources (
       id, display_name, target_identifier, target_identifier_norm, source_type, expected_artifact_type,
       default_collector_type, default_collector_version,
-      capabilities_json, attributes_json, labels_json, enabled,
+      capabilities_json, attributes_json, labels_json, default_collection_scope_json, enabled,
       last_seen_at, health_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
     [
       id,
       input.display_name.trim(),
@@ -168,6 +184,7 @@ export function insertSource(db: Database, input: CreateSourceInput): SourceRow 
       JSON.stringify(caps),
       JSON.stringify(input.attributes ?? {}),
       JSON.stringify(input.labels ?? {}),
+      defaultCollectionScope ? JSON.stringify(defaultCollectionScope) : null,
       input.enabled === false ? 0 : 1,
       now,
       now,
@@ -213,6 +230,7 @@ export interface PatchSourceInput {
   capabilities?: string[];
   labels?: Record<string, string>;
   attributes?: Record<string, unknown>;
+  default_collection_scope?: CollectionScope | null;
   enabled?: boolean;
 }
 
@@ -227,6 +245,7 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
   let capabilities_json = row.capabilities_json;
   let labels_json = row.labels_json;
   let attributes_json = row.attributes_json;
+  let default_collection_scope_json = row.default_collection_scope_json ?? null;
   let enabled = row.enabled;
 
   if (patch.display_name !== undefined) display_name = patch.display_name.trim();
@@ -244,12 +263,23 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
       attributes_json = JSON.stringify(patch.attributes);
     }
   }
+  if (patch.default_collection_scope !== undefined) {
+    const validation = validateCollectionScopeForArtifactType(
+      patch.default_collection_scope,
+      row.expected_artifact_type
+    );
+    if (!validation.ok) {
+      throw codeError("invalid_default_collection_scope");
+    }
+    default_collection_scope_json =
+      patch.default_collection_scope ? JSON.stringify(patch.default_collection_scope) : null;
+  }
   if (patch.enabled !== undefined) enabled = patch.enabled ? 1 : 0;
 
   db.run(
     `UPDATE sources SET
       display_name = ?, default_collector_type = ?, default_collector_version = ?,
-      capabilities_json = ?, labels_json = ?, attributes_json = ?, enabled = ?, updated_at = ?
+      capabilities_json = ?, labels_json = ?, attributes_json = ?, default_collection_scope_json = ?, enabled = ?, updated_at = ?
     WHERE id = ?`,
     [
       display_name,
@@ -258,6 +288,7 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
       capabilities_json,
       labels_json,
       attributes_json,
+      default_collection_scope_json,
       enabled,
       now,
       id,
@@ -303,6 +334,7 @@ export interface CreateCollectionJobInput {
   request_reason?: string | null;
   priority?: number;
   idempotency_key?: string | null;
+  collection_scope?: CollectionScope | null;
 }
 
 export function findRecentJobByIdempotencyKey(
@@ -347,14 +379,20 @@ export function insertCollectionJob(
   const id = randomUUID();
   const now = new Date().toISOString();
   const artifactType = source.expected_artifact_type;
+  const collectionScope =
+    input.collection_scope ?? parseCollectionScopeJson(source.default_collection_scope_json);
+  const scopeValidation = validateCollectionScopeForArtifactType(collectionScope, artifactType);
+  if (!scopeValidation.ok) {
+    throw codeError("invalid_collection_scope");
+  }
 
   db.run(
     `INSERT INTO collection_jobs (
       id, source_id, artifact_type, status, requested_by, request_reason, priority,
       idempotency_key, lease_owner_id, lease_owner_instance_id, lease_expires_at, last_heartbeat_at,
       result_artifact_id, result_run_id, error_code, error_message,
-      created_at, updated_at, queued_at, claimed_at, started_at, submitted_at, finished_at
-    ) VALUES (?, ?, ?, 'queued', 'operator', ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL, NULL, NULL)`,
+      created_at, updated_at, queued_at, claimed_at, started_at, submitted_at, finished_at, collection_scope_json
+    ) VALUES (?, ?, ?, 'queued', 'operator', ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?)`,
     [
       id,
       source.id,
@@ -365,6 +403,7 @@ export function insertCollectionJob(
       now,
       now,
       now,
+      collectionScope ? JSON.stringify(collectionScope) : null,
     ]
   );
 
@@ -471,6 +510,7 @@ export interface CollectionJobSummary {
   status: string;
   created_at: string;
   request_reason: string | null;
+  collection_scope: CollectionScope | null;
 }
 
 /** Why `jobs` is empty (for non-silent client handling). `null` when returning jobs or when there is no queued work. */
@@ -543,6 +583,7 @@ export function listNextQueuedJobSummariesForSource(
       status: job.status,
       created_at: job.created_at,
       request_reason: job.request_reason,
+      collection_scope: parseCollectionScopeJson(job.collection_scope_json),
     });
     if (out.length >= limit) break;
   }
@@ -1086,6 +1127,7 @@ export function sourceToJson(row: SourceRow) {
   } catch {
     labels = {};
   }
+  const defaultCollectionScope = parseCollectionScopeJson(row.default_collection_scope_json);
 
   return {
     id: row.id,
@@ -1098,6 +1140,7 @@ export function sourceToJson(row: SourceRow) {
     capabilities,
     attributes,
     labels,
+    default_collection_scope: defaultCollectionScope,
     enabled: row.enabled === 1,
     last_seen_at: row.last_seen_at,
     health_status: row.health_status,
@@ -1132,5 +1175,6 @@ export function collectionJobToJson(row: CollectionJobRow) {
     submitted_at: row.submitted_at,
     finished_at: row.finished_at,
     result_analysis_status: row.result_analysis_status ?? null,
+    collection_scope: parseCollectionScopeJson(row.collection_scope_json),
   };
 }

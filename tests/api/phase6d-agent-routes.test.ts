@@ -30,7 +30,14 @@ hostname: agent-test-host
 Linux test 5.0 x86_64
 `;
 
-async function createSourceAndAgent(db: Database, tid: string) {
+async function createSourceAndAgent(
+  db: Database,
+  tid: string,
+  opts?: {
+    expected_artifact_type?: "linux-audit-log" | "container-diagnostics" | "kubernetes-bundle";
+    default_collection_scope?: Record<string, unknown>;
+  }
+) {
   process.env.SIGNALFORGE_ADMIN_TOKEN = ADMIN;
   const sres = await POST_SOURCES(
     new NextRequest("http://localhost/api/sources", {
@@ -40,6 +47,8 @@ async function createSourceAndAgent(db: Database, tid: string) {
         display_name: "S",
         target_identifier: tid,
         source_type: "linux_host",
+        expected_artifact_type: opts?.expected_artifact_type,
+        default_collection_scope: opts?.default_collection_scope,
       }),
     })
   );
@@ -112,7 +121,12 @@ describe("Phase 6d agent routes", () => {
     await POST_SOURCE_JOBS(
       new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
         method: "POST",
-        headers: adminAuth,
+        headers: { ...adminAuth, "content-type": "application/json" },
+        body: JSON.stringify({
+          collection_scope: {
+            kind: "linux_host",
+          },
+        }),
       }),
       { params: Promise.resolve({ id: sourceId }) }
     );
@@ -130,7 +144,10 @@ describe("Phase 6d agent routes", () => {
     await POST_SOURCE_JOBS(
       new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
         method: "POST",
-        headers: adminAuth,
+        headers: { ...adminAuth, "content-type": "application/json" },
+        body: JSON.stringify({
+          collection_scope: { kind: "linux_host" },
+        }),
       }),
       { params: Promise.resolve({ id: sourceId }) }
     );
@@ -191,6 +208,85 @@ describe("Phase 6d agent routes", () => {
     expect(body.gate).toBeNull();
     expect(body.jobs).toHaveLength(1);
     expect(body.jobs[0].source_id).toBe(sourceId);
+  });
+
+  it("jobs/next includes explicit collection_scope from queued jobs", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-next-scope-explicit", {
+      expected_artifact_type: "container-diagnostics",
+    });
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:container-diagnostics"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: { ...adminAuth, "content-type": "application/json" },
+        body: JSON.stringify({
+          collection_scope: {
+            kind: "container_target",
+            runtime: "docker",
+            container_ref: "payments-api",
+          },
+        }),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const next = await GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) })
+    );
+    expect(next.status).toBe(200);
+    const body = await next.json();
+    expect(body.jobs).toHaveLength(1);
+    expect(body.jobs[0].collection_scope?.kind).toBe("container_target");
+    expect(body.jobs[0].collection_scope?.container_ref).toBe("payments-api");
+  });
+
+  it("jobs/next includes source default scope when queued job omits override", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-next-scope-default", {
+      expected_artifact_type: "kubernetes-bundle",
+      default_collection_scope: {
+        kind: "kubernetes_scope",
+        scope_level: "namespace",
+        namespace: "payments",
+      },
+    });
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:kubernetes-bundle"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: { ...adminAuth, "content-type": "application/json" },
+        body: JSON.stringify({ request_reason: "defaulted scope job" }),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const next = await GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) })
+    );
+    expect(next.status).toBe(200);
+    const body = await next.json();
+    expect(body.jobs).toHaveLength(1);
+    expect(body.jobs[0].collection_scope?.kind).toBe("kubernetes_scope");
+    expect(body.jobs[0].collection_scope?.namespace).toBe("payments");
   });
 
   it("happy path: heartbeat → next → claim → start → artifact → submitted", async () => {

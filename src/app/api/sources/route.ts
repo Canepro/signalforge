@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSupportedArtifactType } from "@/lib/adapter/registry";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import {
+  isCollectionScope,
+  validateCollectionScopeForArtifactType,
+  type CollectionScope,
+} from "@/lib/collection-scope";
 import { getStorage } from "@/lib/storage";
 import { isSourceType, listSourceTypeOptions } from "@/lib/source-catalog";
 
@@ -43,6 +48,8 @@ export async function POST(request: NextRequest) {
     const target_identifier =
       typeof body.target_identifier === "string" ? body.target_identifier : "";
     const source_type = typeof body.source_type === "string" ? body.source_type : "";
+    const expected_artifact_type =
+      typeof body.expected_artifact_type === "string" ? body.expected_artifact_type : "linux-audit-log";
 
     if (!display_name.trim() || display_name.length > 256) {
       return NextResponse.json(
@@ -77,6 +84,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    let defaultCollectionScope: CollectionScope | null | undefined = undefined;
+    if (body.default_collection_scope !== undefined && body.default_collection_scope !== null) {
+      if (!isCollectionScope(body.default_collection_scope)) {
+        return NextResponse.json(
+          { error: "Invalid default_collection_scope payload", code: "invalid_default_collection_scope" },
+          { status: 400 }
+        );
+      }
+      const validation = validateCollectionScopeForArtifactType(
+        body.default_collection_scope,
+        expected_artifact_type
+      );
+      if (!validation.ok) {
+        return NextResponse.json(
+          { error: validation.error, code: "invalid_default_collection_scope" },
+          { status: 400 }
+        );
+      }
+      defaultCollectionScope = body.default_collection_scope;
+    }
 
     const storage = await getStorage();
     try {
@@ -89,6 +116,7 @@ export async function POST(request: NextRequest) {
             typeof body.expected_artifact_type === "string" ?
               body.expected_artifact_type
             : undefined,
+          default_collection_scope: defaultCollectionScope,
           default_collector_type:
             typeof body.default_collector_type === "string" ?
               body.default_collector_type
@@ -124,6 +152,15 @@ export async function POST(request: NextRequest) {
           {
             error: `Unsupported expected_artifact_type: "${body.expected_artifact_type}"`,
             code: "unsupported_artifact_type",
+          },
+          { status: 400 }
+        );
+      }
+      if (code === "invalid_default_collection_scope") {
+        return NextResponse.json(
+          {
+            error: "default_collection_scope does not match expected_artifact_type",
+            code: "invalid_default_collection_scope",
           },
           { status: 400 }
         );

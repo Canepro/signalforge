@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/source-response.schema.json",
+  "title": "Source response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "display_name": { "type": "string" },
+    "target_identifier": { "type": "string" },
+    "source_type": { "type": "string" },
+    "expected_artifact_type": { "type": "string" },
+    "default_collector_type": { "type": "string" },
+    "default_collector_version": { "type": ["string", "null"] },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "attributes": { "type": "object", "additionalProperties": true },
+    "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+    "default_collection_scope": {
+      "anyOf": [
+        { "$ref": "./collection-scope.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "enabled": { "type": "boolean" },
+    "last_seen_at": { "type": ["string", "null"] },
+    "health_status": { "type": "string" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  },
+  "required": [
+    "id",
+    "display_name",
+    "target_identifier",
+    "source_type",
+    "expected_artifact_type",
+    "default_collector_type",
+    "default_collector_version",
+    "capabilities",
+    "attributes",
+    "labels",
+    "default_collection_scope",
+    "enabled",
+    "last_seen_at",
+    "health_status",
+    "created_at",
+    "updated_at"
+  ]
+}

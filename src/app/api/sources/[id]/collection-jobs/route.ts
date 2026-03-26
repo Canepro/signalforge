@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import {
+  isCollectionScope,
+  validateCollectionScopeForArtifactType,
+  type CollectionScope,
+} from "@/lib/collection-scope";
 import { getStorage } from "@/lib/storage";
 
 export async function GET(
@@ -54,6 +59,27 @@ export async function POST(
     }
 
     try {
+      let collectionScope: CollectionScope | null = null;
+      if (body.collection_scope !== undefined && body.collection_scope !== null) {
+        if (!isCollectionScope(body.collection_scope)) {
+          return NextResponse.json(
+            { error: "Invalid collection_scope payload", code: "invalid_collection_scope" },
+            { status: 400 }
+          );
+        }
+        const validation = validateCollectionScopeForArtifactType(
+          body.collection_scope,
+          source.expected_artifact_type
+        );
+        if (!validation.ok) {
+          return NextResponse.json(
+            { error: validation.error, code: "invalid_collection_scope" },
+            { status: 400 }
+          );
+        }
+        collectionScope = body.collection_scope;
+      }
+
       const { row, inserted } = await storage.withTransaction((tx) =>
         tx.jobs.queueForSource(sourceId, {
           request_reason:
@@ -61,6 +87,7 @@ export async function POST(
           priority: typeof body.priority === "number" ? body.priority : 0,
           idempotency_key:
             typeof body.idempotency_key === "string" ? body.idempotency_key : null,
+          collection_scope: collectionScope,
         })
       );
       return NextResponse.json(row, { status: inserted ? 201 : 200 });
@@ -82,6 +109,12 @@ export async function POST(
         return NextResponse.json(
           { error: "Source is disabled", code: "source_disabled" },
           { status: 409 }
+        );
+      }
+      if (code === "invalid_collection_scope") {
+        return NextResponse.json(
+          { error: "Invalid collection_scope for this source artifact type", code: "invalid_collection_scope" },
+          { status: 400 }
         );
       }
       throw e;
