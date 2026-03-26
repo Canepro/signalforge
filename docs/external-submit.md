@@ -66,6 +66,18 @@ Length limits and validation follow `src/lib/ingestion/meta.ts` (e.g. `collected
 - **`target_identifier`** is **submission metadata**: use it when you have a fleet id, enrollment id, or stable label that should tie runs together even if hostnames differ or logs are ambiguous.
 - Compare and baseline selection use **`target_identifier` first**, then normalized hostname, then same-artifact history when identity is missing (see `findPreviousRunForSameTarget`).
 
+### Recommended `target_identifier` shapes by artifact family
+
+- **`linux-audit-log`**: use a stable machine or fleet id such as `fleet:prod:web-01` when hostname alone is not trustworthy enough.
+- **`container-diagnostics`**: choose the compare scope deliberately.
+  - workload-stable compare: `container-workload:<host>:<runtime>:<service>`
+  - instance-level compare: `container-instance:<host>:<runtime>:<container-id>`
+- **`kubernetes-bundle`**: make cluster and scope explicit.
+  - cluster-scoped bundle: `cluster:<cluster-name>`
+  - namespace-scoped bundle: `cluster:<cluster-name>:namespace:<namespace>`
+
+For container and Kubernetes evidence, prefer workload- or scope-stable identifiers over volatile runtime object names when the operator wants meaningful compare history across redeploys.
+
 ## Quick Examples
 
 Multipart with curl:

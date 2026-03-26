@@ -5,6 +5,8 @@ This file tracks **implemented** work and **recommended next steps**.
 For the canonical long-lived roadmap, see [`roadmap.md`](./roadmap.md).
 For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked historical at the top).
 
+Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at `431ec32`. The `codex/phase-8-implementation` branch has progressed further and the Phase 8 rows below describe the current branch reality rather than released `main`.
+
 ## Implemented phases
 
 | Phase | Scope | Status |
@@ -31,31 +33,45 @@ For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked h
 | 6e-agent | `signalforge-agent` repo (Bun + TypeScript): heartbeat, poll, claim, run `first-audit.sh`, upload artifact, fail with explicit codes. Fatal lease-loss (abort + POST fail). Snapshot-based artifact selection (no stale logs). Validated E2E against live SignalForge. | Done |
 | Sources UI polish | Unified sidebar+topbar layout (matches dashboard), health indicators, job status badges, property grids, source settings (rename/enable/version), agent enrollment info, action feedback (loading/saved states), cancel confirmation, staggered animations, gradient accents | Done |
 | CI + migration discipline | GitHub Actions workflow (`ci.yml`): typecheck, test, build + Postgres parity job (fresh `postgres:16-alpine`, apply migrations, `test:parity`). Checked-in migration policy (`docs/postgres-migrations.md`): append-only files, checksum enforcement, no-down stance, release discipline. Upgrade-path migration test scaffold (activates once `002_*` exists). | Done |
+| 8a | Multi-artifact compare uplift: shared `evidence_delta`, family-aware metrics, target-aware compare support for stable evidence drift | Done on branch |
+| 8b | `container-diagnostics`: adapter, ingestion, compare, fixtures/golden tests, container-aware fallback wording and metrics | Done on branch |
+| 8c | `kubernetes-bundle` push path: locked `kubernetes-bundle.v1` manifest, adapter, ingestion, compare, fixtures/golden tests, scope-aware target identity | Done on branch |
+| 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, and exposure-plus-identity joins | In progress on branch |
 
 ## Product snapshot
 
 - **Artifacts:** `linux-audit-log` (`first-audit.sh`-style host audit output), `container-diagnostics` (text-based container diagnostics for a single container or workload), and `kubernetes-bundle` (UTF-8 JSON manifest for cluster- or namespace-scoped Kubernetes evidence).
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
-- **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
+- **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is now available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations. The live Vercel deployment uses Neon Postgres.
 - **Deployment workflow:** Vercel preview deployments are available for branches and PRs, so live review does not need to wait for a push or merge to remote `main`.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
 - **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, Vercel.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
 
+## Phase 8 branch snapshot
+
+- `container-diagnostics` is a shipped artifact family in this checkout with credible first-slice findings around exposure, privilege, mounts, secrets, identity, and runtime hardening.
+- `kubernetes-bundle` is a shipped artifact family in this checkout using the text-carried `kubernetes-bundle.v1` JSON manifest shape, not raw archive ingestion.
+- Kubernetes analysis on this branch currently covers public Service exposure, namespace isolation gaps, RBAC over-breadth, workload-to-identity joins, exposed-workload-to-identity joins, token/Secret usage, workload hardening, host-escape style settings, probes, and resource governance.
+- The strongest remaining Phase 8 architectural risk is unchanged: the current execution model is still effectively one registration per source, which may be too narrow for future Kubernetes or mixed-scope execution forms.
+
 ## Known limitations
 
-- Multi-artifact support is still early; quality is strongest where evidence is explicit (Linux host posture today, first-slice container diagnostics next).
+- Multi-artifact support is no longer just scaffolding, but Phase 8 quality is still uneven: container coverage is solid first-slice quality, while Kubernetes still has more depth on findings than on noise suppression and finding-key normalization.
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
+- The current source and agent model is still effectively one registration per source, which may become limiting for Kubernetes or future multi-scope execution.
 
 ## Recommended next work (high level)
 
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare/export hardening (small, targeted).
-- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Current branch work has started Phase 0 and the first `container-diagnostics` slice. The Kubernetes artifact-envelope gate is now locked to a text-carried `kubernetes-bundle.v1` JSON manifest, so the next Kubernetes work should build against that shape rather than invent raw archive ingestion.
+- Sync release-facing docs and handoff notes to the current branch reality before more Phase 8 slices land, so future threads do not underestimate what is already implemented.
+- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Current branch work has completed Phase 0, the container slices, and the Kubernetes push path, with Kubernetes findings quality now in progress. The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
 - For Kubernetes specifically, prefer a higher quality bar over the smallest possible demo: use official upstream guidance, relevant local skills, realistic fixtures, and read-only live-cluster inspection when that materially improves rule credibility. Use richer platform examples when helpful, but keep the actual detections and wording anchored in plain Kubernetes primitives so the product still fits operators with simpler clusters.
+- Best next implementation move: stay in Phase 4 and deepen Kubernetes quality with more identity, exposure, and noise-quality joins before reopening Sources or orchestration design.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).
 - Harden agent in real use: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, systemd unit file for `signalforge-agent run`.

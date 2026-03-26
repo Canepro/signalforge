@@ -341,12 +341,12 @@ For the first slice, keep the artifact envelope compatible with the current inge
 
 ### Acceptance criteria
 
-- [ ] SignalForge accepts `artifact_type=container-diagnostics`.
-- [ ] A dedicated adapter handles environment detection, noise suppression, deterministic findings, and incomplete-audit detection for container evidence.
-- [ ] At least one real fixture and one golden expected-output contract exist for a container artifact.
-- [ ] Upload, run detail, and compare work end-to-end for container runs.
-- [ ] Docs describe the reference submission pattern and required metadata for stable compare.
-- [ ] The docs make the intended compare identity explicit: container workload vs container instance.
+- [x] SignalForge accepts `artifact_type=container-diagnostics`.
+- [x] A dedicated adapter handles environment detection, noise suppression, deterministic findings, and incomplete-audit detection for container evidence.
+- [x] At least one real fixture and one golden expected-output contract exist for a container artifact.
+- [x] Upload, run detail, and compare work end-to-end for container runs.
+- [x] Docs describe the reference submission pattern and required metadata for stable compare.
+- [x] The docs make the intended compare identity explicit: container workload vs container instance.
 
 ### Tracer-bullet success condition
 
@@ -380,6 +380,11 @@ Container quality work should stay narrow at first:
 - image/runtime hygiene signals that are explicit in the artifact
 - noisy-but-expected container runtime chatter
 
+Current branch status:
+- complete through the first credible container slice
+- compare and fallback wording are already container-aware
+- further work is optional tuning, not missing plumbing
+
 ---
 
 ## Phase 3: Kubernetes Bundle Push Path
@@ -400,13 +405,13 @@ For v1, the artifact envelope is already chosen:
 
 ### Acceptance criteria
 
-- [ ] SignalForge accepts `artifact_type=kubernetes-bundle`.
-- [ ] A dedicated adapter handles Kubernetes environment detection, noise suppression, deterministic findings, and incomplete-bundle detection.
-- [ ] At least one real fixture and one golden expected-output contract exist for Kubernetes evidence.
-- [ ] Upload, run detail, and compare work end-to-end for Kubernetes runs.
-- [ ] The first implementation consumes the locked `kubernetes-bundle.v1` JSON manifest shape rather than a raw archive.
-- [ ] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
-- [ ] The implementation makes scope explicit so cluster-wide and namespace-scoped bundles do not compare accidentally.
+- [x] SignalForge accepts `artifact_type=kubernetes-bundle`.
+- [x] A dedicated adapter handles Kubernetes environment detection, noise suppression, deterministic findings, and incomplete-bundle detection.
+- [x] At least one real fixture and one golden expected-output contract exist for Kubernetes evidence.
+- [x] Upload, run detail, and compare work end-to-end for Kubernetes runs.
+- [x] The first implementation consumes the locked `kubernetes-bundle.v1` JSON manifest shape rather than a raw archive.
+- [x] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
+- [x] The implementation makes scope explicit so cluster-wide and namespace-scoped bundles do not compare accidentally.
 
 ### Tracer-bullet success condition
 
@@ -428,11 +433,11 @@ The implementation should use real platform guidance rather than improvised seve
 
 ### Acceptance criteria
 
-- [ ] Deterministic rules cover a first credible Kubernetes-specific risk set.
+- [x] Deterministic rules cover a first credible Kubernetes-specific risk set.
 - [ ] Expected platform noise is documented and suppressed deterministically where appropriate.
 - [ ] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
-- [ ] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
-- [ ] At least part of the Kubernetes rule and fixture set is informed by realistic bundle content or live read-only cluster inspection rather than purely invented synthetic examples.
+- [x] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
+- [x] At least part of the Kubernetes rule and fixture set is informed by realistic bundle content or live read-only cluster inspection rather than purely invented synthetic examples.
 
 ### Notes
 
@@ -449,6 +454,10 @@ Guardrails for execution:
 - use local tools such as `kubectl`, `podman`, or Docker-compatible commands when they materially improve fixture realism
 - do not mutate live clusters unless the user explicitly asks for that
 - document which cluster/runtime context informed a rule or fixture when that context meaningfully shaped the result
+
+Current branch status:
+- public exposure, namespace isolation gaps, workload health, secret handling, workload hardening, host-escape settings, RBAC over-breadth, workload-to-identity joins, and exposed-workload-to-identity joins are already implemented
+- the main remaining quality gaps are noise suppression depth and stronger stable issue normalization across changing bundle exports
 
 ---
 
