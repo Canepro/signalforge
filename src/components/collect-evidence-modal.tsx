@@ -249,7 +249,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               Fallback: manual agent commands
             </h3>
             <p className="text-[11px] text-on-surface-variant leading-relaxed">
-              Use these only when you are testing or debugging agent behavior directly from a shell.
+              Use these only when you are testing or debugging agent behavior directly from a shell. They are not the preferred long-running production setup, and shell-exported tokens should not be your durable secret-handling path.
             </p>
           </div>
 
@@ -275,7 +275,8 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
           <p className="text-[10px] text-outline-variant leading-snug">
             Docs: <span className="font-mono">docs/external-submit.md</span>,{" "}
-            <span className="font-mono">docs/getting-started.md</span>
+            <span className="font-mono">docs/getting-started.md</span>,{" "}
+            <span className="font-mono">docs/agent-deployment.md</span>
           </p>
         </div>
     </ModalShell>

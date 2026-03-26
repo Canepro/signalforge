@@ -85,6 +85,15 @@ Restart the dev server, open **`/sources`**, and sign in at **`/sources/login`**
 
 **External agent (Phase 6d):** after you create a source in **`/sources`**, use **Enroll agent** (or `POST /api/agent/registrations` with the admin Bearer) to get a **source-bound agent token**. That token is used as `Authorization: Bearer <agent_token>` on `POST /api/agent/heartbeat`, `GET /api/agent/jobs/next`, and the collection-job **claim / start / fail / artifact** routes documented in [`api-contract.md`](./api-contract.md). Collection still runs on the host outside SignalForge; the server only accepts the artifact and runs the same analysis path as `POST /api/runs`. The agent can now dispatch Linux, container, and Kubernetes collectors, but non-Linux jobs still depend on host-local collector environment such as a pinned container reference or a prepared `kubectl` context.
 
+Preferred deployment model for the external agent:
+
+- run it as a long-running service on the execution host
+- keep the token in a root-controlled file or service credential, not on a shell command line
+- use a dedicated service identity with only the access that host needs
+- avoid treating an operator laptop or mutable `kubectl` current-context as the normal production path
+
+More detail: [`agent-deployment.md`](./agent-deployment.md)
+
 Optional OpenAI direct setup:
 
 ```env
@@ -328,6 +337,25 @@ Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
 
 ```bash
 bun run test:parity
+```
+
+For local Postgres validation, prefer the helper instead of exporting env vars by hand:
+
+```bash
+bash scripts/run-postgres-parity-local.sh
+```
+
+Detection order:
+
+1. `--url`
+2. `DATABASE_URL_TEST` or `DATABASE_URL`
+3. a running local Podman container such as `signalforge-pg`
+
+Examples:
+
+```bash
+bash scripts/run-postgres-parity-local.sh --url postgres://signalforge:signalforge@127.0.0.1:5432/signalforge
+bash scripts/run-postgres-parity-local.sh --container signalforge-pg
 ```
 
 Production build:

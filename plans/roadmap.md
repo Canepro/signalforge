@@ -100,6 +100,7 @@ Current supported artifact families:
 
 - `linux-audit-log`
 - `container-diagnostics`
+- `kubernetes-bundle`
 
 Current provider support:
 
@@ -135,7 +136,7 @@ Published contract/docs:
 
 ## Current Limitations
 
-- broader multi-artifact support is still early, and only Linux plus first-slice container diagnostics are implemented
+- broader multi-artifact support is still early, but the current branch now includes first-slice container diagnostics and Kubernetes bundle analysis in addition to Linux
 - findings quality is strongest where evidence is explicit
 - recommendations remain bounded by collected evidence
 - external collector model includes reference push path (`signalforge-collectors`) and job-driven agent (`signalforge-agent`)
@@ -152,10 +153,10 @@ The live SignalForge instance is deployed on **Vercel** with a **Neon Postgres**
 Recommended near-term choices:
 
 1. Use the system with more real submissions and collect friction.
-2. Harden the API/service contract where real usage shows gaps.
-3. Continue agent hardening: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, systemd unit file.
-4. Add lint to CI.
-5. Land a second migration file (`002_*`) to activate the upgrade-path coverage in CI.
+2. Finish the Phase 8 honesty and merge cleanup across README, docs, and plan files so `main` can catch up to branch reality.
+3. Land the Phase 9 job-scoped collection-parameter slice across `signalforge`, `signalforge-agent`, and `signalforge-collectors` instead of leaving non-Linux job-driven collection dependent on host-local environment.
+4. Continue agent hardening: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, hardened `systemd` service form with secure credential loading, and an explicit preferred deployment stance of always-on service near the execution surface rather than operator laptops or ambient shell context.
+5. Add lint to CI.
 
 ## Future Phases
 

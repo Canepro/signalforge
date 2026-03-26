@@ -35,11 +35,29 @@ Produce an evidence-based cross-repo plan that makes three things explicit:
 2. what is missing for container and Kubernetes collection parity
 3. what should be built next, in which repo, and in what order
 
+It also needs to lock the preferred deployment stance for the execution plane so future work does not drift back toward operator laptops, ambient shell context, or unclear trust boundaries.
+
+## Phase 8 merge gate
+
+Before starting new Phase 9 implementation work, close these Phase 8 cleanup items:
+
+1. README, docs index, roadmap, and current-plan all match the current branch reality:
+   - `linux-audit-log`
+   - `container-diagnostics`
+   - `kubernetes-bundle`
+2. Docs and frontend wording stay honest about collection modes:
+   - Linux is the cleanest end-to-end job-driven path
+   - container and Kubernetes have push-first parity
+   - host-agent job-driven non-Linux collection still has explicit scope limitations until Phase 9 is complete
+3. Phase 8 branch validation remains green for analyzer, compare, API, and storage work.
+4. The next implementation step is linked to the Phase 9 source-of-truth plan instead of being re-described from memory.
+
 ## Non-goals
 
 - do not quietly imply that container or Kubernetes job-driven collection already exists
 - do not commit to a Kubernetes execution form before scope and trust boundaries are explicit
 - do not turn SignalForge into a privileged remote execution app
+- do not make workstation kubeconfig or ad hoc `once` runs the default production story
 
 ## Audit snapshot
 
@@ -170,6 +188,23 @@ Only after real push-first usage:
 - add job-scoped family parameters or scope selectors
 - choose deployment forms for container and Kubernetes
 
+## Preferred execution-plane deployment stance
+
+Until a better model is proven, the preferred SignalForge agent deployment stance is:
+
+- always-on service, not a human shell session
+- close to the execution surface, not remote from it
+- least privilege by default
+- explicit target and scope selection, not ambient local state
+
+Translated into real deployment choices:
+
+- Linux and WSL: prefer a hardened `systemd` service on the target host
+- container host environments: prefer the same host-service model, with explicit runtime access only on the hosts that need it
+- Kubernetes: keep push-first as the honest default until job-scoped parameters and RBAC boundaries are complete; then prefer a dedicated cluster-side runner over workstation `kubectl`
+
+This is the recommended default because it keeps the agent warm for long-polling and job claim, avoids cold-start timing issues, and removes the operational fragility of cron, CI, or laptop-driven collection.
+
 ## Likely implementation slices after the audit
 
 1. Docs and frontend honesty pass across all three repos
@@ -192,6 +227,8 @@ Before any non-Linux agent implementation, lock:
   - Kubernetes `Job`
   - Kubernetes `Deployment`
   - Kubernetes `DaemonSet`
+- whether container runtime access is treated as a distinct higher-trust host profile
+- whether Kubernetes collection requires explicit kubeconfig path and context or an in-cluster identity with scoped RBAC
 
 ## Recommended immediate next moves
 
@@ -199,8 +236,8 @@ Before any non-Linux agent implementation, lock:
    The product should clearly say that Linux is the cleanest end-to-end path, while container and Kubernetes now have both push-first and host-agent paths with real scope limitations.
 2. Add a job-scoped parameter model before pretending non-Linux job-driven collection is fully solved.
    Container target selection and Kubernetes scope should not stay hidden in process-local environment forever.
-3. Delay new packaging until the scope model is explicit.
-   Container images, Kubernetes `Job`s, or `DaemonSet`s will be much easier to justify once the runtime contract is clear.
+3. Lock the preferred deployment model before adding new packaging.
+   The default should remain a hardened always-on host service. Container or Kubernetes-native packaging should only become first-class once the runtime contract and trust boundaries are explicit.
 
 ## Deliverable for this thread
 
