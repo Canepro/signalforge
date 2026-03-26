@@ -66,6 +66,9 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
     }
   }
 
@@ -149,6 +152,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
               accept=".log,.txt,.json"
               onChange={(e) => {
                 const file = e.target.files?.[0];
+                e.target.value = "";
                 if (file) handleFile(file);
               }}
             />
