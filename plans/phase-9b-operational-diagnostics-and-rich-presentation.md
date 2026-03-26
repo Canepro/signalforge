@@ -1,6 +1,6 @@
 # Phase 9b Design: Operational Diagnostics Enrichment and Rich Presentation
 
-> Status: planned follow-on immediately after the current Phase 9 scoped-collection contract is stable across `signalforge`, `signalforge-agent`, and `signalforge-collectors`.
+> Status: in progress. The first presentation slice is already in this branch: dashboard `Collection Pulse` and run-detail findings overview/filtering. The richer diagnostics collection work remains a follow-on across `signalforge`, `signalforge-agent`, and `signalforge-collectors`.
 
 ## Why this exists
 
@@ -19,6 +19,20 @@ But the current branch reality is uneven:
 That is acceptable for the first security and posture slices, but it is not enough for a strong operator diagnostics product.
 
 This plan exists so the next evidence additions and the UI work to surface them are tracked together.
+
+## Already implemented on this branch
+
+The presentation half has started:
+
+- dashboard `Collection Pulse` replaced the low-value `Environment Mix` card with a 42-day collection heatmap plus elevated-day overlays
+- run detail now has a findings overview band above the findings table
+- findings can be filtered by operator-facing signal buckets and severity without hiding the underlying evidence trail
+
+The evidence-enrichment half is still pending:
+
+- richer Kubernetes operational diagnostics
+- richer container runtime-health diagnostics
+- richer Linux pressure diagnostics
 
 ## Problem statement
 

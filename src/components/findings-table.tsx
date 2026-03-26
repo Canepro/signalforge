@@ -6,15 +6,19 @@ import type { Finding } from "@/lib/analyzer/schema";
 
 interface FindingsTableProps {
   findings: Finding[];
+  emptyMessage?: string;
 }
 
-export function FindingsTable({ findings }: FindingsTableProps) {
+export function FindingsTable({
+  findings,
+  emptyMessage = "No findings for this run.",
+}: FindingsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (findings.length === 0) {
     return (
       <div className="rounded-lg bg-surface-container-lowest px-6 py-10 text-center text-sm text-outline-variant shadow-sm">
-        No findings for this run.
+        {emptyMessage}
       </div>
     );
   }

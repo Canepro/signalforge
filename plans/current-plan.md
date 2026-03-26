@@ -79,6 +79,8 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
   - Sources create/edit flows can store typed `default_collection_scope`
   - source detail and dashboard request flows can send typed per-job `collection_scope` overrides
   - operator UI now shows stored source default scope and resolved job scope
+  - dashboard home now surfaces a real `Collection Pulse` heatmap instead of the old `Environment Mix` filler card
+  - run detail now includes a findings overview band with operator-facing signal buckets plus severity and signal filters
   - the remaining Phase 9 work is cross-repo: `signalforge-agent` and `signalforge-collectors` still need to consume the same typed scope contract end to end
 - The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
   - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
