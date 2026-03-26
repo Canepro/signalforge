@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SeverityBar } from "./severity-badge";
 import { StatusBadge } from "./status-badge";
+import { getArtifactTypeLabel, getSourceTypeLabel } from "@/lib/source-catalog";
 import type { RunSummary } from "@/types/api";
 
 interface RunTableProps {
@@ -31,7 +32,64 @@ export function RunTable({ runs }: RunTableProps) {
           {runs.length} {runs.length === 1 ? "run" : "runs"}
         </span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-surface-container-low md:hidden">
+        {runs.map((run) => (
+          <div key={run.id} className="space-y-3 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Link
+                  href={`/runs/${run.id}`}
+                  className="text-sm font-semibold text-on-surface transition-colors hover:text-primary"
+                >
+                  {run.filename.replace(/\.(log|txt|json)$/i, "")}
+                </Link>
+                <div className="mt-1 font-mono text-[11px] text-outline-variant break-all">
+                  {run.filename}
+                </div>
+              </div>
+              <StatusBadge status={run.status} />
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 font-semibold text-on-surface">
+                {getArtifactTypeLabel(run.artifact_type)}
+              </span>
+              <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-on-surface-variant">
+                {getSourceTypeLabel(run.source_type)}
+              </span>
+              <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-on-surface-variant">
+                {run.created_at_label ?? run.created_at}
+              </span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <div className="space-y-1 text-[11px] text-on-surface-variant">
+                <div>
+                  <span className="font-semibold text-on-surface">Target:</span>{" "}
+                  <span className="break-all">{run.target_identifier ?? run.hostname ?? "Not recorded"}</span>
+                </div>
+                {run.hostname && run.target_identifier ? (
+                  <div>
+                    <span className="font-semibold text-on-surface">Hostname:</span>{" "}
+                    {run.hostname}
+                  </div>
+                ) : null}
+                {run.env_tags.length > 0 ? (
+                  <div>
+                    <span className="font-semibold text-on-surface">Tags:</span>{" "}
+                    {run.env_tags.join(" · ")}
+                  </div>
+                ) : null}
+              </div>
+              <div className="min-w-[160px]">
+                <SeverityBar counts={run.severity_counts} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-low">
@@ -71,6 +129,20 @@ export function RunTable({ runs }: RunTableProps) {
                   <div className="font-mono text-[10px] text-outline-variant mt-0.5">
                     {run.filename}
                   </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5 lg:hidden">
+                    <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2 py-0.5 text-[10px] font-semibold text-on-surface">
+                      {getArtifactTypeLabel(run.artifact_type)}
+                    </span>
+                    <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2 py-0.5 text-[10px] text-on-surface-variant">
+                      {getSourceTypeLabel(run.source_type)}
+                    </span>
+                  </div>
+                  {run.target_identifier || run.hostname ? (
+                    <div className="mt-2 text-[10px] text-on-surface-variant md:hidden">
+                      <span className="font-semibold text-on-surface">Target:</span>{" "}
+                      <span className="break-all">{run.target_identifier ?? run.hostname}</span>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-6 py-3.5 hidden md:table-cell">
                   {run.hostname || run.target_identifier ? (
@@ -97,10 +169,10 @@ export function RunTable({ runs }: RunTableProps) {
                 </td>
                 <td className="px-6 py-3.5 hidden lg:table-cell">
                   <div className="text-[11px] font-bold text-on-surface">
-                    {run.source_type}
+                    {getSourceTypeLabel(run.source_type)}
                   </div>
                   <div className="text-[10px] text-on-surface-variant">
-                    {run.artifact_type.replace(/-/g, " ")}
+                    {getArtifactTypeLabel(run.artifact_type)}
                   </div>
                 </td>
                 <td className="px-6 py-3.5 text-xs text-on-surface-variant whitespace-nowrap">

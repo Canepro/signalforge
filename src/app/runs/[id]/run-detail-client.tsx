@@ -15,6 +15,10 @@ import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
 import type { RunDetail } from "@/types/api";
 import { compareRunAgainstHref, compareRunHref } from "@/lib/compare/nav";
+import {
+  getArtifactFamilyPresentation,
+  getArtifactTypeLabel,
+} from "@/lib/source-catalog";
 
 interface RunDetailClientProps {
   run: RunDetail;
@@ -25,10 +29,26 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
   const [reanalyzePending, setReanalyzePending] = useState(false);
+  const artifactFamily = getArtifactFamilyPresentation(run.artifact_type);
+  const artifactFamilyLabel =
+    artifactFamily?.label ?? getArtifactTypeLabel(run.artifact_type);
   const report = run.report;
   const findings = report?.findings ?? [];
   const noise = run.noise ?? report?.noise_or_expected ?? [];
   const topActions = report?.top_actions_now ?? [];
+  const targetLabel =
+    artifactFamily?.value === "container-diagnostics"
+      ? "Container workload"
+      : artifactFamily?.value === "kubernetes-bundle"
+        ? run.target_identifier?.includes(":namespace:")
+          ? "Kubernetes namespace"
+          : "Kubernetes cluster"
+        : "Target host";
+  const targetValue =
+    run.target_identifier ?? run.environment?.hostname ?? run.filename;
+  const targetDetail = run.environment?.os
+    ? run.environment.os
+    : (artifactFamily?.description ?? null);
 
   function handleExport() {
     window.open(`/api/runs/${run.id}/report`, "_blank");
@@ -37,7 +57,9 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   async function handleReanalyze() {
     setReanalyzePending(true);
     try {
-      const res = await fetch(`/api/runs/${run.id}/reanalyze`, { method: "POST" });
+      const res = await fetch(`/api/runs/${run.id}/reanalyze`, {
+        method: "POST",
+      });
       const body = (await res.json()) as { run_id?: string; error?: string };
       if (!res.ok) {
         throw new Error(body.error || `Reanalyze failed (${res.status})`);
@@ -61,16 +83,18 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
         onCollectEvidenceClick={() => setCollectOpen(true)}
       />
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
-      <CollectEvidenceModal open={collectOpen} onClose={() => setCollectOpen(false)} />
+      <CollectEvidenceModal
+        open={collectOpen}
+        onClose={() => setCollectOpen(false)}
+      />
 
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <TopBar
+          onUploadClick={() => setUploadOpen(true)}
+          onCollectEvidenceClick={() => setCollectOpen(true)}
           breadcrumb={
             <>
-              <Link
-                href="/"
-                className="hover:text-primary transition-colors"
-              >
+              <Link href="/" className="hover:text-primary transition-colors">
                 Runs
               </Link>
               <span className="text-outline-variant">/</span>
@@ -98,39 +122,90 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
 
           <div className="flex-1 overflow-y-auto">
             {/* Run Identity Strip */}
-            <div className="flex flex-col lg:flex-row gap-4 justify-between items-start border-b border-surface-container px-4 lg:px-6 py-4">
-              <div className="flex items-center gap-6 flex-wrap">
-                {run.environment && (
+            <div className="border-b border-surface-container px-4 lg:px-6 py-4">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_auto] lg:items-start">
+                <div className="space-y-3">
                   <div>
-                    <div className="text-[10px] font-bold text-outline-variant uppercase tracking-widest">
-                      Target Host
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-outline-variant">
+                      {targetLabel}
                     </div>
-                    <div className="text-base font-bold text-on-surface">
-                      {run.environment.hostname}
-                      <span className="text-xs font-normal text-on-surface-variant ml-2">
-                        {run.environment.os}
-                      </span>
+                    <div className="mt-1 text-base font-bold text-on-surface break-words">
+                      {targetValue}
                     </div>
+                    {run.environment?.hostname ? (
+                      <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                        Hostname snapshot:{" "}
+                        <span className="font-mono text-on-surface">
+                          {run.environment.hostname}
+                        </span>
+                        {run.environment.os ? (
+                          <>
+                            {" "}
+                            <span className="text-outline-variant">·</span>{" "}
+                            {run.environment.os}
+                          </>
+                        ) : null}
+                      </div>
+                    ) : targetDetail ? (
+                      <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                        {targetDetail}
+                      </div>
+                    ) : null}
                   </div>
-                )}
-                <div className="h-8 w-px bg-surface-container hidden lg:block" />
-                <div>
-                  <div className="text-[10px] font-bold text-outline-variant uppercase tracking-widest">
-                    Artifact
-                  </div>
-                  <div className="text-xs font-mono text-primary font-semibold">
-                    {run.filename}
-                    <span className="text-outline-variant font-normal ml-2">
+
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 font-semibold text-on-surface">
+                      {artifactFamilyLabel}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 font-mono text-on-surface-variant">
+                      {run.artifact_type}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-on-surface-variant">
+                      source: {run.source_type}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-on-surface-variant">
                       {run.created_at_label ?? run.created_at}
                     </span>
                   </div>
+
+                  <div className="grid gap-2 text-[11px] text-on-surface-variant sm:grid-cols-2">
+                    <div className="rounded-md border border-outline-variant/15 bg-surface-container-low px-3 py-2">
+                      <div className="font-bold uppercase tracking-widest text-outline-variant">
+                        Artifact source
+                      </div>
+                      <div className="mt-1 break-words">
+                        {run.source_label ? (
+                          <span className="font-mono text-on-surface">
+                            {run.source_label}
+                          </span>
+                        ) : (
+                          "Not recorded"
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-outline-variant/15 bg-surface-container-low px-3 py-2">
+                      <div className="font-bold uppercase tracking-widest text-outline-variant">
+                        Collector
+                      </div>
+                      <div className="mt-1 break-words">
+                        {run.collector_type ? (
+                          <span className="font-mono text-on-surface">
+                            {run.collector_type}
+                          </span>
+                        ) : (
+                          "Direct upload"
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {run.parent_run ? (
-                    <div className="mt-1.5 space-y-1">
-                      <p className="text-[11px] text-on-surface-variant">
+                    <div className="space-y-1 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-2">
+                      <p className="text-[11px] leading-relaxed text-on-surface-variant">
                         Reanalyzed from{" "}
                         <Link
                           href={`/runs/${run.parent_run.id}`}
-                          className="text-primary font-semibold hover:underline font-mono"
+                          className="font-semibold text-primary hover:underline font-mono"
                         >
                           {run.parent_run.filename}
                         </Link>
@@ -138,16 +213,22 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                           ({run.parent_run.id.slice(0, 8)}…)
                         </span>
                       </p>
-                      <p className="text-[10px] text-on-surface-variant max-w-xl leading-snug">
-                        Default compare uses the latest older run for the same target, which may differ
-                        from this parent. Use <span className="font-semibold text-on-surface">vs parent</span>{" "}
-                        in the bar above to diff against this source run.
+                      <p className="text-[10px] leading-snug text-on-surface-variant">
+                        Compare defaults to the latest older run for the same
+                        target, which may differ from this parent. Use{" "}
+                        <span className="font-semibold text-on-surface">
+                          vs parent
+                        </span>{" "}
+                        to diff against the source run that produced this
+                        reanalyze.
                       </p>
                     </div>
                   ) : null}
                 </div>
+                <div className="lg:pt-1">
+                  <SeveritySummary counts={run.severity_counts} compact />
+                </div>
               </div>
-              <SeveritySummary counts={run.severity_counts} compact />
             </div>
 
             {/* Content */}
@@ -181,9 +262,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
               </div>
 
               {/* Environment */}
-              {run.environment && (
-                <EnvironmentBanner env={run.environment} />
-              )}
+              {run.environment && <EnvironmentBanner env={run.environment} />}
             </div>
           </div>
         </div>

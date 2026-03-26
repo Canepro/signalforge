@@ -35,7 +35,7 @@ function formatRelativeTime(iso: string, nowMs: number): string {
 function computeStats(runs: RunSummary[]): DashboardStats {
   let criticalFindings = 0;
   let suppressedNoise = 0;
-  const hostnames = new Set<string>();
+  const logicalTargets = new Set<string>();
   const distribution: Record<string, number> = {
     critical: 0,
     high: 0,
@@ -52,7 +52,8 @@ function computeStats(runs: RunSummary[]): DashboardStats {
     distribution.medium += counts.medium ?? 0;
     distribution.low += counts.low ?? 0;
 
-    if (run.hostname) hostnames.add(run.hostname);
+    const logicalTarget = run.target_identifier || run.hostname || null;
+    if (logicalTarget) logicalTargets.add(logicalTarget);
 
     for (const tag of run.env_tags) {
       envMix[tag] = (envMix[tag] ?? 0) + 1;
@@ -62,7 +63,7 @@ function computeStats(runs: RunSummary[]): DashboardStats {
   return {
     totalRuns: runs.length,
     criticalFindings,
-    environmentsAnalyzed: hostnames.size,
+    environmentsAnalyzed: logicalTargets.size,
     suppressedNoise,
     severityDistribution: distribution,
     environmentMix: envMix,

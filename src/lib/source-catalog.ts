@@ -107,6 +107,20 @@ export const COLLECTION_STACK_ROLES = [
 export const DEFAULT_SOURCE_TYPE: SourceType = "linux_host";
 export const DEFAULT_EXPECTED_ARTIFACT_TYPE: ArtifactType = "linux-audit-log";
 
+const SOURCE_TYPE_SURFACE_LABELS: Record<string, string> = {
+  linux_host: "Linux host",
+  wsl: "WSL",
+  upload: "Manual upload",
+  api: "API submit",
+  agent: "Agent collection",
+};
+
+function humanizeCatalogValue(value: string): string {
+  return value
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (part) => part.toUpperCase());
+}
+
 export function isSourceType(value: string | null | undefined): value is SourceType {
   return SOURCE_TYPE_OPTIONS.some((option) => option.value === value);
 }
@@ -136,12 +150,17 @@ export function getArtifactFamilyPresentation(
 }
 
 export function getSourceTypeLabel(sourceType: string): string {
-  return SOURCE_TYPE_OPTIONS.find((option) => option.value === sourceType)?.label ?? sourceType;
+  return (
+    SOURCE_TYPE_OPTIONS.find((option) => option.value === sourceType)?.label ??
+    SOURCE_TYPE_SURFACE_LABELS[sourceType] ??
+    humanizeCatalogValue(sourceType)
+  );
 }
 
 export function getArtifactTypeLabel(artifactType: string): string {
   return (
-    ARTIFACT_TYPE_OPTIONS.find((option) => option.value === artifactType)?.label ?? artifactType
+    ARTIFACT_TYPE_OPTIONS.find((option) => option.value === artifactType)?.label ??
+    humanizeCatalogValue(artifactType)
   );
 }
 

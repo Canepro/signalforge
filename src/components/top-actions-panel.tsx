@@ -45,12 +45,13 @@ export function TopActionsPanel({
               {showGrid ? "Top Actions Now" : "Run actions"}
             </span>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0" role="toolbar" aria-label="Run actions">
             <button
               type="button"
               onClick={() => void onReanalyze?.()}
               disabled={!onReanalyze || reanalyzePending}
               aria-busy={reanalyzePending || undefined}
+              aria-label={reanalyzePending ? "Reanalyzing artifact" : "Reanalyze artifact"}
               className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant disabled:text-outline-variant disabled:cursor-not-allowed transition-colors"
               title={reanalyzePending ? "Reanalyzing…" : "Reanalyze artifact"}
             >
@@ -94,11 +95,15 @@ export function TopActionsPanel({
                   />
                 </svg>
               )}
+              <span className="sr-only">
+                {reanalyzePending ? "Reanalyzing artifact" : "Reanalyze artifact"}
+              </span>
             </button>
             {compareHref ? (
               <div className="flex items-center gap-0.5">
                 <Link
                   href={compareHref}
+                  aria-label="Compare this run against the previous run for the same target"
                   className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant transition-colors"
                   title="Compare drift — implicit baseline is the latest older run for the same target (not always the reanalyze parent)"
                 >
@@ -116,6 +121,7 @@ export function TopActionsPanel({
                       d="M8 7h12M8 12h12m-12 5h12M4 7h.01M4 12h.01M4 17h.01"
                     />
                   </svg>
+                  <span className="sr-only">Compare against previous run</span>
                 </Link>
                 {compareToParentHref ? (
                   <Link
@@ -132,6 +138,7 @@ export function TopActionsPanel({
               type="button"
               onClick={onExport}
               disabled={!onExport}
+              aria-label="Export report JSON"
               className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Export report JSON"
             >
@@ -149,6 +156,7 @@ export function TopActionsPanel({
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
+              <span className="sr-only">Export report JSON</span>
             </button>
           </div>
         </div>

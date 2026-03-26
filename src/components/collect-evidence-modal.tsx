@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   COLLECTION_STACK_ROLES,
   listArtifactFamilyPresentations,
 } from "@/lib/source-catalog";
+import { ModalShell } from "./modal-shell";
 
 interface CollectEvidenceModalProps {
   open: boolean;
@@ -47,7 +48,6 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
 }
 
 export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [origin, setOrigin] = useState("http://localhost:3000");
   const artifactFamilies = listArtifactFamilyPresentations();
 
@@ -56,24 +56,6 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
       setOrigin(window.location.origin);
     }
   }, [open]);
-
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    document.addEventListener("keydown", handleEscape);
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      prev?.focus();
-    };
-  }, [open, handleEscape]);
 
   if (!open) return null;
 
@@ -143,21 +125,12 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
   ].join("\n");
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/30 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      role="presentation"
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      titleId="collect-evidence-title"
+      maxWidthClassName="max-w-3xl"
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="collect-evidence-title"
-        className="w-full max-w-lg mx-4 rounded-xl bg-surface-container-lowest shadow-xl border border-outline-variant/30 outline-none max-h-[90vh] overflow-y-auto"
-      >
         <div className="px-5 pt-5 pb-4 border-b border-surface-container flex items-start justify-between gap-3">
           <div>
             <h2 id="collect-evidence-title" className="font-headline text-lg font-bold text-on-surface">
@@ -305,7 +278,6 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             <span className="font-mono">docs/getting-started.md</span>
           </p>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
