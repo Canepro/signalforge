@@ -1,5 +1,6 @@
 import { DashboardClient } from "./dashboard-client";
 import { LivePageRefresh } from "@/components/live-page-refresh";
+import type { ArtifactType } from "@/lib/source-catalog";
 import type { RunSummary } from "@/types/api";
 import { getStorage } from "@/lib/storage";
 import type { DashboardCollectionSource } from "@/components/request-collection-modal";
@@ -89,8 +90,9 @@ export default async function DashboardPage() {
           id: source.id,
           display_name: source.display_name,
           target_identifier: source.target_identifier,
-          expected_artifact_type: source.expected_artifact_type,
+          expected_artifact_type: source.expected_artifact_type as ArtifactType,
           last_seen_at: source.last_seen_at,
+          default_collection_scope: source.default_collection_scope,
         } satisfies DashboardCollectionSource;
       })
     )

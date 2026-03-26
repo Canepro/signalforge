@@ -1,6 +1,6 @@
 # Phase 9 Design: Job-Scoped Collection Parameters
 
-> Status: design-first follow-on after Phase 8 analyzer and collection-plane parity work.
+> Status: active follow-on after Phase 8 analyzer and collection-plane parity work. SignalForge repo contract and operator UI work are partially implemented; sibling repo agent and collector integration remains open.
 
 ## Why this exists
 
@@ -358,6 +358,9 @@ This checklist is the source of truth for the actual Phase 9 implementation. Do 
 - [x] Return resolved `collection_scope` from `GET /api/agent/jobs/next`.
 - [x] Publish the updated HTTP contract and JSON schemas.
 - [x] Add SQLite and Postgres storage coverage for the typed scope contract.
+- [x] Extend Sources UI create and edit flows to manage typed source defaults.
+- [x] Extend source detail and dashboard request flows to submit typed per-job scope overrides.
+- [x] Show source default scope and resolved job scope in the operator UI so queued work is inspectable.
 - [ ] Run live Postgres parity for the new scope columns in an environment with a real Postgres URL.
 - [ ] Update Sources UI to display and edit defaults and to show the resolved job scope clearly.
 

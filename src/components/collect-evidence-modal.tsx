@@ -66,9 +66,9 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
     `# Optional: narrow capabilities explicitly instead of relying on auto-detection`,
     `# SIGNALFORGE_AGENT_CAPABILITIES=collect:linux-audit-log,upload:multipart`,
-    `# Container jobs: pin one runtime-visible target`,
+    `# Preferred: set target scope in SignalForge source defaults or per-job request fields`,
+    `# Legacy fallback only when collector-side job scope mapping is not available yet:`,
     `# SIGNALFORGE_CONTAINER_REF=payments-api`,
-    `# Kubernetes jobs: pin the intended context and scope`,
     `# SIGNALFORGE_KUBERNETES_SCOPE=namespace`,
     `# SIGNALFORGE_KUBERNETES_NAMESPACE=payments`,
     `SIGNALFORGE_POLL_INTERVAL_MS=30000`,
@@ -234,7 +234,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               <span className="font-semibold text-on-surface">once</span> is only for smoke tests, debugging, or cron-style schedules.
             </p>
             <p className="text-[11px] leading-relaxed text-on-surface-variant">
-              Linux host sources are the cleanest fit for this model. Container and Kubernetes sources also work when the agent host is deliberately prepared for that target and scope, but those family-specific inputs are still host-local environment, not per-job settings.
+              Linux host sources are the cleanest fit for this model. Container and Kubernetes sources should now prefer typed source defaults and per-job scope in SignalForge. Host-local target env remains a fallback until the agent and collectors finish the Phase 9 scope mapping.
             </p>
           </div>
 

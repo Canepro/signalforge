@@ -123,3 +123,85 @@ export function validateCollectionScopeForArtifactType(
   }
   return { ok: false, error: `Unsupported artifact type for collection_scope: ${artifactType}` };
 }
+
+export function formatCollectionScopeSummary(scope: CollectionScope | null): string | null {
+  if (!scope) return null;
+
+  if (scope.kind === "linux_host") {
+    return "Linux host";
+  }
+
+  if (scope.kind === "container_target") {
+    return `Container target: ${scope.container_ref}`;
+  }
+
+  return scope.scope_level === "namespace" ?
+      `Kubernetes namespace: ${scope.namespace}`
+    : "Kubernetes cluster scope";
+}
+
+export function formatCollectionScopeDetails(scope: CollectionScope | null): string[] {
+  if (!scope) return [];
+
+  if (scope.kind === "linux_host") {
+    return [];
+  }
+
+  if (scope.kind === "container_target") {
+    return [
+      ...(scope.runtime ? [`runtime ${scope.runtime}`] : []),
+      ...(scope.host_hint ? [`host hint ${scope.host_hint}`] : []),
+    ];
+  }
+
+  return [
+    ...(scope.kubectl_context ? [`context ${scope.kubectl_context}`] : []),
+    ...(scope.cluster_name ? [`cluster ${scope.cluster_name}`] : []),
+    ...(scope.provider ? [`provider ${scope.provider}`] : []),
+  ];
+}
+
+export function summarizeCollectionScope(scope: CollectionScope | null): string {
+  if (!scope) return "No explicit scope";
+
+  if (scope.kind === "linux_host") {
+    return "Linux host";
+  }
+
+  if (scope.kind === "container_target") {
+    const runtime = scope.runtime ? ` via ${scope.runtime}` : "";
+    return `Container ${scope.container_ref}${runtime}`;
+  }
+
+  if (scope.scope_level === "namespace") {
+    return `Kubernetes namespace ${scope.namespace}`;
+  }
+
+  return "Kubernetes cluster scope";
+}
+
+export function detailCollectionScope(scope: CollectionScope | null): string[] {
+  if (!scope) return [];
+
+  if (scope.kind === "linux_host") {
+    return ["kind=linux_host"];
+  }
+
+  if (scope.kind === "container_target") {
+    return [
+      "kind=container_target",
+      ...(scope.runtime ? [`runtime=${scope.runtime}`] : []),
+      `container_ref=${scope.container_ref}`,
+      ...(scope.host_hint ? [`host_hint=${scope.host_hint}`] : []),
+    ];
+  }
+
+  return [
+    "kind=kubernetes_scope",
+    `scope_level=${scope.scope_level}`,
+    ...(scope.namespace ? [`namespace=${scope.namespace}`] : []),
+    ...(scope.kubectl_context ? [`kubectl_context=${scope.kubectl_context}`] : []),
+    ...(scope.cluster_name ? [`cluster_name=${scope.cluster_name}`] : []),
+    ...(scope.provider ? [`provider=${scope.provider}`] : []),
+  ];
+}

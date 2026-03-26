@@ -52,8 +52,12 @@ export function DashboardClient({
     message: string;
   } | null>(null);
   const hasLiveCollectionSource = collectionSources.length > 0;
-  const canQuickRequest = collectionSources.length === 1;
-  const quickSource = canQuickRequest ? collectionSources[0]! : null;
+  const singleSource = collectionSources.length === 1 ? collectionSources[0]! : null;
+  const canQuickRequest =
+    singleSource !== null &&
+    (singleSource.expected_artifact_type === "linux-audit-log" ||
+      singleSource.default_collection_scope !== null);
+  const quickSource = canQuickRequest ? singleSource : null;
 
   const totalFindings = Object.values(severityDistribution).reduce(
     (a, b) => a + b,
@@ -176,6 +180,8 @@ export function DashboardClient({
                 <p className="text-[11px] leading-relaxed text-on-surface-variant">
                   {canQuickRequest ?
                     `${quickSource!.display_name} is live. One click queues work for its next agent poll.`
+                  : singleSource ?
+                    `${singleSource.display_name} is live. Open the request dialog to confirm or override its collection scope.`
                   : `${collectionSources.length} live sources are ready. Choose one to queue work for its next agent poll.`}
                 </p>
               ) : (

@@ -6,15 +6,22 @@ import {
   requestCollectionFromDashboardAction,
   type DashboardRequestCollectionState,
 } from "@/app/sources/actions";
-import { getArtifactTypeLabel } from "@/lib/source-catalog";
+import { CollectionScopeFields } from "@/app/sources/collection-scope-fields";
+import {
+  detailCollectionScope,
+  summarizeCollectionScope,
+  type CollectionScope,
+} from "@/lib/collection-scope";
+import { getArtifactTypeLabel, type ArtifactType } from "@/lib/source-catalog";
 import { ModalShell } from "./modal-shell";
 
 export interface DashboardCollectionSource {
   id: string;
   display_name: string;
   target_identifier: string;
-  expected_artifact_type: string;
+  expected_artifact_type: ArtifactType;
   last_seen_at: string | null;
+  default_collection_scope: CollectionScope | null;
 }
 
 interface RequestCollectionModalProps {
@@ -47,6 +54,38 @@ function Spinner({ className = "h-4 w-4" }: { className?: string }) {
         strokeLinecap="round"
       />
     </svg>
+  );
+}
+
+function ScopeSummary({
+  scope,
+}: {
+  scope: CollectionScope | null;
+}) {
+  if (!scope) {
+    return (
+      <p className="text-[11px] leading-relaxed text-on-surface-variant">
+        This source has no stored default scope. Leaving the override blank will queue the job without an explicit scope payload.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] leading-relaxed text-on-surface-variant">
+        This source will default to <span className="font-semibold text-on-surface">{summarizeCollectionScope(scope)}</span> if you do not override the request below.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {detailCollectionScope(scope).map((item) => (
+          <span
+            key={item}
+            className="rounded-md bg-surface-container px-2 py-1 text-[10px] font-mono text-on-surface-variant"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -185,28 +224,46 @@ export function RequestCollectionModal({
                     );
                   })}
                 </div>
-                {selectedSource ? (
-                  <p className="text-[11px] leading-relaxed text-on-surface-variant">
-                    {selectedSource.display_name} is the current target for this request. This source expects{" "}
-                    <span className="font-semibold text-on-surface">
-                      {getArtifactTypeLabel(selectedSource.expected_artifact_type)}
-                    </span>{" "}
-                    collection jobs.
-                  </p>
+              {selectedSource ? (
+                  <div className="space-y-2 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                    <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                      {selectedSource.display_name} is the current target for this request. This source expects{" "}
+                      <span className="font-semibold text-on-surface">
+                        {getArtifactTypeLabel(selectedSource.expected_artifact_type)}
+                      </span>{" "}
+                      collection jobs.
+                    </p>
+                    <ScopeSummary scope={selectedSource.default_collection_scope} />
+                  </div>
                 ) : null}
               </div>
 
-              <label className="block">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Reason (optional)
-                </span>
-                <input
-                  ref={reasonRef}
-                  name="request_reason"
-                  placeholder="e.g. pre-deploy check"
-                  className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
-                />
-              </label>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.95fr)]">
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                    Reason (optional)
+                  </span>
+                  <input
+                    ref={reasonRef}
+                    name="request_reason"
+                    placeholder="e.g. pre-deploy check"
+                    className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                  />
+                </label>
+                {selectedSource ? (
+                  <CollectionScopeFields
+                    key={`${selectedSource.id}:${selectedSource.expected_artifact_type}`}
+                    artifactType={selectedSource.expected_artifact_type}
+                    prefix="collection_scope"
+                    emptyLabel="Use source default / no override"
+                    caption={
+                      selectedSource.default_collection_scope ?
+                        "Optional. Leave blank to inherit the source default scope, or override it for this one dashboard request."
+                      : "Optional. Leave blank to queue the job without an explicit scope payload."
+                    }
+                  />
+                ) : null}
+              </div>
 
               {result && !result.ok ? (
                 <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
@@ -214,6 +271,7 @@ export function RequestCollectionModal({
                   : result.error === "not_ready" ? "That source is no longer live and ready for collection."
                   : result.error === "disabled" ? "That source is disabled and cannot accept new jobs."
                   : result.error === "not_found" ? "That source no longer exists."
+                  : result.error === "invalid_collection_scope" ? "The chosen collection scope does not match this source's artifact family."
                   : "Choose a source to queue a collection job."}
                 </p>
               ) : null}

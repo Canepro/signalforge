@@ -8,7 +8,16 @@ import { SourceHealthDot } from "@/components/source-health-dot";
 import { JobStatusBadge, jobBorderClass } from "@/components/job-status-badge";
 import { CopyTextButton } from "@/components/copy-text-button";
 import { LivePageRefresh } from "@/components/live-page-refresh";
-import { getArtifactTypeLabel, getSourceTypeLabel } from "@/lib/source-catalog";
+import {
+  detailCollectionScope,
+  summarizeCollectionScope,
+  type CollectionScope,
+} from "@/lib/collection-scope";
+import {
+  getArtifactTypeLabel,
+  getSourceTypeLabel,
+  type ArtifactType,
+} from "@/lib/source-catalog";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -35,12 +44,49 @@ function shortTimestamp(iso: string): string {
   }).format(new Date(iso));
 }
 
+function ScopeDetails({
+  label,
+  scope,
+  emptyLabel,
+}: {
+  label: string;
+  scope: CollectionScope | null;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{label}</p>
+        <p className="mt-1 text-sm font-medium text-on-surface">{scope ? summarizeCollectionScope(scope) : emptyLabel}</p>
+      </div>
+      {scope ? (
+        <div className="flex flex-wrap gap-1.5">
+          {detailCollectionScope(scope).map((item) => (
+            <span
+              key={item}
+              className="rounded-md bg-surface-container px-2 py-1 text-[10px] font-mono text-on-surface-variant"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function SourceDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ job?: string; error?: string; cancel_error?: string; delete_error?: string }>;
+  searchParams: Promise<{
+    job?: string;
+    error?: string;
+    cancel_error?: string;
+    delete_error?: string;
+    settings_error?: string;
+  }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -107,9 +153,19 @@ export default async function SourceDetailPage({
           Source is disabled — enable it before requesting collection.
         </p>
       )}
+      {sp.error === "invalid_collection_scope" && (
+        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+          Collection scope did not match this source&apos;s artifact family. Update the request and try again.
+        </p>
+      )}
       {sp.cancel_error && (
         <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
           Could not cancel job ({sp.cancel_error}).
+        </p>
+      )}
+      {sp.settings_error === "invalid_default_collection_scope" && (
+        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+          Default collection scope did not match this source&apos;s artifact family.
         </p>
       )}
       {sp.delete_error === "active_jobs" && (
@@ -129,7 +185,19 @@ export default async function SourceDetailPage({
           on its next poll. If you only run <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">once</code> or cron,
           the job waits until that next invocation.
         </p>
-        <RequestJobForm sourceId={id} enabled={source.enabled} />
+        <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3">
+          <ScopeDetails
+            label="Source default scope"
+            scope={source.default_collection_scope}
+            emptyLabel="No source default scope"
+          />
+        </div>
+        <RequestJobForm
+          sourceId={id}
+          enabled={source.enabled}
+          artifactType={source.expected_artifact_type as ArtifactType}
+          defaultScope={source.default_collection_scope}
+        />
       </section>
 
       {/* Agent enrollment */}
@@ -245,6 +313,13 @@ export default async function SourceDetailPage({
                       </span>
                     )}
                   </div>
+                  <div className="mt-2.5">
+                    <ScopeDetails
+                      label="Resolved collection scope"
+                      scope={j.collection_scope}
+                      emptyLabel="No explicit scope stored on this job"
+                    />
+                  </div>
 
                   {j.error_code && (
                     <div className="mt-2.5 text-xs text-severity-critical bg-severity-critical/[0.06] border border-severity-critical/10 rounded-lg px-3 py-2">
@@ -272,7 +347,9 @@ export default async function SourceDetailPage({
         <SourceSettingsForm
           sourceId={id}
           displayName={source.display_name}
+          artifactType={source.expected_artifact_type as ArtifactType}
           collectorVersion={source.default_collector_version ?? null}
+          defaultCollectionScope={source.default_collection_scope}
           enabled={source.enabled}
         />
         <div className="border-t border-outline-variant/15 pt-4">
