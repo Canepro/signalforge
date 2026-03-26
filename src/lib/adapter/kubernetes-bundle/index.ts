@@ -393,6 +393,21 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     }
 
     for (const doc of manifest.documents) {
+      if (doc.kind !== "service-exposure") continue;
+      const services = parseKubernetesDocumentJson<KubernetesServiceExposure[]>(doc) ?? [];
+      for (const service of services) {
+        const serviceType = service.type?.trim();
+        const isExternal =
+          service.external === true ||
+          serviceType === "LoadBalancer" ||
+          serviceType === "NodePort";
+        if (!isExternal) continue;
+        const namespace = service.namespace?.trim();
+        if (namespace) externalServiceNamespaces.add(namespace);
+      }
+    }
+
+    for (const doc of manifest.documents) {
       if (doc.kind !== "rbac-bindings") continue;
       const bindings = parseKubernetesDocumentJson<KubernetesRbacBinding[]>(doc) ?? [];
       for (const binding of bindings) {
@@ -424,7 +439,8 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             serviceType === "NodePort";
           if (!isExternal) continue;
           const label = workloadLabel(service.namespace, service.name);
-          if (service.namespace) externalServiceNamespaces.add(service.namespace);
+          const namespace = service.namespace?.trim();
+          if (namespace) externalServiceNamespaces.add(namespace);
           findings.push({
             title: `Kubernetes Service exposed externally: ${label} (${serviceType ?? "external"})`,
             severity_hint: "high",
@@ -546,6 +562,11 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           const label = workloadLabel(workload.namespace, workload.name);
           const podSecurityContext = workload.pod_spec?.securityContext;
           const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
+          const workloadNamespace = workload.namespace?.trim();
+          const workloadInExposedNamespace =
+            workloadNamespace !== undefined &&
+            workloadNamespace.length > 0 &&
+            externalServiceNamespaces.has(workloadNamespace);
 
           if (workload.pod_spec?.automountServiceAccountToken !== false) {
             findings.push({
@@ -591,6 +612,26 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             });
           }
 
+          if (
+            workloadInExposedNamespace &&
+            workloadServiceAccountKey &&
+            clusterAdminServiceAccounts.has(workloadServiceAccountKey)
+          ) {
+            findings.push({
+              title: `Kubernetes externally exposed workload service account is bound to cluster-admin: ${label} (${workloadServiceAccountKey})`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                cluster_admin_binding: true,
+                externally_exposed_namespace: workloadNamespace,
+              }),
+              rule_id: "kubernetes.exposed_workload_cluster_admin_service_account",
+            });
+          }
+
           const workloadRoleBindings =
             (workloadServiceAccountKey &&
               serviceAccountRoleBindings.get(workloadServiceAccountKey)) ||
@@ -620,6 +661,22 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             });
           }
 
+          if (workloadInExposedNamespace && boundWildcardRoleCount > 0) {
+            findings.push({
+              title: `Kubernetes externally exposed workload service account is bound to wildcard RBAC roles: ${label} (${boundWildcardRoleCount} roles)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                wildcard_role_binding_count: boundWildcardRoleCount,
+                externally_exposed_namespace: workloadNamespace,
+              }),
+              rule_id: "kubernetes.exposed_workload_wildcard_rbac_service_account",
+            });
+          }
+
           if (boundEscalationRoleCount > 0) {
             findings.push({
               title: `Kubernetes workload service account is bound to privilege-escalation RBAC roles: ${label} (${boundEscalationRoleCount} roles)`,
@@ -635,6 +692,22 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             });
           }
 
+          if (workloadInExposedNamespace && boundEscalationRoleCount > 0) {
+            findings.push({
+              title: `Kubernetes externally exposed workload service account is bound to privilege-escalation RBAC roles: ${label} (${boundEscalationRoleCount} roles)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                privilege_escalation_role_binding_count: boundEscalationRoleCount,
+                externally_exposed_namespace: workloadNamespace,
+              }),
+              rule_id: "kubernetes.exposed_workload_privilege_escalation_rbac_service_account",
+            });
+          }
+
           if (boundNodeProxyRoleCount > 0) {
             findings.push({
               title: `Kubernetes workload service account is bound to node proxy RBAC roles: ${label} (${boundNodeProxyRoleCount} roles)`,
@@ -647,6 +720,22 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 node_proxy_role_binding_count: boundNodeProxyRoleCount,
               }),
               rule_id: "kubernetes.workload_node_proxy_rbac_service_account",
+            });
+          }
+
+          if (workloadInExposedNamespace && boundNodeProxyRoleCount > 0) {
+            findings.push({
+              title: `Kubernetes externally exposed workload service account is bound to node proxy RBAC roles: ${label} (${boundNodeProxyRoleCount} roles)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                service_account: workloadServiceAccountKey,
+                node_proxy_role_binding_count: boundNodeProxyRoleCount,
+                externally_exposed_namespace: workloadNamespace,
+              }),
+              rule_id: "kubernetes.exposed_workload_node_proxy_rbac_service_account",
             });
           }
 

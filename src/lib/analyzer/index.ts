@@ -224,6 +224,26 @@ function containerTitlePriority(title: string): number {
 
 function kubernetesTitlePriority(title: string): number {
   const normalized = title.toLowerCase();
+  if (normalized.includes("externally exposed workload service account is bound to cluster-admin")) {
+    return 13;
+  }
+  if (
+    normalized.includes(
+      "externally exposed workload service account is bound to privilege-escalation rbac roles"
+    )
+  ) {
+    return 12;
+  }
+  if (
+    normalized.includes("externally exposed workload service account is bound to node proxy rbac roles")
+  ) {
+    return 12;
+  }
+  if (
+    normalized.includes("externally exposed workload service account is bound to wildcard rbac roles")
+  ) {
+    return 12;
+  }
   if (normalized.includes("service account is bound to cluster-admin")) return 11;
   if (normalized.includes("service account is bound to privilege-escalation rbac roles")) return 10;
   if (normalized.includes("service account is bound to node proxy rbac roles")) return 10;
@@ -319,6 +339,24 @@ function summarizeFallbackFinding(finding: Finding): string {
   }
   if (finding.category === "kubernetes") {
     const title = finding.title.toLowerCase();
+    if (title.includes("externally exposed workload service account is bound to cluster-admin")) {
+      return `${finding.title}, which combines public service reachability with cluster-admin identity on the same workload boundary.`;
+    }
+    if (
+      title.includes(
+        "externally exposed workload service account is bound to privilege-escalation rbac roles"
+      )
+    ) {
+      return `${finding.title}, which combines external service reachability with an identity that can grant or assume broader RBAC privileges.`;
+    }
+    if (
+      title.includes("externally exposed workload service account is bound to node proxy rbac roles")
+    ) {
+      return `${finding.title}, which combines external service reachability with kubelet-adjacent node proxy identity permissions.`;
+    }
+    if (title.includes("externally exposed workload service account is bound to wildcard rbac roles")) {
+      return `${finding.title}, which combines external service reachability with broad wildcard identity permissions on the same workload.`;
+    }
     if (title.includes("service exposed externally")) {
       return `${finding.title}, which may expose the workload beyond the intended cluster or namespace boundary.`;
     }
@@ -543,6 +581,22 @@ function buildActionForFinding(
 
   if (finding.category === "kubernetes") {
     const tl = finding.title.toLowerCase();
+    if (tl.includes("externally exposed workload service account is bound to cluster-admin")) {
+      return "Remove the workload from public exposure or move it to a narrowly scoped service account first, then delete the cluster-admin grant from that pod identity.";
+    }
+    if (
+      tl.includes(
+        "externally exposed workload service account is bound to privilege-escalation rbac roles"
+      )
+    ) {
+      return "Remove bind, escalate, and impersonate paths from this exposed workload identity, and move any break-glass role assignment to a separately controlled operator flow.";
+    }
+    if (tl.includes("externally exposed workload service account is bound to node proxy rbac roles")) {
+      return "Keep node proxy permissions off externally reachable workload identities, and move kubelet-adjacent access to a tightly reviewed operational service account.";
+    }
+    if (tl.includes("externally exposed workload service account is bound to wildcard rbac roles")) {
+      return "Narrow this exposed workload identity to explicit RBAC permissions and remove wildcard grants before keeping the service externally reachable.";
+    }
     if (tl.includes("service exposed externally")) {
       return "Review whether the LoadBalancer service truly needs public reachability, and switch it to ClusterIP or an internal load balancer if broad exposure is not required.";
     }

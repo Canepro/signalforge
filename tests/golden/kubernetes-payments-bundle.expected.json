@@ -69,6 +69,26 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "externally exposed workload service account is bound to cluster-admin",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to wildcard RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to privilege-escalation RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to node proxy RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "injects Secret values into environment variables",
       "severity": "medium",
       "category": "kubernetes"
@@ -160,6 +180,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 30,
-  "max_findings": 30
+  "min_findings": 34,
+  "max_findings": 34
 }

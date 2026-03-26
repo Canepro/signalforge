@@ -245,6 +245,28 @@ describe("KubernetesBundleAdapter", () => {
       findings.some((finding) => finding.title.includes("service account is bound to node proxy RBAC roles"))
     ).toBe(true);
     expect(
+      findings.some((finding) =>
+        finding.title.includes("externally exposed workload service account is bound to cluster-admin")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("externally exposed workload service account is bound to wildcard RBAC roles")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes(
+          "externally exposed workload service account is bound to privilege-escalation RBAC roles"
+        )
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("externally exposed workload service account is bound to node proxy RBAC roles")
+      )
+    ).toBe(true);
+    expect(
       findings.some((finding) => finding.title.includes("injects Secret values into environment variables"))
     ).toBe(true);
     expect(
