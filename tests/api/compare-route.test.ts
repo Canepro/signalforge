@@ -489,7 +489,7 @@ describe("API GET /api/runs/[id]/compare", () => {
               {
                 scope: "cluster",
                 subject: "system:serviceaccount:payments:payments-api",
-                roleRef: "cluster-admin",
+                roleRef: "Cluster-Admin",
               },
               {
                 scope: "namespace",
@@ -608,7 +608,7 @@ describe("API GET /api/runs/[id]/compare", () => {
               {
                 scope: "cluster",
                 subject: "system:serviceaccount:payments:payments-api",
-                roleRef: "cluster-admin",
+                roleRef: "Cluster-Admin",
               },
               {
                 scope: "cluster",

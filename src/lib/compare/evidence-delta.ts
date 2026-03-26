@@ -398,11 +398,11 @@ function roleKey(
   namespace: string | undefined,
   name: string | undefined
 ): string | null {
-  const trimmedScope = scope?.trim() || "cluster";
-  const trimmedName = name?.trim();
+  const trimmedScope = scope?.trim().toLowerCase() || "cluster";
+  const trimmedName = name?.trim().toLowerCase();
   if (!trimmedName) return null;
   if (trimmedScope === "namespace") {
-    const trimmedNamespace = namespace?.trim();
+    const trimmedNamespace = namespace?.trim().toLowerCase();
     if (!trimmedNamespace) return null;
     return `namespace:${trimmedNamespace}:${trimmedName}`;
   }
@@ -629,6 +629,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       for (const binding of parseKubernetesJson<KubernetesRbacBinding>(doc)) {
         const subjectKey = parseServiceAccountSubjectKey(binding.subject);
         const bindingRoleKey = roleKey(binding.scope, binding.namespace, binding.roleRef);
+        const bindingRoleName = binding.roleRef?.trim().toLowerCase();
         if (subjectKey && bindingRoleKey) {
           let roleBindings = serviceAccountRoleBindings.get(subjectKey);
           if (!roleBindings) {
@@ -638,7 +639,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
           roleBindings.add(bindingRoleKey);
         }
 
-        if (binding.roleRef?.trim() === "cluster-admin") {
+        if (bindingRoleName === "cluster-admin") {
           clusterAdminBindingCount += 1;
           if (subjectKey) clusterAdminServiceAccounts.add(subjectKey);
         }

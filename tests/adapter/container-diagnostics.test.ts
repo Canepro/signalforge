@@ -51,4 +51,36 @@ describe("ContainerDiagnosticsAdapter", () => {
       findings.some((finding) => finding.title.includes("root filesystem is not read-only"))
     ).toBe(true);
   });
+
+  it("skips the rootfs hardening finding when read_only_rootfs is absent", () => {
+    const adapter = new ContainerDiagnosticsAdapter();
+    const clean = adapter.stripNoise(`=== container-diagnostics ===
+hostname: node-b
+runtime: docker
+container_name: payments-api
+container_id: def456
+image: ghcr.io/acme/payments:1.2.3
+`);
+    const sections = adapter.parseSections(clean);
+    const findings = adapter.extractPreFindings(sections, adapter.detectEnvironment(sections));
+
+    expect(
+      findings.some((finding) => finding.rule_id === "container.read_only_rootfs")
+    ).toBe(false);
+  });
+
+  it("flags untagged images from registries with port numbers", () => {
+    const adapter = new ContainerDiagnosticsAdapter();
+    const clean = adapter.stripNoise(`=== container-diagnostics ===
+hostname: node-c
+runtime: docker
+container_name: payments-api
+container_id: ghi789
+image: registry.example:5000/team/payments-api
+`);
+    const sections = adapter.parseSections(clean);
+    const findings = adapter.extractPreFindings(sections, adapter.detectEnvironment(sections));
+
+    expect(findings.some((finding) => finding.rule_id === "container.image_unpinned")).toBe(true);
+  });
 });

@@ -160,13 +160,14 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
       });
     }
 
-    if (!parseContainerBoolean(sections.read_only_rootfs)) {
+    const readOnlyRootfsValue = sections.read_only_rootfs?.trim();
+    if (readOnlyRootfsValue && !parseContainerBoolean(readOnlyRootfsValue)) {
       findings.push({
         title: "Container root filesystem is not read-only",
         severity_hint: "medium",
         category: "container",
         section_source: "read_only_rootfs",
-        evidence: sections.read_only_rootfs || "false",
+        evidence: readOnlyRootfsValue,
         rule_id: "container.read_only_rootfs",
       });
     }
@@ -183,7 +184,7 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
     }
 
     const image = containerValueFor(sections, "image");
-    if (image.endsWith(":latest") || (!image.includes("@sha256:") && !image.includes(":"))) {
+    if (isUnpinnedContainerImage(image)) {
       findings.push({
         title: "Container image is not pinned to an immutable version",
         severity_hint: "low",
@@ -211,4 +212,15 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
     }
     return { incomplete: false };
   }
+}
+
+function isUnpinnedContainerImage(image: string): boolean {
+  const trimmedImage = image.trim();
+  if (!trimmedImage) return false;
+  if (trimmedImage.includes("@sha256:")) return false;
+  if (trimmedImage.endsWith(":latest")) return true;
+
+  const lastSlash = trimmedImage.lastIndexOf("/");
+  const lastSegment = lastSlash >= 0 ? trimmedImage.slice(lastSlash + 1) : trimmedImage;
+  return !lastSegment.includes(":");
 }
