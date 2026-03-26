@@ -133,7 +133,10 @@ export function DashboardClient({
       />
 
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        <TopBar />
+        <TopBar
+          onUploadClick={() => setUploadOpen(true)}
+          onCollectEvidenceClick={() => setCollectOpen(true)}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
           {/* Action Header */}
@@ -143,7 +146,7 @@ export function DashboardClient({
                 Diagnostics Overview
               </h2>
               <p className="text-sm text-on-surface-variant">
-                Active infrastructure monitoring and forensic analysis
+                Review uploaded evidence, queue fresh collection, and track drift across hosts, containers, and Kubernetes targets.
               </p>
             </div>
             <div className="flex flex-col items-start gap-2 md:items-end">
@@ -206,7 +209,7 @@ export function DashboardClient({
               accentColor="bg-severity-critical"
             />
             <KpiCard
-              label="Environments Analyzed"
+              label="Targets analyzed"
               value={environmentsAnalyzed}
               accentColor="bg-secondary"
             />

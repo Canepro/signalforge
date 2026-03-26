@@ -1,7 +1,7 @@
 import type { Database } from "sql.js";
 import { createHash, randomUUID } from "crypto";
 import type { AnalysisResult } from "../analyzer/schema";
-import { normalizeTargetIdentifier } from "../target-identity";
+import { preferredTargetMatchKey } from "../target-identity";
 
 export interface ArtifactRow {
   id: string;
@@ -37,6 +37,11 @@ export interface RunRow {
   collector_type: string | null;
   collector_version: string | null;
   collected_at: string | null;
+}
+
+export interface RunWithArtifactRow extends RunRow {
+  artifact_type: string;
+  artifact_content: string;
 }
 
 export interface RunSummary {
@@ -323,12 +328,14 @@ export function parseEnvironmentHostname(environmentJson: string | null): string
 export function findPreviousRunForSameArtifact(
   db: Database,
   currentRunId: string
-): RunRow | null {
+): RunWithArtifactRow | null {
   const current = getRun(db, currentRunId);
   if (!current) return null;
-  return getOne<RunRow>(
+  return getOne<RunWithArtifactRow>(
     db,
-    `SELECT r.* FROM runs r
+    `SELECT r.*, a.artifact_type, a.content AS artifact_content
+     FROM runs r
+     JOIN artifacts a ON a.id = r.artifact_id
      WHERE r.artifact_id = ? AND r.id != ? AND r.created_at < ?
      ORDER BY r.created_at DESC
      LIMIT 1`,
@@ -340,25 +347,28 @@ export function findPreviousRunForSameArtifact(
  * Latest older run for the same logical target (Phase 5b).
  *
  * Matching order:
- * 1. If current run has `target_identifier`, match candidates with the same normalized
- *    target_identifier only (hostname is ignored for baseline selection).
- * 2. Else if analyzed hostname is available, match candidates with the same hostname
- *    (legacy behavior; candidate may or may not have target_identifier).
- * 3. Else fall back to same-artifact previous run (reanalyze chain / no stable identity).
+ * 1. Explicit `target_identifier`
+ * 2. Family-aware workload identity where available
+ * 3. Hostname fallback
+ * 4. Same-artifact previous run
  */
 export function findPreviousRunForSameTarget(
   db: Database,
   currentRunId: string
-): RunRow | null {
+): RunWithArtifactRow | null {
   const current = getRunWithArtifact(db, currentRunId);
   if (!current) return null;
 
-  const currentTid = normalizeTargetIdentifier(current.target_identifier);
-  const currentHostname = parseEnvironmentHostname(current.environment_json);
+  const currentMatchKey = preferredTargetMatchKey({
+    target_identifier: current.target_identifier,
+    environment_hostname: parseEnvironmentHostname(current.environment_json),
+    artifact_type: current.artifact_type,
+    artifact_content: current.artifact_content,
+  });
 
-  const candidates = allRows<RunRow & { artifact_type: string }>(
+  const candidates = allRows<RunWithArtifactRow>(
     db,
-    `SELECT r.*, a.artifact_type
+    `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON r.artifact_id = a.id
      WHERE r.id != ? AND r.created_at < ? AND a.artifact_type = ?
@@ -366,20 +376,18 @@ export function findPreviousRunForSameTarget(
     [currentRunId, current.created_at, current.artifact_type]
   );
 
-  if (currentTid) {
+  if (currentMatchKey) {
     const hit = candidates.find(
-      (c) => normalizeTargetIdentifier(c.target_identifier) === currentTid
+      (candidate) =>
+        preferredTargetMatchKey({
+          target_identifier: candidate.target_identifier,
+          environment_hostname: parseEnvironmentHostname(candidate.environment_json),
+          artifact_type: candidate.artifact_type,
+          artifact_content: candidate.artifact_content,
+        }) === currentMatchKey
     );
-    return hit ?? null;
-  }
-
-  if (currentHostname) {
-    return (
-      candidates.find(
-        (c) =>
-          parseEnvironmentHostname(c.environment_json) === currentHostname
-      ) ?? null
-    );
+    if (hit) return hit;
+    return null;
   }
 
   return findPreviousRunForSameArtifact(db, currentRunId);
@@ -388,10 +396,10 @@ export function findPreviousRunForSameTarget(
 export function getRunWithArtifact(
   db: Database,
   id: string
-): (RunRow & { artifact_type: string }) | null {
-  return getOne<RunRow & { artifact_type: string }>(
+): RunWithArtifactRow | null {
+  return getOne<RunWithArtifactRow>(
     db,
-    `SELECT r.*, a.artifact_type
+    `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r JOIN artifacts a ON r.artifact_id = a.id
      WHERE r.id = ?`,
     [id]

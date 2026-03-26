@@ -33,22 +33,15 @@ export function FindingsTable({ findings }: FindingsTableProps) {
         {findings.map((f) => {
           const isExpanded = expandedId === f.id;
           return (
-            <div
-              key={f.id}
-              role="button"
-              tabIndex={0}
-              aria-expanded={isExpanded}
-              className="hover:bg-surface-container-low/30 transition-colors cursor-pointer"
-              onClick={() => setExpandedId(isExpanded ? null : f.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setExpandedId(isExpanded ? null : f.id);
-                }
-              }}
-            >
+            <div key={f.id} className="transition-colors hover:bg-surface-container-low/30">
               {/* Primary row */}
-              <div className="flex gap-4 px-5 py-3.5">
+              <button
+                type="button"
+                className="flex w-full gap-4 px-5 py-3.5 text-left"
+                onClick={() => setExpandedId(isExpanded ? null : f.id)}
+                aria-expanded={isExpanded}
+                aria-controls={`finding-${f.id}`}
+              >
                 {/* Severity */}
                 <div className="w-20 shrink-0 pt-0.5">
                   <SeverityBadge severity={f.severity} />
@@ -59,14 +52,20 @@ export function FindingsTable({ findings }: FindingsTableProps) {
                   <div className="text-sm font-bold text-on-surface leading-snug">
                     {f.title}
                   </div>
-                  <div className="text-[10px] font-bold uppercase text-outline-variant mt-0.5">
+                  <div className="mt-0.5 text-[10px] font-bold uppercase text-outline-variant">
                     {f.category}
+                  </div>
+                  <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant lg:hidden">
+                    {f.evidence.length > 110 ? `${f.evidence.slice(0, 110)}…` : f.evidence}
+                  </div>
+                  <div className="mt-2 text-[11px] font-semibold text-primary">
+                    {isExpanded ? "Hide evidence" : "Inspect evidence"}
                   </div>
                 </div>
 
                 {/* Evidence — visible on larger screens inline */}
-                <div className="hidden lg:block w-2/5 shrink-0">
-                  <div className="rounded border border-surface-container bg-surface-container-low px-2.5 py-1.5 font-mono text-[10px] text-on-surface-variant leading-relaxed whitespace-pre-wrap break-words">
+                <div className="hidden w-2/5 shrink-0 lg:block">
+                  <div className="rounded border border-surface-container bg-surface-container-low px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-on-surface-variant whitespace-pre-wrap break-words">
                     {f.evidence.length > 140
                       ? f.evidence.slice(0, 140) + "…"
                       : f.evidence}
@@ -81,15 +80,15 @@ export function FindingsTable({ findings }: FindingsTableProps) {
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
                 </div>
-              </div>
+              </button>
 
               {/* Expanded detail */}
               {isExpanded && (
-                <div className="px-5 pb-4 pt-0 ml-24 space-y-3">
+                <div id={`finding-${f.id}`} className="px-5 pb-4 pt-0 ml-24 space-y-3">
                   {/* Evidence (shown here on small screens, always shown expanded for full text) */}
                   <div>
                     <div className="text-[9px] font-bold uppercase text-outline-variant mb-1">

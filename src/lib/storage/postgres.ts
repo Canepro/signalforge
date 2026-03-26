@@ -9,8 +9,10 @@ import {
   parseEnvironmentHostname,
   submissionMetaFromRun,
   type RunRow,
+  type RunWithArtifactRow,
 } from "@/lib/db/repository";
 import { compareFindingsDrift, type FindingsDriftResult } from "@/lib/compare/findings-diff";
+import { buildEvidenceDelta } from "@/lib/compare/evidence-delta";
 import type {
   AgentsStore,
   CollectionJobView,
@@ -35,7 +37,12 @@ import {
   type SourceRow,
 } from "@/lib/db/source-job-repository";
 import type { CompareDriftPayload, CompareRunSnapshot } from "@/lib/compare/build-compare";
-import { compareTargetsMismatch, normalizeTargetIdentifier, preferredTargetDisplayLabel } from "@/lib/target-identity";
+import {
+  compareTargetsMismatch,
+  normalizeTargetIdentifier,
+  preferredTargetDisplayLabel,
+  preferredTargetMatchKey,
+} from "@/lib/target-identity";
 import { emitDomainEvent } from "@/lib/domain-events";
 import {
   collectCapabilityForArtifactType,
@@ -54,7 +61,7 @@ type PgArtifactRow = {
   content: string;
 };
 
-type PgRunWithArtifactRow = RunRow & { artifact_type: string };
+type PgRunWithArtifactRow = RunWithArtifactRow;
 
 type PgSourceRow = {
   id: string;
@@ -242,7 +249,7 @@ function parseFindings(reportJson: string | null): Finding[] {
   }
 }
 
-function snapshotFromRun(row: RunRow): CompareRunSnapshot {
+function snapshotFromRun(row: RunWithArtifactRow): CompareRunSnapshot {
   const host = parseEnvironmentHostname(row.environment_json ?? null);
   return {
     id: row.id,
@@ -254,6 +261,8 @@ function snapshotFromRun(row: RunRow): CompareRunSnapshot {
     target_display_label: preferredTargetDisplayLabel({
       target_identifier: row.target_identifier ?? null,
       environment_hostname: host,
+      artifact_type: row.artifact_type,
+      artifact_content: row.artifact_content,
     }),
   };
 }
@@ -269,7 +278,7 @@ async function getArtifactById(q: Queryable, id: string): Promise<PgArtifactRow 
 async function getRunWithArtifactById(q: Queryable, id: string): Promise<PgRunWithArtifactRow | null> {
   return one<PgRunWithArtifactRow>(
     q,
-    `SELECT r.*, a.artifact_type
+    `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON a.id = r.artifact_id
      WHERE r.id = $1`,
@@ -277,15 +286,19 @@ async function getRunWithArtifactById(q: Queryable, id: string): Promise<PgRunWi
   );
 }
 
-async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string): Promise<RunRow | null> {
+async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string): Promise<RunWithArtifactRow | null> {
   const current = await getRunWithArtifactById(q, currentRunId);
   if (!current) return null;
 
-  const currentTid = normalizeTargetIdentifier(current.target_identifier);
-  const currentHostname = parseEnvironmentHostname(current.environment_json);
+  const currentMatchKey = preferredTargetMatchKey({
+    target_identifier: current.target_identifier,
+    environment_hostname: parseEnvironmentHostname(current.environment_json),
+    artifact_type: current.artifact_type,
+    artifact_content: current.artifact_content,
+  });
   const candidates = await many<PgRunWithArtifactRow>(
     q,
-    `SELECT r.*, a.artifact_type
+    `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON a.id = r.artifact_id
      WHERE r.id != $1 AND r.created_at < $2 AND a.artifact_type = $3
@@ -293,11 +306,18 @@ async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string):
     [currentRunId, current.created_at, current.artifact_type]
   );
 
-  if (currentTid) {
-    return candidates.find((c) => normalizeTargetIdentifier(c.target_identifier) === currentTid) ?? null;
-  }
-  if (currentHostname) {
-    return candidates.find((c) => parseEnvironmentHostname(c.environment_json) === currentHostname) ?? null;
+  if (currentMatchKey) {
+    const hit = candidates.find(
+      (candidate) =>
+        preferredTargetMatchKey({
+          target_identifier: candidate.target_identifier,
+          environment_hostname: parseEnvironmentHostname(candidate.environment_json),
+          artifact_type: candidate.artifact_type,
+          artifact_content: candidate.artifact_content,
+        }) === currentMatchKey
+    );
+    if (hit) return hit;
+    return null;
   }
   return candidates.find((c) => c.artifact_id === current.artifact_id) ?? null;
 }
@@ -481,7 +501,7 @@ class PostgresRunsStore implements RunsStore {
     if (!currentRow) {
       return { ok: false as const, error: "current_not_found" as const };
     }
-    const baselineRow = against ? await getRunById(this.q, against) : await findPreviousRunForSameTarget(this.q, id);
+    const baselineRow = against ? await getRunWithArtifactById(this.q, against) : await findPreviousRunForSameTarget(this.q, id);
     if (against && !baselineRow) {
       return { ok: false as const, error: "baseline_not_found" as const };
     }
@@ -495,10 +515,14 @@ class PostgresRunsStore implements RunsStore {
           {
             target_identifier: currentRow.target_identifier ?? null,
             environment_hostname: parseEnvironmentHostname(currentRow.environment_json ?? null),
+            artifact_type: currentRow.artifact_type,
+            artifact_content: currentRow.artifact_content,
           },
           {
             target_identifier: baselineRow.target_identifier ?? null,
             environment_hostname: parseEnvironmentHostname(baselineRow.environment_json ?? null),
+            artifact_type: baselineRow.artifact_type,
+            artifact_content: baselineRow.artifact_content,
           }
         )
     );
@@ -510,6 +534,7 @@ class PostgresRunsStore implements RunsStore {
       baseline_selection: baselineMissing ? "none" : against ? "explicit" : "implicit_same_target",
       against_requested: against ?? null,
       drift,
+      evidence_delta: buildEvidenceDelta(baselineRow, currentRow),
     };
     return { ok: true as const, payload };
   }

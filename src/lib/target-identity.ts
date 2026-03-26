@@ -1,16 +1,25 @@
+import {
+  containerValueFor,
+  parseContainerSections,
+} from "@/lib/adapter/container-diagnostics/parse";
+import { parseKubernetesBundle } from "@/lib/adapter/kubernetes-bundle/parse";
+
 /**
  * Preferred target identity for compare/baseline (Phase 5b).
  *
  * Priority:
  * 1. `target_identifier` when set (normalized for matching)
- * 2. Else analyzed hostname from environment (trim + lowercase in match key)
- * 3. Else no stable key — callers fall back to same-artifact baseline where appropriate
+ * 2. Else artifact-family-specific workload identity when available
+ * 3. Else analyzed hostname from environment (trim + lowercase in match key)
+ * 4. Else no stable key — callers fall back to same-artifact baseline where appropriate
  */
 
 export interface PreferredTargetParams {
   target_identifier: string | null;
   /** Analyzed hostname (or null); `preferredTargetMatchKey` lowercases for matching */
   environment_hostname: string | null;
+  artifact_type?: string | null;
+  artifact_content?: string | null;
 }
 
 /** Normalize for equality: trim + lowercase. */
@@ -22,6 +31,75 @@ export function normalizeTargetIdentifier(
   return t.toLowerCase();
 }
 
+function normalizeTargetPart(raw: string | null | undefined): string | null {
+  const value = raw?.trim().toLowerCase();
+  return value || null;
+}
+
+function containerWorkloadKey(params: PreferredTargetParams): string | null {
+  if (params.artifact_type !== "container-diagnostics" || !params.artifact_content) {
+    return null;
+  }
+
+  const sections = parseContainerSections(params.artifact_content);
+  const containerName = normalizeTargetPart(containerValueFor(sections, "container_name"));
+  const containerId = normalizeTargetPart(containerValueFor(sections, "container_id"));
+  const image = normalizeTargetPart(containerValueFor(sections, "image"));
+  const host = normalizeTargetPart(params.environment_hostname);
+
+  if (containerName) return `container:${host ?? "unknown-host"}:${containerName}`;
+  if (containerId) return `container-id:${host ?? "unknown-host"}:${containerId}`;
+  if (image) return `container-image:${host ?? "unknown-host"}:${image}`;
+  return null;
+}
+
+function containerDisplayLabel(params: PreferredTargetParams): string | null {
+  if (params.artifact_type !== "container-diagnostics" || !params.artifact_content) {
+    return null;
+  }
+
+  const sections = parseContainerSections(params.artifact_content);
+  const containerName = containerValueFor(sections, "container_name").trim();
+  if (!containerName) return null;
+
+  const host = params.environment_hostname?.trim();
+  if (host) return `${containerName} @ ${host}`;
+  return containerName;
+}
+
+function kubernetesScopeKey(params: PreferredTargetParams): string | null {
+  if (params.artifact_type !== "kubernetes-bundle" || !params.artifact_content) {
+    return null;
+  }
+
+  const manifest = parseKubernetesBundle(params.artifact_content);
+  const cluster = normalizeTargetPart(manifest?.cluster.name);
+  if (!cluster) return null;
+
+  if (manifest?.scope.level === "namespace") {
+    const namespace = normalizeTargetPart(manifest.scope.namespace);
+    if (namespace) return `k8s:${cluster}:namespace:${namespace}`;
+  }
+
+  return `k8s:${cluster}:cluster`;
+}
+
+function kubernetesDisplayLabel(params: PreferredTargetParams): string | null {
+  if (params.artifact_type !== "kubernetes-bundle" || !params.artifact_content) {
+    return null;
+  }
+
+  const manifest = parseKubernetesBundle(params.artifact_content);
+  const cluster = manifest?.cluster.name?.trim();
+  if (!cluster) return null;
+
+  if (manifest?.scope.level === "namespace" && manifest.scope.namespace?.trim()) {
+    return `${cluster} / namespace ${manifest.scope.namespace.trim()}`;
+  }
+
+  return `${cluster} / cluster`;
+}
+
 /**
  * Stable key for "same target" comparisons. Uses `id:` / `host:` prefixes so a
  * target id never collides with a hostname string.
@@ -29,6 +107,10 @@ export function normalizeTargetIdentifier(
 export function preferredTargetMatchKey(params: PreferredTargetParams): string | null {
   const tid = normalizeTargetIdentifier(params.target_identifier);
   if (tid !== null) return `id:${tid}`;
+  const workload = containerWorkloadKey(params);
+  if (workload !== null) return workload;
+  const kubernetes = kubernetesScopeKey(params);
+  if (kubernetes !== null) return kubernetes;
   const host = params.environment_hostname?.trim();
   if (host) return `host:${host.toLowerCase()}`;
   return null;
@@ -38,6 +120,10 @@ export function preferredTargetMatchKey(params: PreferredTargetParams): string |
 export function preferredTargetDisplayLabel(params: PreferredTargetParams): string | null {
   const raw = params.target_identifier?.trim();
   if (raw) return raw;
+  const container = containerDisplayLabel(params);
+  if (container) return container;
+  const kubernetes = kubernetesDisplayLabel(params);
+  if (kubernetes) return kubernetes;
   return params.environment_hostname;
 }
 

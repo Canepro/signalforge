@@ -1,0 +1,195 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": false,
+    "ran_as_root": false,
+    "os_contains": "Kubernetes"
+  },
+  "must_be_noise": [],
+  "must_not_be_findings": [],
+  "must_be_findings": [
+    {
+      "title_contains": "Service exposed externally",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "Cluster-admin binding",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "CrashLoopBackOff",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "without NetworkPolicy isolation",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "runs privileged",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "allows privilege escalation",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "automatically mounts service account tokens",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "uses the default service account with token automount",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "service account is bound to cluster-admin",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "service account is bound to wildcard RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "service account is bound to privilege-escalation RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "service account is bound to node proxy RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to cluster-admin",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to wildcard RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to privilege-escalation RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload service account is bound to node proxy RBAC roles",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload uses the default service account with token automount",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload mounts projected service account token volumes",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "injects Secret values into environment variables",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "bulk-imports Secret data into environment variables",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "mounts Secret volumes",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "mounts projected service account token volumes",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "shares the host network namespace",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "shares the host PID namespace",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "shares the host IPC namespace",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "mounts hostPath volumes",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "adds Linux capabilities",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "uses privileged init containers",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "does not enforce runAsNonRoot",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "uses a writable root filesystem",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "missing liveness or readiness probes",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "missing resource requests or limits",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "missing a RuntimeDefault seccomp profile",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "grants wildcard access",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "grants privilege-escalation verbs",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "can access kubelet or node proxy APIs",
+      "severity": "high",
+      "category": "kubernetes"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 36,
+  "max_findings": 36
+}

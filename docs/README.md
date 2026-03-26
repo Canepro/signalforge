@@ -29,6 +29,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | Document | Use it for |
 |---|---|
 | [`getting-started.md`](./getting-started.md) | Beginner-friendly setup and first successful run |
+| [`agent-deployment.md`](./agent-deployment.md) | Preferred `signalforge-agent` deployment model, trust boundaries, and security baseline |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
@@ -41,11 +42,13 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 
 ## What SignalForge Covers Today
 
-SignalForge currently ships one artifact family:
+SignalForge currently supports three artifact families in this checkout:
 
 - `linux-audit-log`
+- `container-diagnostics`
+- `kubernetes-bundle`
 
-That includes Linux and WSL audit logs in the `signalforge-collectors` style.
+That includes Linux and WSL audit logs in the `signalforge-collectors` style, text-based container diagnostics, and UTF-8 JSON Kubernetes evidence bundles.
 
 SignalForge is strongest today on:
 
@@ -56,6 +59,8 @@ SignalForge is strongest today on:
 - external push submission
 - job-driven collection via `signalforge-agent` (sibling repo, not yet published)
 
+For the preferred job-driven deployment model and security stance, see [`agent-deployment.md`](./agent-deployment.md).
+
 ## What These Docs Do Not Promise Yet
 
 - in-product collectors
@@ -63,7 +68,8 @@ SignalForge is strongest today on:
 - scheduling
 - fleet management
 - remediation in the current product scope
-- broad multi-artifact support beyond the currently shipped path
+- raw archive ingestion for Kubernetes support bundles
+- a fully general non-Linux job-driven collection model without explicit job-scoped parameters
 
 Those remain current limitations or future design topics in the repo plans. Remediation is deferred, not permanently ruled out, and would require a separate higher-trust model if introduced later.
 
@@ -79,6 +85,8 @@ Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` an
 ## Deployment
 
 The live SignalForge instance runs on Vercel with a Neon Postgres backend. Local development defaults to SQLite.
+
+Vercel preview deployments are also available for branches and pull requests, so product and UI changes can be reviewed on a live preview before merging to remote `main`.
 
 ## CI
 

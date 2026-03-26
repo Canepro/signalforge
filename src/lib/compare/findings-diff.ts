@@ -41,6 +41,15 @@ export function normalizeFindingTitle(title: string): string {
     return listenerKey;
   }
 
+  if (/^container publishes ports: .+$/.test(normalized)) {
+    return "container publishes ports";
+  }
+
+  const kubernetesCountStableTitle = normalizeKubernetesCountStableTitle(normalized);
+  if (kubernetesCountStableTitle !== null) {
+    return kubernetesCountStableTitle;
+  }
+
   return normalized;
 }
 
@@ -68,6 +77,32 @@ function normalizeListenerFindingTitle(normalized: string): string | null {
   const bound = normalized.match(/^(.+?) bound to (.+?) \(port (\d+)\)$/);
   if (bound) {
     return `network listener bound ${bound[2]} port ${bound[3]}`;
+  }
+
+  return null;
+}
+
+function normalizeKubernetesCountStableTitle(normalized: string): string | null {
+  const countStablePatterns = [
+    /^(kubernetes workload service account is bound to wildcard rbac roles: .+?) \(\d+ roles\)$/,
+    /^(kubernetes externally exposed workload service account is bound to wildcard rbac roles: .+?) \(\d+ roles\)$/,
+    /^(kubernetes workload service account is bound to privilege-escalation rbac roles: .+?) \(\d+ roles\)$/,
+    /^(kubernetes externally exposed workload service account is bound to privilege-escalation rbac roles: .+?) \(\d+ roles\)$/,
+    /^(kubernetes workload service account is bound to node proxy rbac roles: .+?) \(\d+ roles\)$/,
+    /^(kubernetes externally exposed workload service account is bound to node proxy rbac roles: .+?) \(\d+ roles\)$/,
+    /^(kubernetes workload injects secret values into environment variables: .+?) \(\d+ refs\)$/,
+    /^(kubernetes workload bulk-imports secret data into environment variables: .+?) \(\d+ refs\)$/,
+    /^(kubernetes workload mounts secret volumes: .+?) \(\d+ mounts\)$/,
+    /^(kubernetes workload mounts projected service account token volumes: .+?) \(\d+ mounts\)$/,
+    /^(kubernetes externally exposed workload mounts projected service account token volumes: .+?) \(\d+ mounts\)$/,
+    /^(kubernetes workload mounts hostpath volumes: .+?) \(\d+ mounts\)$/,
+    /^(kubernetes workload adds linux capabilities: .+?) \(\d+ capabilities\)$/,
+    /^(kubernetes workload uses privileged init containers: .+?) \(\d+ containers\)$/,
+  ];
+
+  for (const pattern of countStablePatterns) {
+    const match = normalized.match(pattern);
+    if (match) return match[1];
   }
 
   return null;

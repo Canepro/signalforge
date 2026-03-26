@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   requestCollectionFromDashboardAction,
   type DashboardRequestCollectionState,
 } from "@/app/sources/actions";
+import { getArtifactTypeLabel } from "@/lib/source-catalog";
+import { ModalShell } from "./modal-shell";
 
 export interface DashboardCollectionSource {
   id: string;
   display_name: string;
   target_identifier: string;
+  expected_artifact_type: string;
   last_seen_at: string | null;
 }
 
@@ -21,7 +24,7 @@ interface RequestCollectionModalProps {
 }
 
 function relativeTime(iso: string | null): string {
-  if (!iso) return "just now";
+  if (!iso) return "unknown";
   const ms = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(ms / 1000);
   if (sec < 60) return "just now";
@@ -52,7 +55,6 @@ export function RequestCollectionModal({
   onClose,
   sources,
 }: RequestCollectionModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const reasonRef = useRef<HTMLInputElement>(null);
   const [selectedSourceId, setSelectedSourceId] = useState(sources[0]?.id ?? "");
   const [result, setResult] = useState<DashboardRequestCollectionState | null>(null);
@@ -70,42 +72,15 @@ export function RequestCollectionModal({
     [selectedSourceId, sources]
   );
 
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    document.addEventListener("keydown", handleEscape);
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      prev?.focus();
-    };
-  }, [open, handleEscape]);
-
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/30 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      role="presentation"
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      titleId="request-collection-title"
+      maxWidthClassName="max-w-lg"
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="request-collection-title"
-        className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest shadow-xl outline-none"
-      >
         <div className="flex items-start justify-between gap-3 border-b border-surface-container px-5 pt-5 pb-4">
           <div>
             <h2 id="request-collection-title" className="font-headline text-lg font-bold text-on-surface">
@@ -193,13 +168,16 @@ export function RequestCollectionModal({
                             <div className="mt-1 truncate text-xs font-mono text-on-surface-variant">
                               {source.target_identifier}
                             </div>
+                            <div className="mt-1 text-[10px] uppercase tracking-widest text-outline-variant">
+                              {getArtifactTypeLabel(source.expected_artifact_type)}
+                            </div>
                           </div>
                           <div className="shrink-0 text-right">
                             <div className="text-[10px] font-bold uppercase tracking-widest text-primary">
                               online
                             </div>
                             <div className="mt-1 text-[10px] text-on-surface-variant">
-                              seen {relativeTime(source.last_seen_at)}
+                              last seen {relativeTime(source.last_seen_at)}
                             </div>
                           </div>
                         </div>
@@ -209,7 +187,11 @@ export function RequestCollectionModal({
                 </div>
                 {selectedSource ? (
                   <p className="text-[11px] leading-relaxed text-on-surface-variant">
-                    {selectedSource.display_name} is the current target for this request.
+                    {selectedSource.display_name} is the current target for this request. This source expects{" "}
+                    <span className="font-semibold text-on-surface">
+                      {getArtifactTypeLabel(selectedSource.expected_artifact_type)}
+                    </span>{" "}
+                    collection jobs.
                   </p>
                 ) : null}
               </div>
@@ -259,7 +241,6 @@ export function RequestCollectionModal({
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

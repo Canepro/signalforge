@@ -276,6 +276,54 @@ function fakeAnalysis(): import("@/lib/analyzer/schema").AnalysisResult {
   };
 }
 
+function containerArtifact(fields: Record<string, string>): string {
+  const orderedKeys = [
+    "hostname",
+    "runtime",
+    "container_name",
+    "image",
+    "published_ports",
+    "mounts",
+    "writable_mounts",
+    "read_only_rootfs",
+    "added_capabilities",
+    "secrets",
+    "ran_as_root",
+  ];
+  return [
+    "=== container-diagnostics ===",
+    ...orderedKeys
+      .filter((key) => key in fields)
+      .map((key) => `${key}: ${fields[key]}`),
+  ].join("\n");
+}
+
+function kubernetesBundleArtifact(input: {
+  clusterName: string;
+  scopeLevel: "cluster" | "namespace";
+  namespace?: string;
+  documents?: Array<{
+    path: string;
+    kind: string;
+    media_type: string;
+    content: string;
+  }>;
+}): string {
+  return JSON.stringify(
+    {
+      schema_version: "kubernetes-bundle.v1",
+      cluster: { name: input.clusterName, provider: "aks" },
+      scope: {
+        level: input.scopeLevel,
+        namespace: input.scopeLevel === "namespace" ? (input.namespace ?? null) : null,
+      },
+      documents: input.documents ?? [],
+    },
+    null,
+    2
+  );
+}
+
 for (const backend of backends) {
   describe(`storage parity [${backend.name}]`, () => {
     let storage: Storage;
@@ -419,6 +467,861 @@ for (const backend of backends) {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.evidence_delta).not.toBeNull();
+    });
+
+    it("compare exposes container evidence_delta metrics when findings are unchanged", async () => {
+      const older = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-before.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.3",
+            published_ports: "8080:80",
+            mounts: "/srv/config:/config",
+            writable_mounts: "/config",
+            read_only_rootfs: "true",
+            added_capabilities: "NET_BIND_SERVICE",
+            secrets: "db-password",
+            ran_as_root: "false",
+          }),
+          ingestion: {
+            target_identifier: "container:payments",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const newer = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-after.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.4",
+            published_ports: "8080:80,8443:443",
+            mounts: "/srv/config:/config,/srv/data:/data",
+            writable_mounts: "/config,/data",
+            read_only_rootfs: "false",
+            added_capabilities: "NET_BIND_SERVICE,SYS_PTRACE",
+            secrets: "db-password,api-key",
+            ran_as_root: "true",
+          }),
+          ingestion: {
+            target_identifier: "container:payments",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(newer.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(older.run_id);
+      expect(result.payload.drift.rows).toEqual([]);
+      expect(result.payload.evidence_delta?.changed).toBe(true);
+      expect(result.payload.evidence_delta?.metrics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "published_port_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "added_capability_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "secret_mount_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "mount_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "writable_mount_count",
+            family: "container-diagnostics",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "runs_as_root",
+            family: "container-diagnostics",
+            previous: false,
+            current: true,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "read_only_rootfs",
+            family: "container-diagnostics",
+            previous: true,
+            current: false,
+            status: "changed",
+          }),
+        ])
+      );
+    });
+
+    it("compare exposes Kubernetes evidence_delta metrics when findings are unchanged", async () => {
+      const older = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "payments-before.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "payments",
+            documents: [
+              {
+                path: "network/services.json",
+                kind: "service-exposure",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    type: "LoadBalancer",
+                    external: true,
+                  },
+                ]),
+              },
+              {
+                path: "rbac/bindings.json",
+                kind: "rbac-bindings",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    scope: "cluster",
+                    subject: "system:serviceaccount:payments:payments-api",
+                    roleRef: "Cluster-Admin",
+                  },
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    subject: "system:serviceaccount:payments:payments-api",
+                    roleRef: "payments-ops",
+                  },
+                ]),
+              },
+              {
+                path: "rbac/roles.json",
+                kind: "rbac-roles",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    name: "payments-ops",
+                    rules: [
+                      {
+                        apiGroups: ["*"],
+                        resources: ["*"],
+                        verbs: ["*"],
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "network/network-policies.json",
+                kind: "network-policies",
+                media_type: "application/json",
+                content: JSON.stringify([]),
+              },
+              {
+                path: "workloads/specs.json",
+                kind: "workload-specs",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    kind: "Deployment",
+                    pod_spec: {
+                      serviceAccountName: "payments-api",
+                      hostNetwork: false,
+                      hostPID: false,
+                      hostIPC: false,
+                      securityContext: {
+                        runAsNonRoot: true,
+                        readOnlyRootFilesystem: true,
+                        seccompProfile: { type: "RuntimeDefault" },
+                      },
+                      automountServiceAccountToken: false,
+                      volumes: [],
+                      containers: [
+                        {
+                          name: "api",
+                          env: [],
+                          envFrom: [],
+                          volumeMounts: [],
+                          securityContext: {
+                            allowPrivilegeEscalation: false,
+                            readOnlyRootFilesystem: true,
+                            capabilities: { add: [] },
+                          },
+                          readinessProbe: { httpGet: { path: "/ready", port: 8080 } },
+                          livenessProbe: { httpGet: { path: "/live", port: 8080 } },
+                          resources: {
+                            requests: { cpu: "100m", memory: "128Mi" },
+                            limits: { cpu: "500m", memory: "256Mi" },
+                          },
+                        },
+                      ],
+                      initContainers: [],
+                    },
+                  },
+                ]),
+              },
+            ],
+          }),
+          ingestion: {
+            target_identifier: "cluster:aks-prod-eu-1:namespace:payments",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const newer = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "payments-after.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "payments",
+            documents: [
+              {
+                path: "network/services.json",
+                kind: "service-exposure",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    type: "LoadBalancer",
+                    external: true,
+                  },
+                  {
+                    namespace: "payments",
+                    name: "payments-metrics",
+                    type: "NodePort",
+                    external: false,
+                  },
+                ]),
+              },
+              {
+                path: "rbac/bindings.json",
+                kind: "rbac-bindings",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    scope: "cluster",
+                    subject: "system:serviceaccount:payments:payments-api",
+                    roleRef: "Cluster-Admin",
+                  },
+                  {
+                    scope: "cluster",
+                    subject: "system:serviceaccount:payments:payments-jobs",
+                    roleRef: "cluster-admin",
+                  },
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    subject: "system:serviceaccount:payments:default",
+                    roleRef: "payments-ops",
+                  },
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    subject: "system:serviceaccount:payments:default",
+                    roleRef: "payments-automation",
+                  },
+                  {
+                    scope: "cluster",
+                    subject: "system:serviceaccount:payments:default",
+                    roleRef: "payments-breakglass",
+                  },
+                ]),
+              },
+              {
+                path: "rbac/roles.json",
+                kind: "rbac-roles",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    name: "payments-ops",
+                    rules: [
+                      {
+                        apiGroups: ["*"],
+                        resources: ["*"],
+                        verbs: ["*"],
+                      },
+                    ],
+                  },
+                  {
+                    scope: "namespace",
+                    namespace: "payments",
+                    name: "payments-automation",
+                    rules: [
+                      {
+                        apiGroups: ["*"],
+                        resources: ["*"],
+                        verbs: ["get", "list", "*"],
+                      },
+                    ],
+                  },
+                  {
+                    scope: "cluster",
+                    name: "payments-breakglass",
+                    rules: [
+                      {
+                        apiGroups: ["rbac.authorization.k8s.io"],
+                        resources: ["clusterroles"],
+                        verbs: ["bind", "escalate", "impersonate"],
+                      },
+                      {
+                        apiGroups: [""],
+                        resources: ["nodes/proxy"],
+                        verbs: ["get"],
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "network/network-policies.json",
+                kind: "network-policies",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "default-deny",
+                  },
+                ]),
+              },
+              {
+                path: "workloads/specs.json",
+                kind: "workload-specs",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    kind: "Deployment",
+                    pod_spec: {
+                      serviceAccountName: "default",
+                      automountServiceAccountToken: true,
+                      hostNetwork: true,
+                      hostPID: true,
+                      hostIPC: true,
+                      volumes: [
+                        {
+                          name: "payments-api-secrets-volume",
+                          secret: { secretName: "payments-api-secrets" },
+                        },
+                        {
+                          name: "payments-host-data",
+                          hostPath: { path: "/var/lib/payments-data" },
+                        },
+                        {
+                          name: "payments-token",
+                          projected: {
+                            sources: [
+                              {
+                                serviceAccountToken: {
+                                  audience: "payments-api",
+                                  expirationSeconds: 3600,
+                                  path: "token",
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                      containers: [
+                        {
+                          name: "api",
+                          env: [
+                            {
+                              name: "DATABASE_URL",
+                              valueFrom: {
+                                secretKeyRef: { name: "payments-api-secrets", key: "database_url" },
+                              },
+                            },
+                            {
+                              name: "PAYMENTS_API_KEY",
+                              valueFrom: {
+                                secretKeyRef: { name: "payments-api-secrets", key: "api_key" },
+                              },
+                            },
+                          ],
+                          envFrom: [
+                            {
+                              secretRef: { name: "payments-api-env" },
+                            },
+                          ],
+                          volumeMounts: [
+                            {
+                              name: "payments-api-secrets-volume",
+                              mountPath: "/var/run/secrets/payments",
+                              readOnly: true,
+                            },
+                            {
+                              name: "payments-host-data",
+                              mountPath: "/host/payments-data",
+                            },
+                            {
+                              name: "payments-token",
+                              mountPath: "/var/run/secrets/tokens",
+                              readOnly: true,
+                            },
+                          ],
+                          securityContext: {
+                            privileged: true,
+                            allowPrivilegeEscalation: true,
+                            runAsNonRoot: false,
+                            readOnlyRootFilesystem: false,
+                            capabilities: { add: ["NET_ADMIN"] },
+                            seccompProfile: { type: "Unconfined" },
+                          },
+                          readinessProbe: null,
+                          livenessProbe: null,
+                          resources: {},
+                        },
+                      ],
+                      initContainers: [
+                        {
+                          name: "bootstrap",
+                          securityContext: { privileged: true },
+                        },
+                      ],
+                    },
+                  },
+                ]),
+              },
+            ],
+          }),
+          ingestion: {
+            target_identifier: "cluster:aks-prod-eu-1:namespace:payments",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(newer.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(older.run_id);
+      expect(result.payload.drift.rows).toEqual([]);
+      expect(result.payload.evidence_delta?.changed).toBe(true);
+      expect(result.payload.evidence_delta?.metrics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "external_service_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "cluster_admin_binding_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "workload_cluster_admin_binding_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 0,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "workload_rbac_wildcard_binding_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "workload_rbac_privilege_escalation_binding_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "workload_rbac_node_proxy_binding_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_workload_cluster_admin_binding_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 0,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_workload_rbac_wildcard_binding_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_workload_rbac_privilege_escalation_binding_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_workload_rbac_node_proxy_binding_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_default_service_account_automount_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_projected_service_account_token_volume_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "network_policy_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "exposed_namespace_without_network_policy_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 0,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "workload_hardening_gap_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 14,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "rbac_wildcard_role_count",
+            family: "kubernetes-bundle",
+            previous: 1,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "rbac_privilege_escalation_role_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "rbac_node_proxy_access_role_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "service_account_token_automount_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "writable_root_filesystem_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "default_service_account_automount_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "secret_env_reference_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "secret_env_from_reference_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "secret_volume_mount_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "projected_service_account_token_volume_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_network_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_pid_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_ipc_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "host_path_volume_mount_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "added_capability_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "privileged_init_container_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+        ])
+      );
+    });
+
+    it("compare prefers matching container identity over hostname-only fallback", async () => {
+      const olderPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-old.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.3",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const newerSearch = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "search.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "search",
+            image: "registry.example/search:3.4.5",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const currentPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "container-diagnostics",
+          sourceType: "api",
+          filename: "payments-new.txt",
+          content: containerArtifact({
+            hostname: "node-a",
+            runtime: "docker",
+            container_name: "payments",
+            image: "registry.example/payments:1.2.4",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(currentPayments.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(olderPayments.run_id);
+      expect(result.payload.baseline?.id).not.toBe(newerSearch.run_id);
+    });
+
+    it("compare prefers matching Kubernetes scope over hostname-only fallback", async () => {
+      const olderPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "payments-old.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "payments",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const newerCheckout = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "checkout.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "checkout",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      const currentPayments = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "kubernetes-bundle",
+          sourceType: "api",
+          filename: "payments-new.json",
+          content: kubernetesBundleArtifact({
+            clusterName: "aks-prod-eu-1",
+            scopeLevel: "namespace",
+            namespace: "payments",
+          }),
+          ingestion: {
+            target_identifier: null,
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const result = await storage.runs.getComparePayload(currentPayments.run_id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payload.baseline_missing).toBe(false);
+      expect(result.payload.baseline?.id).toBe(olderPayments.run_id);
+      expect(result.payload.baseline?.id).not.toBe(newerCheckout.run_id);
+      expect(result.payload.current.target_display_label).toBe("aks-prod-eu-1 / namespace payments");
     });
 
     // --- SOURCES ---
@@ -458,7 +1361,7 @@ for (const backend of backends) {
             display_name: "Unsupported",
             target_identifier: "unsupported-artifact-source",
             source_type: "linux_host",
-            expected_artifact_type: "container-diagnostics",
+            expected_artifact_type: "windows-evidence-pack",
           })
         )
       ).rejects.toThrow();

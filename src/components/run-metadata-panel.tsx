@@ -1,46 +1,149 @@
+import { CopyTextButton } from "./copy-text-button";
+import {
+  getArtifactFamilyPresentation,
+  getArtifactTypeLabel,
+  getSourceTypeLabel,
+} from "@/lib/source-catalog";
 import type { RunDetail } from "@/types/api";
 
 interface RunMetadataPanelProps {
   run: RunDetail;
 }
 
+type MetadataRow = {
+  label: string;
+  value: string | null;
+  display: string | null;
+  secondary?: string | null;
+  copyable?: boolean;
+  mono?: boolean;
+};
+
+type MetadataSection = {
+  title: string;
+  rows: MetadataRow[];
+};
+
 export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
   const numberFormatter = new Intl.NumberFormat("en-US");
-  const rows: Array<{ label: string; value: string | null }> = [
-    { label: "Run ID", value: run.id.slice(0, 8) },
-    { label: "Artifact Type", value: run.artifact_type },
-    { label: "Source", value: run.source_type },
-    { label: "Target ID", value: run.target_identifier },
-    { label: "Source label", value: run.source_label },
-    { label: "Collector", value: run.collector_type },
-    { label: "Collector version", value: run.collector_version },
-    {
-      label: "Collected at",
-      value: run.collected_at
-        ? new Date(run.collected_at).toLocaleString()
-        : null,
-    },
-    { label: "Model", value: run.model_used ?? "deterministic-only" },
-    {
-      label: "Analysis Time",
-      value: run.duration_ms ? `${(run.duration_ms / 1000).toFixed(1)}s` : null,
-    },
-    {
-      label: "Tokens Used",
-      value: run.tokens_used ? numberFormatter.format(run.tokens_used) : null,
-    },
-    {
-      label: "Incomplete",
-      value: run.is_incomplete ? (run.incomplete_reason ?? "Yes") : null,
-    },
-    { label: "Error", value: run.analysis_error },
-  ];
+  const artifactFamily = getArtifactFamilyPresentation(run.artifact_type);
+  const artifactFamilyLabel =
+    artifactFamily?.label ?? getArtifactTypeLabel(run.artifact_type);
 
-  const visibleRows = rows.filter((r) => r.value !== null);
+  const sections: MetadataSection[] = [
+    {
+      title: "Identity",
+      rows: [
+        {
+          label: "Run ID",
+          value: run.id,
+          display: run.id.slice(0, 8),
+          copyable: true,
+          mono: true,
+        },
+        {
+          label: "Artifact family",
+          value: run.artifact_type,
+          display: artifactFamilyLabel,
+          secondary: artifactFamily?.description ?? null,
+          mono: true,
+        },
+        {
+          label: "Source type",
+          value: run.source_type,
+          display: getSourceTypeLabel(run.source_type),
+          secondary: run.source_type,
+        },
+        {
+          label: "Target ID",
+          value: run.target_identifier,
+          display: run.target_identifier,
+          copyable: true,
+          mono: true,
+        },
+        {
+          label: "Source label",
+          value: run.source_label,
+          display: run.source_label,
+          copyable: true,
+          mono: true,
+        },
+      ],
+    },
+    {
+      title: "Collection",
+      rows: [
+        {
+          label: "Collector",
+          value: run.collector_type,
+          display: run.collector_type,
+          copyable: true,
+          mono: true,
+        },
+        {
+          label: "Collector version",
+          value: run.collector_version,
+          display: run.collector_version,
+          copyable: true,
+          mono: true,
+        },
+        {
+          label: "Collected at",
+          value: run.collected_at
+            ? new Date(run.collected_at).toLocaleString()
+            : null,
+          display: run.collected_at
+            ? new Date(run.collected_at).toLocaleString()
+            : null,
+        },
+      ],
+    },
+    {
+      title: "Analysis",
+      rows: [
+        {
+          label: "Model",
+          value: run.model_used ?? "deterministic-only",
+          display: run.model_used ?? "deterministic-only",
+          mono: true,
+        },
+        {
+          label: "Analysis time",
+          value: run.duration_ms
+            ? `${(run.duration_ms / 1000).toFixed(1)}s`
+            : null,
+          display: run.duration_ms
+            ? `${(run.duration_ms / 1000).toFixed(1)}s`
+            : null,
+          mono: true,
+        },
+        {
+          label: "Tokens used",
+          value: run.tokens_used
+            ? numberFormatter.format(run.tokens_used)
+            : null,
+          display: run.tokens_used
+            ? numberFormatter.format(run.tokens_used)
+            : null,
+          mono: true,
+        },
+        {
+          label: "Incomplete",
+          value: run.is_incomplete ? (run.incomplete_reason ?? "Yes") : null,
+          display: run.is_incomplete ? (run.incomplete_reason ?? "Yes") : null,
+        },
+        {
+          label: "Error",
+          value: run.analysis_error,
+          display: run.analysis_error,
+        },
+      ],
+    },
+  ];
 
   return (
     <div className="rounded-lg border border-surface-container bg-surface-container-lowest p-4 shadow-sm">
-      <h3 className="text-xs font-bold uppercase text-on-surface-variant mb-3 flex items-center gap-2">
+      <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase text-on-surface-variant">
         <svg
           className="h-4 w-4 text-outline-variant"
           fill="none"
@@ -56,14 +159,59 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
         </svg>
         Run Metadata
       </h3>
-      <div className="grid grid-cols-2 gap-y-2 text-[10px]">
-        {visibleRows.map((r) => (
-          <div key={r.label} className="contents">
-            <div className="text-outline-variant">{r.label}</div>
-            <div className="text-on-surface-variant font-mono text-right">
-              {r.value}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {sections.map((section) => (
+          <section
+            key={section.title}
+            className="rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-3"
+          >
+            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              {section.title}
             </div>
-          </div>
+            <dl className="mt-3 space-y-2.5">
+              {section.rows.map((row) => {
+                if (row.value === null) return null;
+                const value = row.value;
+                const display = row.display ?? value;
+
+                return (
+                  <div
+                    key={row.label}
+                    className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-2.5"
+                  >
+                    <dt className="text-[10px] font-bold uppercase tracking-widest text-outline-variant">
+                      {row.label}
+                    </dt>
+                    <dd className="mt-1 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div
+                          className={`text-sm font-medium text-on-surface break-words ${
+                            row.mono ? "font-mono" : ""
+                          }`}
+                        >
+                          {display}
+                        </div>
+                        {row.secondary ? (
+                          <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                            {row.secondary}
+                          </div>
+                        ) : null}
+                      </div>
+                      {row.copyable ? (
+                        <CopyTextButton
+                          value={value}
+                          idleLabel="Copy"
+                          doneLabel="Copied"
+                          className="shrink-0 rounded border border-outline-variant/20 bg-surface-container-low px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                        />
+                      ) : null}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </section>
         ))}
       </div>
     </div>

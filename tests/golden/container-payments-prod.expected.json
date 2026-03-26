@@ -1,0 +1,45 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": true,
+    "ran_as_root": true,
+    "os_contains": "Container"
+  },
+  "must_be_noise": [],
+  "must_not_be_findings": [],
+  "must_be_findings": [
+    {
+      "title_contains": "publishes ports",
+      "severity": "medium",
+      "category": "network"
+    },
+    {
+      "title_contains": "privileged mode",
+      "severity": "high",
+      "category": "container"
+    },
+    {
+      "title_contains": "Docker socket",
+      "severity": "high",
+      "category": "container"
+    },
+    {
+      "title_contains": "host PID",
+      "severity": "high",
+      "category": "container"
+    },
+    {
+      "title_contains": "Linux capabilities",
+      "severity": "medium",
+      "category": "container"
+    },
+    {
+      "title_contains": "privilege escalation",
+      "severity": "medium",
+      "category": "container"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 8,
+  "max_findings": 12
+}

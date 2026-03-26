@@ -36,8 +36,10 @@ This document describes the current `POST /api/runs` submission contract.
 | **Multipart** | `file` (uploaded file). Optionally `artifact_type`, `source_type`. |
 
 If `artifact_type` is omitted, the server infers a type from content.
-Today, the only shipped artifact family is `linux-audit-log`.
+Today, the shipped artifact families are `linux-audit-log`, `container-diagnostics`, and `kubernetes-bundle`.
 If the supplied or inferred `artifact_type` is unsupported, the route returns **400** with `code: "unsupported_artifact_type"`.
+
+For `kubernetes-bundle`, `content` should be a UTF-8 JSON manifest with `schema_version: "kubernetes-bundle.v1"` and a `documents` array of named text documents. Raw archives are not accepted in this v1 contract.
 
 ## Optional Ingestion Metadata
 
@@ -63,6 +65,18 @@ Length limits and validation follow `src/lib/ingestion/meta.ts` (e.g. `collected
 - **Hostname** is still derived from the artifact by the adapter (`linux-audit-log`) when present.
 - **`target_identifier`** is **submission metadata**: use it when you have a fleet id, enrollment id, or stable label that should tie runs together even if hostnames differ or logs are ambiguous.
 - Compare and baseline selection use **`target_identifier` first**, then normalized hostname, then same-artifact history when identity is missing (see `findPreviousRunForSameTarget`).
+
+### Recommended `target_identifier` shapes by artifact family
+
+- **`linux-audit-log`**: use a stable machine or fleet id such as `fleet:prod:web-01` when hostname alone is not trustworthy enough.
+- **`container-diagnostics`**: choose the compare scope deliberately.
+  - workload-stable compare: `container-workload:<host>:<runtime>:<service>`
+  - instance-level compare: `container-instance:<host>:<runtime>:<container-id>`
+- **`kubernetes-bundle`**: make cluster and scope explicit.
+  - cluster-scoped bundle: `cluster:<cluster-name>`
+  - namespace-scoped bundle: `cluster:<cluster-name>:namespace:<namespace>`
+
+For container and Kubernetes evidence, prefer workload- or scope-stable identifiers over volatile runtime object names when the operator wants meaningful compare history across redeploys.
 
 ## Quick Examples
 
@@ -117,7 +131,6 @@ The **`signalforge-collectors`** repository includes a narrow **reference push p
 
 That same pattern can later be reused for:
 
-- Kubernetes bundles
 - container diagnostics
 - Windows evidence packs
 - macOS evidence packs
@@ -125,7 +138,7 @@ That same pattern can later be reused for:
 
 ## Read Back Run / Compare Data
 
-`GET /api/runs/{id}/compare` returns deterministic finding drift for programmatic use using the same logic as `/runs/{id}/compare`. Optional query: `?against=<otherRunId>` pins the baseline. Response includes `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, and `drift` (`summary` + `rows`). Each run snapshot includes `id` and `run_id` (same UUID) for consistency with POST responses. No LLM.
+`GET /api/runs/{id}/compare` returns deterministic compare data for programmatic use using the same logic as `/runs/{id}/compare`. Optional query: `?against=<otherRunId>` pins the baseline. Response includes `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `drift` (`summary` + `rows`), and `evidence_delta` for stable metadata and aggregate evidence changes. Each run snapshot includes `id` and `run_id` (same UUID) for consistency with POST responses. No LLM.
 
 From the shell, `scripts/signalforge-read.sh compare <run-id>` prints the same JSON, with optional `--against <id>`. `signalforge-read.sh run` and `report` call `GET /api/runs/{id}` and `GET /api/runs/{id}/report` respectively. These are the read-side complements to `scripts/analyze.sh`.
 

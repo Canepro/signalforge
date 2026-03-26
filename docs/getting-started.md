@@ -20,11 +20,13 @@ SignalForge analyzes infrastructure evidence artifacts and turns them into:
 - top actions
 - drift comparisons between runs
 
-Today, the shipped analyzer supports one artifact family:
+Today, the shipped analyzer supports three artifact families:
 
 - `linux-audit-log`
+- `container-diagnostics`
+- `kubernetes-bundle`
 
-That currently means Linux and WSL audit logs generated in the `signalforge-collectors` style.
+That currently means Linux and WSL audit logs generated in the `signalforge-collectors` style, plus text-based container diagnostics and UTF-8 JSON Kubernetes evidence bundles.
 
 ## Before You Start
 
@@ -81,7 +83,16 @@ SIGNALFORGE_ADMIN_TOKEN=choose-a-long-random-secret
 
 Restart the dev server, open **`/sources`**, and sign in at **`/sources/login`** with the same value (stored as an httpOnly cookie — not embedded in the JS bundle). For `curl`, send `Authorization: Bearer <same value>`.
 
-**External agent (Phase 6d):** after you create a source in **`/sources`**, use **Enroll agent** (or `POST /api/agent/registrations` with the admin Bearer) to get a **source-bound agent token**. That token is used as `Authorization: Bearer <agent_token>` on `POST /api/agent/heartbeat`, `GET /api/agent/jobs/next`, and the collection-job **claim / start / fail / artifact** routes documented in [`api-contract.md`](./api-contract.md). Collection still runs on the host outside SignalForge; the server only accepts the artifact and runs the same analysis path as `POST /api/runs`.
+**External agent (Phase 6d):** after you create a source in **`/sources`**, use **Enroll agent** (or `POST /api/agent/registrations` with the admin Bearer) to get a **source-bound agent token**. That token is used as `Authorization: Bearer <agent_token>` on `POST /api/agent/heartbeat`, `GET /api/agent/jobs/next`, and the collection-job **claim / start / fail / artifact** routes documented in [`api-contract.md`](./api-contract.md). Collection still runs on the host outside SignalForge; the server only accepts the artifact and runs the same analysis path as `POST /api/runs`. The agent can now dispatch Linux, container, and Kubernetes collectors, but non-Linux jobs still depend on host-local collector environment such as a pinned container reference or a prepared `kubectl` context.
+
+Preferred deployment model for the external agent:
+
+- run it as a long-running service on the execution host
+- keep the token in a root-controlled file or service credential, not on a shell command line
+- use a dedicated service identity with only the access that host needs
+- avoid treating an operator laptop or mutable `kubectl` current-context as the normal production path
+
+More detail: [`agent-deployment.md`](./agent-deployment.md)
 
 Optional OpenAI direct setup:
 
@@ -132,7 +143,12 @@ Keep that terminal running.
 
 ## Step 4: Submit Your First Artifact
 
-In the UI, use **How to collect** in the sidebar (or **Collect externally** on the dashboard) for copy-paste commands that use **this** app’s URL — collection still runs **outside** SignalForge; the panel only helps you wire `SIGNALFORGE_URL` and the reference collector.
+In the UI, use **How to collect** in the sidebar (or **Collect externally** on the dashboard) for copy-paste commands that use **this** app’s URL. Collection still runs **outside** SignalForge in one of two ways:
+
+- push-first, where `signalforge-collectors` produces the artifact and submits it directly
+- job-driven, where `signalforge-agent` runs a collector from `signalforge-collectors` and uploads the result
+
+Today, Linux host collection is the cleanest fully general job-driven path. Container and Kubernetes also have real collector support, but job-driven use still assumes the host agent has already been prepared for the intended target and scope.
 
 The simplest first run is one of the repo fixtures:
 
@@ -222,6 +238,19 @@ The UI also exposes a **vs parent** path when lineage exists.
 
 ## Step 7: Try the External Collector Path
 
+### How The Repos Fit Together
+
+SignalForge uses three cooperating repos with different responsibilities:
+
+- **`signalforge`**: the app you are running here. It stores artifacts and runs the deterministic-first analysis, compare, and UI/API flows.
+- **`signalforge-collectors`**: the collector repo. It produces evidence artifacts and can push them straight into SignalForge over HTTP.
+- **`signalforge-agent`**: the execution-plane helper. It heartbeats, polls for queued jobs, claims work, runs collectors locally, and uploads the produced artifact back to SignalForge.
+
+Short version:
+
+- if you already have an artifact or can generate one from a script, use the **push path**
+- if you want SignalForge Sources to queue work and a machine to pick it up, use the **job-driven agent path**
+
 SignalForge is designed to analyze evidence, not collect it directly.
 
 There is a reference collector in the companion repo [signalforge-collectors](https://github.com/Canepro/signalforge-collectors) (`submit-to-signalforge.sh` at the repo root).
@@ -242,6 +271,54 @@ This proves the external push model:
 
 For **job-driven** collection (Sources → “Collect Fresh Evidence”), use the separate execution-plane repo **`signalforge-agent`** (sibling repo, not yet published): it authenticates with an enrollment token, polls `GET /api/agent/jobs/next`, runs **signalforge-collectors** on the host, and completes `POST /api/collection-jobs/{id}/artifact`. For normal operator use, keep the agent running in **`run`** mode on the source machine. Use **`once`** for smoke tests, ad-hoc manual runs, or cron-style schedules. SignalForge now supports bounded long-poll on `jobs/next`, so a continuously running agent can wait briefly for newly queued jobs instead of racing a tight manual poll.
 
+### Which Path Is Honest Today By Environment
+
+- **Linux / WSL host**
+  - push-first is valid: run `signalforge-collectors` directly and submit over HTTP
+  - job-driven is also valid today: enroll `signalforge-agent`, keep it running on the host, and let it execute collectors locally when SignalForge queues a job
+- **Containerized environment**
+  - today the honest path is **push-first**
+  - run a collector or helper near the container runtime, produce a `container-diagnostics` artifact, and submit it with `POST /api/runs`
+  - do not assume the current shipped host agent automatically supports every container-runtime collection mode
+- **Kubernetes**
+  - today the honest path is **push-first**
+  - gather Kubernetes evidence from an operator workstation, CI runner, automation job, or in-cluster helper that already has the required read access
+  - normalize that evidence into the `kubernetes-bundle.v1` JSON manifest shape, then submit it with `POST /api/runs`
+  - do not assume the current shipped host agent already models cluster-scoped or namespace-scoped Kubernetes execution forms
+
+### Install And Use By Environment
+
+**Linux / WSL host, push-first**
+
+```bash
+git clone https://github.com/Canepro/signalforge-collectors.git
+cd signalforge-collectors
+./submit-to-signalforge.sh --file examples/sample_audit.log --url http://localhost:3000
+```
+
+**Linux / WSL host, job-driven**
+
+1. Start SignalForge and set `SIGNALFORGE_ADMIN_TOKEN`.
+2. Open `/sources`, register a source, and enroll an agent.
+3. On the source host, install `signalforge-agent` and point `SIGNALFORGE_COLLECTORS_DIR` at a local `signalforge-collectors` checkout.
+4. Run the agent in continuous `run` mode for normal operation.
+5. Request collection from the Sources UI.
+
+**Containerized environment**
+
+1. Run a collector, script, or runtime helper close to the container host or workload.
+2. Produce a `container-diagnostics` artifact.
+3. Submit it directly with `POST /api/runs`, `./scripts/analyze.sh`, or another HTTP client that sends the same contract fields.
+4. Use an explicit `target_identifier` when you want workload-stable compare across redeploys.
+
+**Kubernetes**
+
+1. Run collection from a place that already has Kubernetes read access, such as a workstation, CI runner, or in-cluster helper.
+2. Gather the needed Kubernetes text/JSON evidence.
+3. Normalize it into a UTF-8 `kubernetes-bundle.v1` JSON manifest.
+4. Submit that manifest directly with `POST /api/runs`.
+5. Use an explicit scope-aware `target_identifier`, such as `cluster:<cluster-name>` or `cluster:<cluster-name>:namespace:<namespace>`.
+
 ## Step 8: Useful Commands
 
 Typecheck:
@@ -260,6 +337,25 @@ Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
 
 ```bash
 bun run test:parity
+```
+
+For local Postgres validation, prefer the helper instead of exporting env vars by hand:
+
+```bash
+bash scripts/run-postgres-parity-local.sh
+```
+
+Detection order:
+
+1. `--url`
+2. `DATABASE_URL_TEST` or `DATABASE_URL`
+3. a running local Podman container such as `signalforge-pg`
+
+Examples:
+
+```bash
+bash scripts/run-postgres-parity-local.sh --url postgres://signalforge:signalforge@127.0.0.1:5432/signalforge
+bash scripts/run-postgres-parity-local.sh --container signalforge-pg
 ```
 
 Production build:

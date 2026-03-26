@@ -9,7 +9,12 @@ import {
   hashAdminSessionCookie,
   verifyAdminSessionCookie,
 } from "@/lib/api/admin-auth";
-import { isSourceType, type SourceType } from "@/lib/source-catalog";
+import {
+  isCatalogArtifactType,
+  isSourceType,
+  type ArtifactType,
+  type SourceType,
+} from "@/lib/source-catalog";
 import { getStorage } from "@/lib/storage";
 
 async function assertAdminSession(): Promise<void> {
@@ -57,12 +62,16 @@ export async function createSourceAction(formData: FormData): Promise<void> {
   const display_name = String(formData.get("display_name") ?? "").trim();
   const target_identifier = String(formData.get("target_identifier") ?? "").trim();
   const source_type = String(formData.get("source_type") ?? "").trim();
+  const expected_artifact_type = String(formData.get("expected_artifact_type") ?? "").trim();
 
-  if (!display_name || !target_identifier || !source_type) {
+  if (!display_name || !target_identifier || !source_type || !expected_artifact_type) {
     redirect("/sources/new?error=missing");
   }
   if (!isSourceType(source_type)) {
     redirect("/sources/new?error=type");
+  }
+  if (!isCatalogArtifactType(expected_artifact_type)) {
+    redirect("/sources/new?error=artifact_type");
   }
 
   const storage = await getStorage();
@@ -72,6 +81,7 @@ export async function createSourceAction(formData: FormData): Promise<void> {
         display_name,
         target_identifier,
         source_type: source_type as SourceType,
+        expected_artifact_type: expected_artifact_type as ArtifactType,
       })
     );
     revalidatePath("/sources");

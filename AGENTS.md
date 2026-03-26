@@ -40,17 +40,27 @@ SignalForge lives in its own repo:
 **Canonical roadmap:** [`plans/roadmap.md`](plans/roadmap.md).  
 **Current snapshot:** [`plans/current-plan.md`](plans/current-plan.md).
 
-Completed through **Phase 6e** (agent repo + Sources UI polish; see `plans/current-plan.md`): analyzer, API/DB, UI, reanalyze, compare (UI + JSON API), CLI submit + **read** helpers, published API contract, **Sources** + **collection jobs** (`/sources`, operator APIs) behind **`SIGNALFORGE_ADMIN_TOKEN`** (Bearer for HTTP; `/sources/login` sets an httpOnly session cookie — not in the client bundle), agent registration API (one token per source), **agent execution routes** with **strict `instance_id`** on start/fail/artifact and on heartbeat when reporting `active_job_id`, and **strict jobs/next** (must heartbeat first with a **non-empty** capability list that includes the job’s `collect:<artifact_type>` via agent∩source caps). Lease reaper: claimed→queued, running→expired per Phase 6b. **Collection job `submitted`** means the artifact was accepted; **`result_analysis_status`** (and artifact-upload **`run_status`**) reflects whether the linked run succeeded analysis (`complete` vs `error`, etc.). Heartbeat **200** includes **`active_job_lease`** so agents see whether the lease was extended. **`signalforge-agent`** repo (Bun + TypeScript) implements the first thin external agent; validated E2E. Sources UI uses unified sidebar+topbar layout matching dashboard, with health dots, job status badges, inline settings (enable/disable, rename), agent enrollment info, action feedback, and cancel confirmation.
+Completed on `main` through **Phase 6e** (agent repo + Sources UI polish; see `plans/current-plan.md`): analyzer, API/DB, UI, reanalyze, compare (UI + JSON API), CLI submit + **read** helpers, published API contract, **Sources** + **collection jobs** (`/sources`, operator APIs) behind **`SIGNALFORGE_ADMIN_TOKEN`** (Bearer for HTTP; `/sources/login` sets an httpOnly session cookie — not in the client bundle), agent registration API (one token per source), **agent execution routes** with **strict `instance_id`** on start/fail/artifact and on heartbeat when reporting `active_job_id`, and **strict jobs/next** (must heartbeat first with a **non-empty** capability list that includes the job’s `collect:<artifact_type>` via agent∩source caps). Lease reaper: claimed→queued, running→expired per Phase 6b. **Collection job `submitted`** means the artifact was accepted; **`result_analysis_status`** (and artifact-upload **`run_status`**) reflects whether the linked run succeeded analysis (`complete` vs `error`, etc.). Heartbeat **200** includes **`active_job_lease`** so agents see whether the lease was extended. **`signalforge-agent`** repo (Bun + TypeScript) implements the first thin external agent; validated E2E. Sources UI uses unified sidebar+topbar layout matching dashboard, with health dots, job status badges, inline settings (enable/disable, rename), agent enrollment info, action feedback, and cancel confirmation.
 
-**Artifacts:** `linux-audit-log` only.
+Current branch work has moved into **Phase 8**:
+
+- `container-diagnostics` and `kubernetes-bundle` are both implemented artifact families in this checkout
+- compare now includes deterministic `evidence_delta` output for stable evidence and metadata drift
+- container analysis now covers runtime isolation signals such as privileged mode, host namespaces, writable mounts, writable root filesystem, root execution, capability adds, socket mounts, and secret mounts
+- Kubernetes analysis now covers first-slice exposure, RBAC escalation, token automount, default service-account use, writable root filesystems, secret-backed env injection, `envFrom` Secret imports, probes, and resource-governance signals
+- Kubernetes support in this branch still uses the locked `kubernetes-bundle.v1` UTF-8 JSON manifest shape, not raw support-bundle archive ingestion
+
+**Artifacts:** `linux-audit-log`, `container-diagnostics`, `kubernetes-bundle`.
 
 **Providers:** OpenAI direct; Azure OpenAI Responses with **legacy** (requires `AZURE_OPENAI_API_VERSION`) or **`/openai/v1` base URL** (omit API version — Azure rejects `api-version` on v1). Deterministic fallback if unavailable or misconfigured. See `README.md` env table.
 
 **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js (SQLite local), Postgres/Neon (production), Vitest, GitHub Actions CI.
 
-**Deployment:** Vercel with Neon Postgres. The live site uses `DATABASE_DRIVER=postgres`.
+**Deployment:** Vercel with Neon Postgres. The live site uses `DATABASE_DRIVER=postgres`. Branches and PRs can also use Vercel preview deployments, which is often the safest way to review live behavior before merging to remote `main`.
 
 **CI:** GitHub Actions (`.github/workflows/ci.yml`): typecheck, test, build on every push to `main` and on PRs; a separate Postgres parity job starts `postgres:16-alpine`, applies migrations, and runs `bun run test:parity`. Postgres schema changes follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
+
+**Local Postgres validation:** prefer [`scripts/run-postgres-parity-local.sh`](scripts/run-postgres-parity-local.sh) for local Postgres parity work. It mirrors the CI flow by resolving a local Postgres URL, applying migrations, and then running the parity suite with one-shot env vars.
 
 ## Current Priorities
 
@@ -67,6 +77,8 @@ Historical context:
 - [`plans/phase-2-ui.md`](plans/phase-2-ui.md)
 
 Those older plan files are useful context, but they are no longer the source of truth for current status.
+
+For this branch specifically, prioritize current checkout reality over older phase labels. The working source of truth is still `plans/current-plan.md`, but this branch intentionally contains newer Phase 8 slices than `main`.
 
 **External agent (implemented):** `signalforge-agent` repo (Bun + TypeScript) implements the thin execution-plane agent from Phase 6b. Validated end-to-end: source → queued job → agent claim → first-audit.sh → artifact upload → submitted job + linked run. Lease-loss is fatal (agent aborts + POSTs fail); artifact selection requires a freshly produced log (snapshot before/after). Reference: [`plans/phase-6b-source-job-api-contract.md`](plans/phase-6b-source-job-api-contract.md).
 
@@ -126,6 +138,20 @@ Core directories:
 - Prefer targeted rule improvements over broad abstraction.
 - Preserve evidence grounding for every finding.
 - Keep UI operator-first, table-first, and light-theme by default.
+- Use the local `naming-quality` skill whenever naming or renaming files, fixtures, modules, exported identifiers, routes, API fields, or user-facing labels.
+- Treat naming as part of product quality. Prefer scenario-based, open-source-safe names over names tied to the author's machine, provider, runtime, or temporary environment unless that provenance is itself the behavior under test.
+- Do not optimize Kubernetes or container work for the weakest demo that happens to pass tests. Prefer slices that feel credible to a real platform engineer.
+- For Kubernetes, container, and platform-security work, prefer official upstream guidance and cloud-provider best practices over ad hoc heuristics when choosing rules, priorities, and wording.
+- Use relevant local skills proactively when the task matches them, especially `kubernetes-platform-architecture`, `k8s-sre-triage`, `gitops-workflow`, `observability-architecture`, `grill-me`, and `tdd`.
+- When realistic validation or fixture quality would materially improve the result, use the available local runtime tools and environments instead of staying purely synthetic. This machine may provide `kubectl`, `podman`, Docker-compatible commands, local clusters, and cloud-cluster access.
+- Use richer platform examples when they help widen coverage, but keep the product model rooted in plain Kubernetes primitives. Rules, docs, labels, and fixtures should still make sense to operators who do not run Argo CD, Grafana, external-secrets, or any other optional platform layer.
+- Prefer detections that map back to broadly available Kubernetes surfaces such as workload specs, Services, RBAC, probes, volumes, securityContext, and NetworkPolicy. Platform-specific examples are evidence sources, not the product boundary.
+- Be careful with live infrastructure: inspect first, prefer read-only commands by default, avoid changing cluster state unless explicitly requested, and report clearly which environment was used.
+- After non-trivial changes, run targeted validation by default.
+- In `--yolo` or other high-autonomy workflows, do not skip relevant verification unless the user explicitly says to.
+- Prefer the smallest validation that meaningfully covers the change.
+- After validation, report exactly what ran, what passed, what failed, and any remaining risk.
+- For local Postgres parity, prefer `bash scripts/run-postgres-parity-local.sh` over ad hoc exported connection strings unless the task specifically requires a different database target.
 
 ## Codex Skills Available
 
@@ -149,6 +175,7 @@ This environment usually provides a Codex skill catalog at runtime. Agents shoul
 - `grill-me`
 - `setup-pre-commit`
 - `openai-docs`
+- `naming-quality` when available
 
 ### Adjacent Platform / Ops Skills
 
@@ -176,6 +203,7 @@ This environment usually provides a Codex skill catalog at runtime. Agents shoul
 - For UI critique or layout cleanup, use `frontend-review` and `responsive-design`.
 - For behavior changes, prefer `tdd`.
 - For architectural cleanup or reshaping module boundaries, use `improve-codebase-architecture` or `design-an-interface`.
+- For Kubernetes and platform work, do not stop at toy examples when better evidence is available. Use official documentation, realistic fixtures, and live read-only inspection when that materially improves rule quality or operator trust.
 - Treat skill availability as session-dependent. Re-check the runtime skill list if a named skill is missing.
 
 ## Non-Goals
@@ -263,6 +291,12 @@ Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
 bun run test:parity
 ```
 
+Local Postgres parity helper (detects local Podman Postgres such as `signalforge-pg`, applies migrations, then runs parity):
+
+```bash
+bash scripts/run-postgres-parity-local.sh
+```
+
 Postgres migrations:
 
 ```bash
@@ -312,6 +346,9 @@ Mandatory fixtures:
 - `tests/fixtures/wsl-nov2025-full.log`
 - `tests/fixtures/wsl-nov2025-truncated.log`
 - `tests/fixtures/wsl-mar2026-full.log`
+- `tests/fixtures/container-database-service.txt`
+- `tests/fixtures/kubernetes-payments-bundle.json`
+- `tests/fixtures/kubernetes-public-ingress-namespace.json`
 
 When changing findings logic, verify against these first.
 

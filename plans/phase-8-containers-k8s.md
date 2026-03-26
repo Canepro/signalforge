@@ -20,6 +20,8 @@ Durable decisions that apply across all phases:
   - containers should prefer explicit `target_identifier` values that reflect the intended compare scope, for example `container-workload:<host>:<runtime>:<service>` or `container-instance:<host>:<runtime>:<container-id>`
   - Kubernetes should prefer explicit `target_identifier` values such as `cluster:<cluster-name>` or `cluster:<cluster-name>:namespace:<scope>`
 - **Operator UX**: containers and Kubernetes must feel like first-class evidence types in upload, run detail, compare, and docs before any orchestration work is considered.
+- **Quality bar**: Phase 8 should not stop at the weakest demo that proves the plumbing. Container and Kubernetes slices should aim for credible operator value, using official platform guidance, realistic fixtures, and real read-only cluster/runtime inspection when that materially improves rule quality.
+- **Kubernetes breadth without tool lock-in**: richer platform examples such as Argo CD, Grafana, ingress controllers, or secrets operators are useful evidence sources, but the product should still describe and detect plain Kubernetes primitives first. A cluster without those optional tools should still recognize the rule set as relevant.
 - **Trust model**: collection and remediation are different trust classes. Remediation is deferred for now, but not forbidden as a future product direction.
 
 ---
@@ -65,7 +67,6 @@ These should be settled quickly before writing implementation code:
 
 - **Container artifact shape**: one plain-text collector output vs a small structured bundle normalized to text or JSON before ingestion.
 - **Kubernetes scope**: cluster-wide support bundle first vs namespace-scoped evidence first.
-- **Kubernetes artifact envelope**: normalized text or JSON export first vs raw archive support as a prerequisite ingestion change.
 - **Compare delta contract**: whether `evidence_delta` is a sibling summary block or a new row status family, and what exact API payload carries it.
 - **Reference collectors**: whether the first container and Kubernetes push paths live only in `signalforge-collectors` or begin as documented external contracts with fixtures first.
 - **Target identity defaults**:
@@ -80,6 +81,92 @@ These should be settled quickly before writing implementation code:
   - higher-trust remediation later, with explicit approvals and auditability
 
 If any of these stay fuzzy, compare and fixtures will get reworked later.
+
+---
+
+## Kubernetes Envelope Decision For v1
+
+This decision is now locked for the first Kubernetes implementation slice.
+
+- **Envelope**: `kubernetes-bundle` v1 will use a **UTF-8 JSON manifest submitted through the existing text upload path**.
+- **No raw archives in v1**: `.zip`, `.tar`, `.tar.gz`, binary blobs, or base64-packed bundle uploads are explicitly out of scope for the first slice.
+- **Producer responsibility**: collectors must unpack, normalize, and select relevant Kubernetes evidence **before** upload.
+- **Analyzer responsibility**: SignalForge consumes one JSON document that contains stable metadata plus a set of named text documents.
+
+### Why this shape wins
+
+Three viable designs were considered:
+
+1. **Raw archive ingestion**
+   - Best fidelity, but it immediately forces binary upload, archive parsing, storage changes, and new failure modes before any Kubernetes finding value exists.
+2. **Single flattened text export**
+   - Fits today’s ingestion path, but it loses document boundaries too aggressively and makes deterministic parsing, fixture review, and compare metrics harder.
+3. **Structured JSON manifest carrying named text documents**
+   - Keeps the current ingestion/storage model, preserves internal document boundaries, and is easy to fixture, diff, and parse deterministically.
+
+Recommendation: choose option 3 for v1 and defer raw archive support until there is clear evidence that the normalized manifest loses necessary diagnostic value.
+
+### Required manifest properties
+
+- One uploaded artifact is one UTF-8 JSON string.
+- The manifest must carry stable cluster and scope metadata at the top level.
+- Each embedded document must be UTF-8 text, not binary content.
+- Each embedded document must keep a stable `path` or logical name so deterministic parsing and compare metrics can stay document-aware.
+- The first scope model should support:
+  - cluster-wide bundles
+  - namespace-scoped bundles
+- The intended compare anchor should be explicit in submission metadata:
+  - cluster scope: `target_identifier=cluster:<cluster-name>`
+  - namespace scope: `target_identifier=cluster:<cluster-name>:namespace:<namespace>`
+
+### Recommended manifest shape
+
+```json
+{
+  "schema_version": "kubernetes-bundle.v1",
+  "cluster": {
+    "name": "prod-eu-1",
+    "provider": "aks"
+  },
+  "scope": {
+    "level": "cluster",
+    "namespace": null
+  },
+  "collected_at": "2026-03-25T10:15:00Z",
+  "collector": {
+    "type": "signalforge-collectors",
+    "version": "0.1.0"
+  },
+  "documents": [
+    {
+      "path": "kubectl/get-nodes.json",
+      "kind": "kubectl-resource-list",
+      "media_type": "application/json",
+      "content": "{...json text...}"
+    },
+    {
+      "path": "kubectl/get-pods-all-namespaces.txt",
+      "kind": "kubectl-table",
+      "media_type": "text/plain",
+      "content": "NAMESPACE NAME READY STATUS ..."
+    },
+    {
+      "path": "events/warning-events.txt",
+      "kind": "events",
+      "media_type": "text/plain",
+      "content": "..."
+    }
+  ]
+}
+```
+
+### Guardrails
+
+- Keep `documents[*].content` text-only in v1.
+- Do not add nested tarballs, screenshots, or opaque binary attachments.
+- Do not require SignalForge to understand every possible support-bundle layout.
+- Prefer a narrow reference export with a small set of explicit document kinds first.
+- If later evidence shows that critical value is lost during normalization, treat raw archive support as a separate ingestion/storage phase, not a quiet extension of the same adapter.
 
 ---
 
@@ -254,12 +341,12 @@ For the first slice, keep the artifact envelope compatible with the current inge
 
 ### Acceptance criteria
 
-- [ ] SignalForge accepts `artifact_type=container-diagnostics`.
-- [ ] A dedicated adapter handles environment detection, noise suppression, deterministic findings, and incomplete-audit detection for container evidence.
-- [ ] At least one real fixture and one golden expected-output contract exist for a container artifact.
-- [ ] Upload, run detail, and compare work end-to-end for container runs.
-- [ ] Docs describe the reference submission pattern and required metadata for stable compare.
-- [ ] The docs make the intended compare identity explicit: container workload vs container instance.
+- [x] SignalForge accepts `artifact_type=container-diagnostics`.
+- [x] A dedicated adapter handles environment detection, noise suppression, deterministic findings, and incomplete-audit detection for container evidence.
+- [x] At least one real fixture and one golden expected-output contract exist for a container artifact.
+- [x] Upload, run detail, and compare work end-to-end for container runs.
+- [x] Docs describe the reference submission pattern and required metadata for stable compare.
+- [x] The docs make the intended compare identity explicit: container workload vs container instance.
 
 ### Tracer-bullet success condition
 
@@ -293,6 +380,11 @@ Container quality work should stay narrow at first:
 - image/runtime hygiene signals that are explicit in the artifact
 - noisy-but-expected container runtime chatter
 
+Current branch status:
+- complete through the first credible container slice
+- compare and fallback wording are already container-aware
+- further work is optional tuning, not missing plumbing
+
 ---
 
 ## Phase 3: Kubernetes Bundle Push Path
@@ -305,19 +397,21 @@ Container quality work should stay narrow at first:
 
 Introduce `kubernetes-bundle` as a third artifact family. Start with support-bundle style evidence that is easy to export and upload, rather than live-cluster access from SignalForge. Focus the first slice on cluster or namespace configuration and health evidence that can be analyzed deterministically.
 
-Before implementation starts, explicitly choose the artifact envelope:
+For v1, the artifact envelope is already chosen:
 
-- If v1 uses normalized text or JSON evidence, keep the current ingestion path and document the export shape.
-- If v1 requires raw archive uploads, create a prerequisite ingestion/storage phase and do not treat Kubernetes as only an adapter addition.
+- use a UTF-8 JSON manifest submitted through the current text upload path
+- carry stable top-level cluster and scope metadata plus named embedded text documents
+- keep raw archive or binary support out of scope for this phase
 
 ### Acceptance criteria
 
-- [ ] SignalForge accepts `artifact_type=kubernetes-bundle`.
-- [ ] A dedicated adapter handles Kubernetes environment detection, noise suppression, deterministic findings, and incomplete-bundle detection.
-- [ ] At least one real fixture and one golden expected-output contract exist for Kubernetes evidence.
-- [ ] Upload, run detail, and compare work end-to-end for Kubernetes runs.
-- [ ] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
-- [ ] The implementation makes scope explicit so cluster-wide and namespace-scoped bundles do not compare accidentally.
+- [x] SignalForge accepts `artifact_type=kubernetes-bundle`.
+- [x] A dedicated adapter handles Kubernetes environment detection, noise suppression, deterministic findings, and incomplete-bundle detection.
+- [x] At least one real fixture and one golden expected-output contract exist for Kubernetes evidence.
+- [x] Upload, run detail, and compare work end-to-end for Kubernetes runs.
+- [x] The first implementation consumes the locked `kubernetes-bundle.v1` JSON manifest shape rather than a raw archive.
+- [x] Submission docs define the recommended `target_identifier` and scope model for clusters and namespaces.
+- [x] The implementation makes scope explicit so cluster-wide and namespace-scoped bundles do not compare accidentally.
 
 ### Tracer-bullet success condition
 
@@ -335,12 +429,15 @@ A single Kubernetes bundle can be submitted end-to-end and produces a credible r
 
 Improve the Kubernetes adapter around RBAC exposure, control-plane or workload misconfiguration, public service exposure, secret/config drift, workload health, and noisy-but-expected platform conditions. Tune summaries and actions around cluster operators and platform engineers rather than host admins.
 
+The implementation should use real platform guidance rather than improvised severity lore. Recommended sources include upstream Kubernetes security guidance, Pod Security Standards, RBAC least-privilege guidance, Service/networking docs, probe guidance, and provider-specific operational guidance where it affects realistic defaults or wording.
+
 ### Acceptance criteria
 
-- [ ] Deterministic rules cover a first credible Kubernetes-specific risk set.
-- [ ] Expected platform noise is documented and suppressed deterministically where appropriate.
-- [ ] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
-- [ ] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
+- [x] Deterministic rules cover a first credible Kubernetes-specific risk set.
+- [x] Expected platform noise is documented and suppressed deterministically where appropriate.
+- [x] Compare normalization handles stable issue identity across bundle exports with volatile names or counts.
+- [x] The product can demonstrate meaningful compare output across two Kubernetes runs even when the broad risk posture is stable.
+- [x] At least part of the Kubernetes rule and fixture set is informed by realistic bundle content or live read-only cluster inspection rather than purely invented synthetic examples.
 
 ### Notes
 
@@ -350,6 +447,18 @@ Kubernetes quality work should start with high-signal areas only:
 - workload health and crash patterns
 - secret/config drift that is explicit in the evidence
 - noisy control-plane or system add-on conditions filtered as expected where justified
+
+Guardrails for execution:
+
+- prefer read-only cluster inspection when generating or validating realistic fixtures
+- use local tools such as `kubectl`, `podman`, or Docker-compatible commands when they materially improve fixture realism
+- do not mutate live clusters unless the user explicitly asks for that
+- document which cluster/runtime context informed a rule or fixture when that context meaningfully shaped the result
+
+Current branch status:
+- public exposure, namespace isolation gaps, workload health, secret handling, workload hardening, host-escape settings, RBAC over-breadth, workload-to-identity joins, and exposed-workload-to-identity joins are already implemented
+- deterministic platform noise now suppresses clearly healthy zero-restart workload status records instead of treating them as actionable findings
+- compare normalization now keeps several Kubernetes workload findings stable when only trailing counts change across bundle exports
 
 ---
 
@@ -374,6 +483,11 @@ This phase must not silently assume that one logical source always maps to one r
 - [ ] Source registration supports the new artifact families and collector labels.
 - [ ] “How to collect” guidance is artifact-aware for Linux, containers, and Kubernetes.
 - [ ] The UI clearly distinguishes push-first submission patterns from job-driven host collection.
+- [ ] The UI and docs clearly explain where `signalforge`, `signalforge-collectors`, and `signalforge-agent` each fit in the flow.
+- [ ] The UI and docs explain install and usage expectations by environment:
+  - Linux / WSL host: host-local collector or job-driven host agent
+  - containerized environment: push-first collector execution near the runtime
+  - Kubernetes: push-first normalized bundle collection from a workstation, CI runner, or in-cluster helper with cluster access
 - [ ] No live-cluster or container-runtime remote execution is introduced into the web app.
 - [ ] The chosen model for execution scope is documented before any multi-scope agent behavior is implied in UI copy or API shape.
 
@@ -383,6 +497,10 @@ This phase should follow real submissions, not lead them. SignalForge needs the 
 
 When this phase happens, the UI should be honest about scope:
 - push-first flows remain valid even if no agent is present
+- `signalforge-agent` is the execution-plane helper for job-driven collection, not the collector logic itself
+- `signalforge-collectors` produces artifacts and can also push them directly without any agent in the loop
+- Linux / WSL host collection is the current honest job-driven path
+- container and Kubernetes now also have real host-agent execution paths, but they still depend on host-local scope preparation and should not be presented as a clean multi-target deployment model yet
 - some future capabilities may require cluster-scoped collection, not just namespace-scoped collection
 - remediation, if ever added, must be represented as a higher-trust mode than read-only diagnostics
 

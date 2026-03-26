@@ -22,6 +22,16 @@ export function SourcesShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <TopBar
+          mobileMenuFooter={
+            <form action={logoutAdminAction}>
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 text-sm font-medium text-on-surface"
+              >
+                Sign out
+              </button>
+            </form>
+          }
           breadcrumb={
             <>
               <span className="text-on-surface font-semibold">Sources</span>
@@ -36,9 +46,11 @@ export function SourcesShell({ children }: { children: React.ReactNode }) {
               </form>
             </>
           }
+          onUploadClick={() => setUploadOpen(true)}
+          onCollectEvidenceClick={() => setCollectOpen(true)}
         />
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-          <div className="max-w-4xl mx-auto">{children}</div>
+          <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>
     </div>

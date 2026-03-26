@@ -8,11 +8,13 @@ SignalForge ingests infrastructure evidence, turns it into findings, stores runs
 - what changed since the last run?
 - what should I do now?
 
-Today, the shipped product is strongest on one artifact family:
+Today, the current branch supports three artifact families:
 
 - `linux-audit-log`
+- `container-diagnostics`
+- `kubernetes-bundle`
 
-That currently means Linux and WSL audit logs in the `signalforge-collectors` style.
+That currently means Linux and WSL audit logs in the `signalforge-collectors` style, plus text-based container diagnostic artifacts for a single container or workload, and UTF-8 JSON Kubernetes evidence bundles.
 
 ## What SignalForge Is
 
@@ -56,6 +58,7 @@ The live site uses:
 - `DATABASE_DRIVER=postgres`
 - Neon-hosted Postgres: set `DATABASE_URL` to the connection string from Neon (direct or pooled hostname). The app uses the [`pg`](https://node-postgres.com/) driver with a connection pool (`src/lib/storage/postgres.ts`); there is no Neon-specific JavaScript driver in this repo.
 - Vercel serverless functions for all API routes
+- Vercel preview deployments for branches and pull requests, so feature work can be reviewed live before anything is pushed or merged to remote `main`
 
 Local development defaults to SQLite. The production deployment uses Postgres exclusively.
 
@@ -122,7 +125,7 @@ For the fuller step-by-step version, use [`docs/getting-started.md`](docs/gettin
 
 - upload an artifact
 - inspect the run detail page
-- **Sources** (`/sources`): register a target, request **Collect Fresh Evidence** jobs (queued until a thin external agent claims them via the Phase **6d** agent API; for interactive use, run the agent continuously on the source machine so it can heartbeat and long-poll for new jobs instead of relying on one-shot timing — see [`docs/api-contract.md`](docs/api-contract.md) and [`plans/phase-6b-source-job-api-contract.md`](plans/phase-6b-source-job-api-contract.md))
+- **Sources** (`/sources`): register a target, request **Collect Fresh Evidence** jobs (queued until a thin external agent claims them via the Phase **6d** agent API; the preferred deployment model is a long-running agent service on the execution host, not an operator laptop or ad hoc one-shot shell session, so it can heartbeat and long-poll for work reliably — see [`docs/api-contract.md`](docs/api-contract.md) and [`plans/phase-6b-source-job-api-contract.md`](plans/phase-6b-source-job-api-contract.md))
 - reanalyze the same stored artifact if needed
 - compare runs
 
@@ -150,6 +153,18 @@ Reference path:
 
 - [signalforge-collectors](https://github.com/Canepro/signalforge-collectors) — `submit-to-signalforge.sh` (repo root)
 - `signalforge-agent` (sibling repo, not yet published) — thin execution-plane agent (heartbeat, poll, claim, run collectors, upload artifacts)
+
+Preferred job-driven deployment stance:
+
+- run `signalforge-agent` as an always-on service near the target
+- use a dedicated local service identity and least privilege
+- avoid workstation kubeconfig, ambient shell context, and command-line secrets as the normal production model
+
+Deployment guidance:
+
+- [`docs/agent-deployment.md`](docs/agent-deployment.md)
+
+More detail: [`docs/agent-deployment.md`](docs/agent-deployment.md)
 
 Contract docs:
 
@@ -213,9 +228,11 @@ Historical background only:
 
 ## Current Scope
 
-Current shipped artifact family:
+Current shipped artifact families in this checkout:
 
 - `linux-audit-log`
+- `container-diagnostics`
+- `kubernetes-bundle`
 
 Current strengths:
 
@@ -228,7 +245,7 @@ Current strengths:
 
 Current limitations:
 
-- one artifact family only
+- Kubernetes support is still a first slice built around the `kubernetes-bundle.v1` JSON manifest, not raw support-bundle archive ingestion
 - recommendations are bounded by captured evidence
 - findings quality will continue to improve as more real logs are reviewed
 
@@ -305,6 +322,14 @@ Before starting the app on Postgres, apply the checked-in SQL migrations:
 ```bash
 bun run db:migrate:postgres
 ```
+
+For local Postgres parity validation, prefer:
+
+```bash
+bash scripts/run-postgres-parity-local.sh
+```
+
+That helper will use `--url` if provided, otherwise `DATABASE_URL_TEST` / `DATABASE_URL`, otherwise it will try to detect a local Podman container such as `signalforge-pg`.
 
 SQLite remains the easiest local quickstart path. Postgres is the recommended production backend. The live Vercel deployment uses Neon Postgres.
 

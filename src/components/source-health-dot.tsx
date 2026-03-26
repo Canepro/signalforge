@@ -30,7 +30,7 @@ export function SourceHealthDot({ status, size = "sm" }: { status: string; size?
   const ringSize = size === "lg" ? "h-6 w-6" : "h-4.5 w-4.5";
 
   return (
-    <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+    <span className="inline-flex items-center gap-2 text-[11px] font-semibold text-on-surface-variant">
       <span className={`inline-flex items-center justify-center rounded-full border-2 ${cfg.ring} ${ringSize}`}>
         <span
           className={`inline-block rounded-full ${dotSize} ${cfg.dot} ${cfg.glow ?? ""}`}

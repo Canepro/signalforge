@@ -2,6 +2,10 @@ import Link from "next/link";
 import { LivePageRefresh } from "@/components/live-page-refresh";
 import { SourceHealthDot } from "@/components/source-health-dot";
 import { getStorage } from "@/lib/storage";
+import {
+  getArtifactTypeLabel,
+  getSourceTypeLabel,
+} from "@/lib/source-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -97,16 +101,23 @@ export default async function SourcesListPage({
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-on-surface-variant mt-0.5 font-mono truncate">{s.target_identifier}</div>
-                    <div className="flex items-center gap-3 mt-1.5 text-[10px] text-outline">
-                      <span>{s.source_type}</span>
-                      <span className="text-outline-variant/50">·</span>
-                      <span>{s.expected_artifact_type}</span>
+                    <div className="mt-1 text-xs text-on-surface-variant">
+                      <span className="font-semibold text-on-surface-variant">Target:</span>{" "}
+                      <span className="inline-block max-w-full truncate font-mono">
+                        {s.target_identifier}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+                      <span className="rounded-full border border-outline-variant/15 bg-surface-container-low px-2 py-0.5 font-semibold uppercase tracking-wider text-on-surface-variant">
+                        {getSourceTypeLabel(s.source_type)}
+                      </span>
+                      <span className="rounded-full border border-outline-variant/15 bg-surface-container-low px-2 py-0.5 font-semibold uppercase tracking-wider text-on-surface-variant">
+                        {getArtifactTypeLabel(s.expected_artifact_type)}
+                      </span>
                       {s.last_seen_at && (
-                        <>
-                          <span className="text-outline-variant/50">·</span>
-                          <span>seen {relativeTime(s.last_seen_at)}</span>
-                        </>
+                        <span className="text-outline-variant/80">
+                          seen {relativeTime(s.last_seen_at)}
+                        </span>
                       )}
                     </div>
                   </div>

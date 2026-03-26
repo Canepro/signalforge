@@ -1,0 +1,37 @@
+{
+  "schema_version": "kubernetes-bundle.v1",
+  "cluster": {
+    "name": "oke-edge-prod",
+    "provider": "oke"
+  },
+  "scope": {
+    "level": "namespace",
+    "namespace": "ingress-nginx"
+  },
+  "documents": [
+    {
+      "path": "network/services.json",
+      "kind": "service-exposure",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"ingress-nginx\",\"name\":\"nginx-ingress-controller\",\"type\":\"LoadBalancer\",\"external\":true}]"
+    },
+    {
+      "path": "network/network-policies.json",
+      "kind": "network-policies",
+      "media_type": "application/json",
+      "content": "[]"
+    },
+    {
+      "path": "workloads/specs.json",
+      "kind": "workload-specs",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"ingress-nginx\",\"name\":\"nginx-ingress-controller\",\"kind\":\"Deployment\",\"pod_spec\":{\"serviceAccountName\":\"ingress-controller\",\"automountServiceAccountToken\":true,\"containers\":[{\"name\":\"controller\",\"securityContext\":{\"allowPrivilegeEscalation\":false,\"runAsNonRoot\":true,\"readOnlyRootFilesystem\":false,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":10254}},\"livenessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":10254}},\"resources\":{\"requests\":{\"cpu\":\"100m\",\"memory\":\"128Mi\"},\"limits\":{\"cpu\":\"500m\",\"memory\":\"256Mi\"}}}]}}]"
+    },
+    {
+      "path": "workloads/status.json",
+      "kind": "workload-status",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"ingress-nginx\",\"name\":\"nginx-ingress-controller\",\"status\":\"Healthy\",\"restarts\":0}]"
+    }
+  ]
+}
