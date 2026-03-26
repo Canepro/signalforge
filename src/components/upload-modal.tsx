@@ -3,8 +3,7 @@
 import { useRef, useState, useEffect, useCallback, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  DEFAULT_EXPECTED_ARTIFACT_TYPE,
-  getArtifactTypeLabel,
+  listArtifactFamilyPresentations,
 } from "@/lib/source-catalog";
 
 interface UploadModalProps {
@@ -19,7 +18,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const currentArtifactLabel = getArtifactTypeLabel(DEFAULT_EXPECTED_ARTIFACT_TYPE);
+  const artifactFamilies = listArtifactFamilyPresentations();
 
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -158,10 +157,36 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
           </div>
         )}
 
-        <div className="mt-3 text-[10px] text-outline-variant">
-          Current shipped artifact family: {currentArtifactLabel} (
-          <code className="text-[10px] font-mono">{DEFAULT_EXPECTED_ARTIFACT_TYPE}</code>).
-          Uploaded artifacts are analyzed immediately.
+        <div className="mt-4 space-y-3">
+          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-3">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Supported artifact families
+            </div>
+            <div className="mt-2 space-y-2">
+              {artifactFamilies.map((family) => (
+                <div
+                  key={family.value}
+                  className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-on-surface">{family.label}</div>
+                    <code className="text-[10px] text-outline-variant">{family.value}</code>
+                  </div>
+                  <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                    {family.uploadShape}
+                  </div>
+                  <div className="mt-1 text-[10px] leading-snug text-outline-variant">
+                    {family.targetIdentifierHint}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-[10px] leading-snug text-outline-variant">
+            UI upload analyzes the file immediately, but it does not prompt for metadata such as
+            <code className="mx-1 text-[10px] font-mono">target_identifier</code>. For stable compare on repeated manual submissions, prefer the CLI or external submit path so you can pass source metadata explicitly.
+          </div>
         </div>
       </div>
     </div>

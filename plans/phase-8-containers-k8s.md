@@ -483,6 +483,11 @@ This phase must not silently assume that one logical source always maps to one r
 - [ ] Source registration supports the new artifact families and collector labels.
 - [ ] “How to collect” guidance is artifact-aware for Linux, containers, and Kubernetes.
 - [ ] The UI clearly distinguishes push-first submission patterns from job-driven host collection.
+- [ ] The UI and docs clearly explain where `signalforge`, `signalforge-collectors`, and `signalforge-agent` each fit in the flow.
+- [ ] The UI and docs explain install and usage expectations by environment:
+  - Linux / WSL host: host-local collector or job-driven host agent
+  - containerized environment: push-first collector execution near the runtime
+  - Kubernetes: push-first normalized bundle collection from a workstation, CI runner, or in-cluster helper with cluster access
 - [ ] No live-cluster or container-runtime remote execution is introduced into the web app.
 - [ ] The chosen model for execution scope is documented before any multi-scope agent behavior is implied in UI copy or API shape.
 
@@ -492,6 +497,10 @@ This phase should follow real submissions, not lead them. SignalForge needs the 
 
 When this phase happens, the UI should be honest about scope:
 - push-first flows remain valid even if no agent is present
+- `signalforge-agent` is the execution-plane helper for job-driven collection, not the collector logic itself
+- `signalforge-collectors` produces artifacts and can also push them directly without any agent in the loop
+- Linux / WSL host collection is the current honest job-driven path
+- container and Kubernetes now also have real host-agent execution paths, but they still depend on host-local scope preparation and should not be presented as a clean multi-target deployment model yet
 - some future capabilities may require cluster-scoped collection, not just namespace-scoped collection
 - remediation, if ever added, must be represented as a higher-trust mode than read-only diagnostics
 

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  DEFAULT_EXPECTED_ARTIFACT_TYPE,
-  getArtifactTypeLabel,
+  COLLECTION_STACK_ROLES,
+  listArtifactFamilyPresentations,
 } from "@/lib/source-catalog";
 
 interface CollectEvidenceModalProps {
@@ -49,7 +49,7 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
 export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [origin, setOrigin] = useState("http://localhost:3000");
-  const currentArtifactLabel = getArtifactTypeLabel(DEFAULT_EXPECTED_ARTIFACT_TYPE);
+  const artifactFamilies = listArtifactFamilyPresentations();
 
   useEffect(() => {
     if (open && typeof window !== "undefined") {
@@ -82,6 +82,13 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `SIGNALFORGE_AGENT_TOKEN=<token from enrollment or reissue>`,
     `SIGNALFORGE_AGENT_INSTANCE_ID=$(hostname)-agent-1`,
     `SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
+    `# Optional: narrow capabilities explicitly instead of relying on auto-detection`,
+    `# SIGNALFORGE_AGENT_CAPABILITIES=collect:linux-audit-log,upload:multipart`,
+    `# Container jobs: pin one runtime-visible target`,
+    `# SIGNALFORGE_CONTAINER_REF=payments-api`,
+    `# Kubernetes jobs: pin the intended context and scope`,
+    `# SIGNALFORGE_KUBERNETES_SCOPE=namespace`,
+    `# SIGNALFORGE_KUBERNETES_NAMESPACE=payments`,
     `SIGNALFORGE_POLL_INTERVAL_MS=30000`,
     `SIGNALFORGE_JOBS_WAIT_SECONDS=20`,
   ].join("\n");
@@ -118,9 +125,21 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
   const cliSubmit = `SIGNALFORGE_URL=${origin} ./scripts/analyze.sh /path/to/your-artifact.log`;
 
-  const collectorPush = [
+  const collectorPushLinux = [
     `cd /path/to/signalforge-collectors`,
     `SIGNALFORGE_URL=${origin} ./submit-to-signalforge.sh --file examples/sample_audit.log`,
+  ].join("\n");
+
+  const collectorPushContainer = [
+    `cd /path/to/signalforge-collectors`,
+    `./collect-container-diagnostics.sh --runtime podman --container payments-api --output ./payments-container.txt`,
+    `SIGNALFORGE_URL=${origin} ./submit-to-signalforge.sh --file ./payments-container.txt --artifact-type container-diagnostics --target-id 'container-workload:host-a:podman:payments-api' --source-label 'signalforge-collectors:collect-container-diagnostics.sh'`,
+  ].join("\n");
+
+  const collectorPushKubernetes = [
+    `cd /path/to/signalforge-collectors`,
+    `./collect-kubernetes-bundle.sh --namespace payments --output ./payments-bundle.json`,
+    `SIGNALFORGE_URL=${origin} ./submit-to-signalforge.sh --file ./payments-bundle.json --artifact-type kubernetes-bundle --target-id 'cluster:prod-eu-1:namespace:payments' --source-label 'signalforge-collectors:collect-kubernetes-bundle.sh'`,
   ].join("\n");
 
   return (
@@ -145,9 +164,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               Collect evidence
             </h2>
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-              SignalForge analyzes evidence; collection runs outside the app.
-              Use the <strong>job-driven</strong> path (Sources + agent) or <strong>push</strong> directly.
-              The current shipped artifact family is <strong>{currentArtifactLabel}</strong>.
+              SignalForge analyzes evidence, but collection runs outside the app. Use a <strong>push-first</strong> path when you already have an artifact, or a <strong>job-driven</strong> path when you want a running agent to poll and collect on demand.
             </p>
           </div>
           <button
@@ -163,6 +180,59 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
         </div>
 
         <div className="px-5 py-4 space-y-5">
+          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+              How the repos fit together
+            </h3>
+            <div className="space-y-2">
+              {COLLECTION_STACK_ROLES.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <code className="text-[10px] font-mono text-on-surface">{entry.label}</code>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                      {entry.role}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                    {entry.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+              Supported artifact families
+            </h3>
+            <div className="space-y-2">
+              {artifactFamilies.map((family) => (
+                <div
+                  key={family.value}
+                  className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-on-surface">{family.label}</div>
+                    <code className="text-[10px] text-outline-variant">{family.value}</code>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                    {family.description}
+                  </p>
+                  <div className="mt-2 space-y-1 text-[10px] leading-snug text-outline-variant">
+                    <div>Upload shape: {family.uploadShape}</div>
+                    <div>Compare hint: {family.targetIdentifierHint}</div>
+                    <div>Target id example: <code className="font-mono">{family.targetIdentifierExample}</code></div>
+                    <div>Normal path: {family.recommendedCollection}</div>
+                    <div>Job-driven status: {family.jobDrivenStatus}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Job-driven path — lead with this */}
           <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-widest text-primary">
@@ -190,6 +260,9 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               <span className="font-semibold text-on-surface">run</span> stays alive in the background;{" "}
               <span className="font-semibold text-on-surface">once</span> is only for smoke tests, debugging, or cron-style schedules.
             </p>
+            <p className="text-[11px] leading-relaxed text-on-surface-variant">
+              Linux host sources are the cleanest fit for this model. Container and Kubernetes sources also work when the agent host is deliberately prepared for that target and scope, but those family-specific inputs are still host-local environment, not per-job settings.
+            </p>
           </div>
 
           <CopyBlock label="Agent env file" text={agentEnvFile} />
@@ -215,16 +288,19 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Alternative: direct push</h3>
             <p className="text-[11px] text-on-surface-variant leading-relaxed">
               If you already have a compatible diagnostic artifact and don&apos;t need job tracking, push it directly.
-              Use <span className="font-semibold text-on-surface">--target-id</span> so compare can match runs to the same host.
+              This is the most flexible path for container and Kubernetes because you can choose target scope explicitly.
             </p>
           </div>
 
           <CopyBlock label="Submit from this repo (CLI)" text={cliSubmit} />
 
-          <CopyBlock label="Reference push (from signalforge-collectors checkout)" text={collectorPush} />
+          <CopyBlock label="Reference push: Linux audit" text={collectorPushLinux} />
+
+          <CopyBlock label="Reference push: container diagnostics" text={collectorPushContainer} />
+
+          <CopyBlock label="Reference push: Kubernetes bundle" text={collectorPushKubernetes} />
 
           <p className="text-[10px] text-outline-variant leading-snug">
-            Current family: <span className="font-mono">{DEFAULT_EXPECTED_ARTIFACT_TYPE}</span>.{" "}
             Docs: <span className="font-mono">docs/external-submit.md</span>,{" "}
             <span className="font-mono">docs/getting-started.md</span>
           </p>

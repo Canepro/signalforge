@@ -6,11 +6,13 @@ import {
   requestCollectionFromDashboardAction,
   type DashboardRequestCollectionState,
 } from "@/app/sources/actions";
+import { getArtifactTypeLabel } from "@/lib/source-catalog";
 
 export interface DashboardCollectionSource {
   id: string;
   display_name: string;
   target_identifier: string;
+  expected_artifact_type: string;
   last_seen_at: string | null;
 }
 
@@ -193,6 +195,9 @@ export function RequestCollectionModal({
                             <div className="mt-1 truncate text-xs font-mono text-on-surface-variant">
                               {source.target_identifier}
                             </div>
+                            <div className="mt-1 text-[10px] uppercase tracking-widest text-outline-variant">
+                              {getArtifactTypeLabel(source.expected_artifact_type)}
+                            </div>
                           </div>
                           <div className="shrink-0 text-right">
                             <div className="text-[10px] font-bold uppercase tracking-widest text-primary">
@@ -209,7 +214,11 @@ export function RequestCollectionModal({
                 </div>
                 {selectedSource ? (
                   <p className="text-[11px] leading-relaxed text-on-surface-variant">
-                    {selectedSource.display_name} is the current target for this request.
+                    {selectedSource.display_name} is the current target for this request. This source expects{" "}
+                    <span className="font-semibold text-on-surface">
+                      {getArtifactTypeLabel(selectedSource.expected_artifact_type)}
+                    </span>{" "}
+                    collection jobs.
                   </p>
                 ) : null}
               </div>

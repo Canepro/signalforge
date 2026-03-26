@@ -3,6 +3,8 @@ import { createSourceAction } from "../../actions";
 import {
   DEFAULT_EXPECTED_ARTIFACT_TYPE,
   getArtifactTypeLabel,
+  listArtifactFamilyPresentations,
+  listArtifactTypeOptions,
   listSourceTypeOptions,
 } from "@/lib/source-catalog";
 
@@ -15,6 +17,8 @@ export default async function NewSourcePage({
 }) {
   const sp = await searchParams;
   const sourceTypeOptions = listSourceTypeOptions();
+  const artifactTypeOptions = listArtifactTypeOptions();
+  const artifactFamilies = listArtifactFamilyPresentations();
   const defaultArtifactLabel = getArtifactTypeLabel(DEFAULT_EXPECTED_ARTIFACT_TYPE);
 
   return (
@@ -40,6 +44,11 @@ export default async function NewSourcePage({
       {(sp.error === "missing" || sp.error === "type") && (
         <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
           Please fill all required fields and pick a valid source type.
+        </p>
+      )}
+      {sp.error === "artifact_type" && (
+        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+          Please choose a supported artifact family for this source.
         </p>
       )}
 
@@ -83,11 +92,29 @@ export default async function NewSourcePage({
             ))}
           </select>
           <span className="text-[10px] text-on-surface-variant mt-1 block leading-snug">
-            Current default artifact family:{" "}
+            Default expected artifact family for new sources:{" "}
             <code className="text-[10px] font-mono bg-surface-container px-1 py-0.5 rounded">
               {DEFAULT_EXPECTED_ARTIFACT_TYPE}
             </code>{" "}
             ({defaultArtifactLabel}).
+          </span>
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Artifact family</span>
+          <select
+            name="expected_artifact_type"
+            required
+            defaultValue={DEFAULT_EXPECTED_ARTIFACT_TYPE}
+            className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+          >
+            {artifactTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-[10px] text-on-surface-variant mt-1 block leading-snug">
+            This controls which collector capability the source expects and which artifact family collection jobs may upload.
           </span>
         </label>
         <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-2.5">
@@ -99,6 +126,22 @@ export default async function NewSourcePage({
               <li key={option.value}>
                 <span className="font-semibold text-on-surface">{option.label}</span>:{" "}
                 {option.description}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            Supported artifact families
+          </p>
+          <ul className="mt-2 space-y-2 text-[11px] leading-relaxed text-on-surface-variant">
+            {artifactFamilies.map((family) => (
+              <li key={family.value}>
+                <span className="font-semibold text-on-surface">{family.label}</span>:{" "}
+                {family.description}
+                <div className="mt-1 font-mono text-[10px] text-outline-variant">
+                  {family.value}
+                </div>
               </li>
             ))}
           </ul>

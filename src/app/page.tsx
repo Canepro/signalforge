@@ -88,6 +88,7 @@ export default async function DashboardPage() {
           id: source.id,
           display_name: source.display_name,
           target_identifier: source.target_identifier,
+          expected_artifact_type: source.expected_artifact_type,
           last_seen_at: source.last_seen_at,
         } satisfies DashboardCollectionSource;
       })
