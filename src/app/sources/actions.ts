@@ -21,7 +21,7 @@ import { parseCollectionScopeFormData } from "./collection-scope-form";
 async function assertAdminSession(): Promise<void> {
   const jar = await cookies();
   const v = jar.get(ADMIN_SESSION_COOKIE)?.value;
-  if (!verifyAdminSessionCookie(v)) {
+  if (!(await verifyAdminSessionCookie(v))) {
     redirect("/sources/login");
   }
 }

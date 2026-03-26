@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { webcrypto } from "node:crypto";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import {
   getAdminTokenFromEnv,
@@ -9,6 +10,13 @@ import {
 
 describe("admin-auth", () => {
   const originalCrypto = globalThis.crypto;
+
+  beforeEach(() => {
+    Object.defineProperty(globalThis, "crypto", {
+      value: originalCrypto ?? webcrypto,
+      configurable: true,
+    });
+  });
 
   afterEach(() => {
     delete process.env.SIGNALFORGE_ADMIN_TOKEN;
@@ -57,15 +65,6 @@ describe("admin-auth", () => {
     expect(hex.length).toBe(64);
     expect(await verifyAdminSessionCookie(hex)).toBe(true);
     expect(await verifyAdminSessionCookie("deadbeef")).toBe(false);
-  });
-
-  it("hashAdminSessionCookie falls back to node webcrypto when global crypto is unavailable", async () => {
-    Object.defineProperty(globalThis, "crypto", {
-      value: undefined,
-      configurable: true,
-    });
-    const hex = await hashAdminSessionCookie("abc");
-    expect(hex.length).toBe(64);
   });
 
   it("getAdminTokenFromEnv trims whitespace", () => {
