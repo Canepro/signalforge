@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { isCollectionScope, validateCollectionScopeForArtifactType } from "@/lib/collection-scope";
 import { getStorage } from "@/lib/storage";
 
 export async function GET(
@@ -75,6 +76,28 @@ export async function PATCH(
     }
     if (body.attributes && typeof body.attributes === "object" && body.attributes !== null) {
       patch.attributes = body.attributes as Record<string, unknown>;
+    }
+    if (body.default_collection_scope !== undefined) {
+      if (body.default_collection_scope === null) {
+        patch.default_collection_scope = null;
+      } else if (isCollectionScope(body.default_collection_scope)) {
+        const validation = validateCollectionScopeForArtifactType(
+          body.default_collection_scope,
+          existing.expected_artifact_type
+        );
+        if (!validation.ok) {
+          return NextResponse.json(
+            { error: validation.error, code: "invalid_default_collection_scope" },
+            { status: 400 }
+          );
+        }
+        patch.default_collection_scope = body.default_collection_scope;
+      } else {
+        return NextResponse.json(
+          { error: "Invalid default_collection_scope payload", code: "invalid_default_collection_scope" },
+          { status: 400 }
+        );
+      }
     }
     if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
 

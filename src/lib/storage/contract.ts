@@ -9,6 +9,7 @@ import type {
   PatchSourceInput,
 } from "@/lib/db/source-job-repository";
 import type { RunSubmissionMeta } from "@/lib/db/repository";
+import type { CollectionScope } from "@/lib/collection-scope";
 import type { ParsedIngestionMeta } from "@/lib/ingestion/meta";
 import type { SourceType } from "@/lib/source-catalog";
 import type { RunDetail, RunSummary } from "@/types/api";
@@ -66,6 +67,7 @@ export interface SourceView {
   capabilities: string[];
   attributes: Record<string, unknown>;
   labels: Record<string, string>;
+  default_collection_scope: CollectionScope | null;
   enabled: boolean;
   last_seen_at: string | null;
   health_status: string;
@@ -98,6 +100,7 @@ export interface CollectionJobView {
   submitted_at: string | null;
   finished_at: string | null;
   result_analysis_status: string | null;
+  collection_scope: CollectionScope | null;
 }
 
 export interface AgentRegistrationView {
@@ -121,6 +124,7 @@ export interface CreateSourceInput {
   capabilities?: string[];
   attributes?: Record<string, unknown>;
   labels?: Record<string, string>;
+  default_collection_scope?: CollectionScope | null;
   enabled?: boolean;
 }
 
@@ -128,6 +132,7 @@ export interface CreateCollectionJobInput {
   request_reason?: string | null;
   priority?: number;
   idempotency_key?: string | null;
+  collection_scope?: CollectionScope | null;
 }
 
 export type DeleteSourceResult =

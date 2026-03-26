@@ -2,6 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import type { Finding } from "@/lib/analyzer/schema";
 import { isSupportedArtifactType } from "@/lib/adapter/registry";
+import {
+  parseCollectionScopeJson,
+  validateCollectionScopeForArtifactType,
+  type CollectionScope,
+} from "@/lib/collection-scope";
 import { buildRunDetail, toRunDetailJson } from "@/lib/api/run-detail-json";
 import {
   contentHash,
@@ -75,6 +80,7 @@ type PgSourceRow = {
   capabilities_json: string;
   attributes_json: string;
   labels_json: string;
+  default_collection_scope_json: string | null;
   enabled: boolean;
   last_seen_at: string | null;
   health_status: string;
@@ -107,6 +113,7 @@ type PgCollectionJobRow = {
   submitted_at: string | null;
   finished_at: string | null;
   result_analysis_status: string | null;
+  collection_scope_json: string | null;
 };
 
 type PgAgentRegistrationRow = {
@@ -160,6 +167,7 @@ function sourceToView(row: PgSourceRow): SourceView {
     capabilities: parseJson<string[]>(row.capabilities_json, []),
     attributes: parseJson<Record<string, unknown>>(row.attributes_json, {}),
     labels: parseJson<Record<string, string>>(row.labels_json, {}),
+    default_collection_scope: parseCollectionScopeJson(row.default_collection_scope_json),
     enabled: Boolean(row.enabled),
     last_seen_at: row.last_seen_at,
     health_status: row.health_status,
@@ -181,6 +189,7 @@ function sourceToHeartbeatRow(row: PgSourceRow): SourceRow {
     capabilities_json: row.capabilities_json,
     attributes_json: row.attributes_json,
     labels_json: row.labels_json,
+    default_collection_scope_json: row.default_collection_scope_json,
     enabled: row.enabled ? 1 : 0,
     last_seen_at: row.last_seen_at,
     health_status: row.health_status,
@@ -229,6 +238,7 @@ function jobToView(row: PgCollectionJobRow): CollectionJobView {
     submitted_at: row.submitted_at,
     finished_at: row.finished_at,
     result_analysis_status: row.result_analysis_status,
+    collection_scope: parseCollectionScopeJson(row.collection_scope_json),
   };
 }
 
@@ -606,17 +616,27 @@ class PostgresSourcesStore implements SourcesStore {
       err.code = "unsupported_artifact_type";
       throw err;
     }
+    const defaultCollectionScope = input.default_collection_scope ?? null;
+    const defaultScopeValidation = validateCollectionScopeForArtifactType(
+      defaultCollectionScope,
+      expected
+    );
+    if (!defaultScopeValidation.ok) {
+      const err = new Error("invalid_default_collection_scope") as Error & { code: string };
+      err.code = "invalid_default_collection_scope";
+      throw err;
+    }
     const targetNorm = normalizeTargetIdentifier(input.target_identifier);
     if (!targetNorm) throw new Error("target_identifier is required");
     await this.q.query(
       `INSERT INTO sources (
         id, display_name, target_identifier, target_identifier_norm, source_type, expected_artifact_type,
         default_collector_type, default_collector_version, capabilities_json, attributes_json, labels_json,
-        enabled, last_seen_at, health_status, created_at, updated_at
+        default_collection_scope_json, enabled, last_seen_at, health_status, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
-        $12, NULL, 'unknown', $13, $14
+        $12, $13, NULL, 'unknown', $14, $15
       )`,
       [
         id,
@@ -630,6 +650,7 @@ class PostgresSourcesStore implements SourcesStore {
         JSON.stringify(input.capabilities?.length ? input.capabilities : defaultCapabilitiesForArtifactType(expected)),
         JSON.stringify(input.attributes ?? {}),
         JSON.stringify(input.labels ?? {}),
+        defaultCollectionScope ? JSON.stringify(defaultCollectionScope) : null,
         input.enabled !== false,
         now,
         now,
@@ -662,9 +683,24 @@ class PostgresSourcesStore implements SourcesStore {
         patch.attributes !== undefined ?
           JSON.stringify({ ...parseJson<Record<string, unknown>>(row.attributes_json, {}), ...patch.attributes })
         : row.attributes_json,
+      default_collection_scope_json:
+        patch.default_collection_scope !== undefined ?
+          patch.default_collection_scope ? JSON.stringify(patch.default_collection_scope) : null
+        : row.default_collection_scope_json,
       enabled:
         patch.enabled !== undefined ? patch.enabled : Boolean(row.enabled),
     };
+    if (patch.default_collection_scope !== undefined) {
+      const validation = validateCollectionScopeForArtifactType(
+        patch.default_collection_scope,
+        row.expected_artifact_type
+      );
+      if (!validation.ok) {
+        const err = new Error("invalid_default_collection_scope") as Error & { code: string };
+        err.code = "invalid_default_collection_scope";
+        throw err;
+      }
+    }
     await this.q.query(
       `UPDATE sources SET
         display_name = $1,
@@ -673,9 +709,10 @@ class PostgresSourcesStore implements SourcesStore {
         capabilities_json = $4,
         labels_json = $5,
         attributes_json = $6,
-        enabled = $7,
-        updated_at = $8
-       WHERE id = $9`,
+        default_collection_scope_json = $7,
+        enabled = $8,
+        updated_at = $9
+       WHERE id = $10`,
       [
         next.display_name,
         next.default_collector_type,
@@ -683,6 +720,7 @@ class PostgresSourcesStore implements SourcesStore {
         next.capabilities_json,
         next.labels_json,
         next.attributes_json,
+        next.default_collection_scope_json,
         next.enabled,
         now,
         id,
@@ -737,7 +775,15 @@ class PostgresJobsStore implements JobsStore {
     return row ? jobToView(row) : null;
   }
 
-  async queueForSource(sourceId: string, input: { request_reason?: string | null; priority?: number; idempotency_key?: string | null; }) {
+  async queueForSource(
+    sourceId: string,
+    input: {
+      request_reason?: string | null;
+      priority?: number;
+      idempotency_key?: string | null;
+      collection_scope?: CollectionScope | null;
+    }
+  ) {
     const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
     if (!source) {
       const err = new Error("source_not_found");
@@ -765,13 +811,24 @@ class PostgresJobsStore implements JobsStore {
       );
       if (existing) return { row: jobToView(existing), inserted: false };
     }
+    const collectionScope =
+      input.collection_scope ?? parseCollectionScopeJson(source.default_collection_scope_json);
+    const scopeValidation = validateCollectionScopeForArtifactType(
+      collectionScope,
+      source.expected_artifact_type
+    );
+    if (!scopeValidation.ok) {
+      const err = new Error("invalid_collection_scope") as Error & { code: string };
+      err.code = "invalid_collection_scope";
+      throw err;
+    }
     const id = randomUUID();
     const now = new Date().toISOString();
     await this.q.query(
       `INSERT INTO collection_jobs (
         id, source_id, artifact_type, status, requested_by, request_reason, priority,
-        idempotency_key, created_at, updated_at, queued_at
-      ) VALUES ($1, $2, $3, 'queued', 'operator', $4, $5, $6, $7, $8, $9)`,
+        idempotency_key, created_at, updated_at, queued_at, collection_scope_json
+      ) VALUES ($1, $2, $3, 'queued', 'operator', $4, $5, $6, $7, $8, $9, $10)`,
       [
         id,
         sourceId,
@@ -782,6 +839,7 @@ class PostgresJobsStore implements JobsStore {
         now,
         now,
         now,
+        collectionScope ? JSON.stringify(collectionScope) : null,
       ]
     );
     const row = (await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [id]))!;
@@ -895,6 +953,7 @@ class PostgresJobsStore implements JobsStore {
         status: job.status,
         created_at: job.created_at,
         request_reason: job.request_reason,
+        collection_scope: parseCollectionScopeJson(job.collection_scope_json),
       }));
     if (jobs.length === 0 && rows.length > 0) return { jobs: [], gate: "capability_mismatch" };
     return { jobs, gate: null };

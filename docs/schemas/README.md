@@ -20,6 +20,10 @@ They intentionally do **not** fully duplicate the analyzer’s full `AuditReport
 | `get-runs-list-response.schema.json` | `GET /api/runs` |
 | `run-detail-response.schema.json` | `GET /api/runs/[id]` (report summarized) |
 | `compare-drift-response.schema.json` | `GET /api/runs/[id]/compare` |
+| `collection-scope.schema.json` | Shared typed `collection_scope` object (`linux_host` / `container_target` / `kubernetes_scope`) |
+| `source-response.schema.json` | `Source` response body used by `GET/POST/PATCH /api/sources*` |
+| `collection-job-response.schema.json` | `CollectionJob` response body used by source/job routes |
+| `agent-next-jobs-response.schema.json` | `GET /api/agent/jobs/next` |
 
 Code mirrors:
 

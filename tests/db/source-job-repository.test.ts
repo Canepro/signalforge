@@ -14,6 +14,7 @@ import {
   getSourceById,
   claimCollectionJobForAgent,
 } from "@/lib/db/source-job-repository";
+import { isCollectionScope } from "@/lib/collection-scope";
 
 describe("source-job-repository", () => {
   let db: Database;
@@ -58,6 +59,38 @@ describe("source-job-repository", () => {
     ).toThrow();
   });
 
+  it("insertSource validates and persists default_collection_scope", () => {
+    expect(() =>
+      insertSource(db, {
+        display_name: "Bad source scope",
+        target_identifier: "bad-source-scope",
+        source_type: "linux_host",
+        expected_artifact_type: "linux-audit-log",
+        default_collection_scope: { kind: "container_target", container_ref: "api" },
+      })
+    ).toThrow();
+
+    const ok = insertSource(db, {
+      display_name: "Good source scope",
+      target_identifier: "good-source-scope",
+      source_type: "linux_host",
+      expected_artifact_type: "kubernetes-bundle",
+      default_collection_scope: { kind: "kubernetes_scope", scope_level: "cluster" },
+    });
+    expect(ok.default_collection_scope_json).toContain("\"kind\":\"kubernetes_scope\"");
+  });
+
+  it("isCollectionScope rejects extra properties and empty optional namespace", () => {
+    expect(isCollectionScope({ kind: "linux_host", unexpected: true })).toBe(false);
+    expect(
+      isCollectionScope({
+        kind: "kubernetes_scope",
+        scope_level: "cluster",
+        namespace: "",
+      })
+    ).toBe(false);
+  });
+
   it("insertCollectionJob sets queued and artifact_type from source", () => {
     const s = insertSource(db, {
       display_name: "S",
@@ -69,6 +102,57 @@ describe("source-job-repository", () => {
     expect(row.status).toBe("queued");
     expect(row.artifact_type).toBe("linux-audit-log");
     expect(row.requested_by).toBe("operator");
+    expect(row.collection_scope_json ?? null).toBeNull();
+  });
+
+  it("insertCollectionJob stores collection_scope_json when valid", () => {
+    const s = insertSource(db, {
+      display_name: "Container source",
+      target_identifier: "container-host-a",
+      source_type: "linux_host",
+      expected_artifact_type: "container-diagnostics",
+    });
+    const { row } = insertCollectionJob(db, s, {
+      collection_scope: {
+        kind: "container_target",
+        runtime: "docker",
+        container_ref: "payments-api",
+      },
+    });
+    expect(row.collection_scope_json).toContain("\"kind\":\"container_target\"");
+  });
+
+  it("insertCollectionJob falls back to source default_collection_scope_json", () => {
+    const s = insertSource(db, {
+      display_name: "Defaulted scope source",
+      target_identifier: "source-defaulted-scope",
+      source_type: "linux_host",
+      expected_artifact_type: "container-diagnostics",
+      default_collection_scope: {
+        kind: "container_target",
+        runtime: "docker",
+        container_ref: "payments-api",
+      },
+    });
+    const { row } = insertCollectionJob(db, s, {});
+    expect(row.collection_scope_json).toContain("\"container_ref\":\"payments-api\"");
+  });
+
+  it("insertCollectionJob rejects mismatched collection_scope kind", () => {
+    const s = insertSource(db, {
+      display_name: "Linux source",
+      target_identifier: "linux-host-a",
+      source_type: "linux_host",
+      expected_artifact_type: "linux-audit-log",
+    });
+    expect(() =>
+      insertCollectionJob(db, s, {
+        collection_scope: {
+          kind: "kubernetes_scope",
+          scope_level: "cluster",
+        },
+      })
+    ).toThrow();
   });
 
   it("insertCollectionJob idempotency returns same job", () => {
@@ -82,6 +166,29 @@ describe("source-job-repository", () => {
     expect(a.inserted).toBe(true);
     expect(b.inserted).toBe(false);
     expect(a.row.id).toBe(b.row.id);
+  });
+
+  it("insertCollectionJob idempotency returns existing job before validating a replay payload", () => {
+    const s = insertSource(db, {
+      display_name: "K8s source",
+      target_identifier: "idempotent-k8s-source",
+      source_type: "linux_host",
+      expected_artifact_type: "kubernetes-bundle",
+      default_collection_scope: {
+        kind: "kubernetes_scope",
+        scope_level: "namespace",
+        namespace: "payments",
+      },
+    });
+    const first = insertCollectionJob(db, s, { idempotency_key: "k-replay" });
+    const replay = insertCollectionJob(db, s, {
+      idempotency_key: "k-replay",
+      collection_scope: { kind: "linux_host" },
+    });
+    expect(first.inserted).toBe(true);
+    expect(replay.inserted).toBe(false);
+    expect(replay.row.id).toBe(first.row.id);
+    expect(replay.row.collection_scope_json).toContain("\"namespace\":\"payments\"");
   });
 
   it("findRecentJobByIdempotencyKey respects window", () => {
@@ -218,6 +325,34 @@ describe("source-job-repository", () => {
     const d = listNextQueuedJobSummariesForSource(db, s3, out3.registration, 10);
     expect(d.jobs).toHaveLength(1);
     expect(d.gate).toBeNull();
+  });
+
+  it("listNextQueuedJobSummariesForSource includes collection_scope", () => {
+    const s = insertSource(db, {
+      display_name: "K8s source",
+      target_identifier: "k8s-host-listnext",
+      source_type: "linux_host",
+      expected_artifact_type: "kubernetes-bundle",
+    });
+    const { row: reg } = createAgentRegistration(db, s.id);
+    const hb = applyAgentHeartbeat(db, reg, s, {
+      capabilities: ["collect:kubernetes-bundle"],
+      attributes: {},
+      agent_version: "1",
+      active_job_id: null,
+      instance_id: null,
+    });
+    insertCollectionJob(db, s, {
+      collection_scope: {
+        kind: "kubernetes_scope",
+        scope_level: "namespace",
+        namespace: "payments",
+      },
+    });
+    const source = getSourceById(db, s.id)!;
+    const next = listNextQueuedJobSummariesForSource(db, source, hb.registration, 1);
+    expect(next.jobs).toHaveLength(1);
+    expect(next.jobs[0].collection_scope?.kind).toBe("kubernetes_scope");
   });
 
   it("applyAgentHeartbeat reports lease_not_extended when instance_id does not match lease", () => {

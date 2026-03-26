@@ -1332,11 +1332,13 @@ for (const backend of backends) {
           display_name: "Parity Host",
           target_identifier: "parity-src-1",
           source_type: "linux_host",
+          default_collection_scope: { kind: "linux_host" },
         })
       );
       expect(src.id).toBeTruthy();
       expect(src.health_status).toBe("unknown");
       expect(src.enabled).toBe(true);
+      expect(src.default_collection_scope?.kind).toBe("linux_host");
 
       const list = await storage.sources.list();
       expect(list.some((s) => s.id === src.id)).toBe(true);
@@ -1371,10 +1373,15 @@ for (const backend of backends) {
       const list = await storage.sources.list();
       const src = list.find((s) => s.target_identifier === "parity-src-1")!;
       const updated = await storage.withTransaction((tx) =>
-        tx.sources.update(src.id, { display_name: "Renamed Host", enabled: false })
+        tx.sources.update(src.id, {
+          display_name: "Renamed Host",
+          enabled: false,
+          default_collection_scope: null,
+        })
       );
       expect(updated!.display_name).toBe("Renamed Host");
       expect(updated!.enabled).toBe(false);
+      expect(updated!.default_collection_scope).toBeNull();
     });
 
     it("getById returns null for missing source", async () => {
@@ -1456,6 +1463,78 @@ for (const backend of backends) {
 
       const jobs = await storage.jobs.listForSource(src.id);
       expect(jobs.some((j) => j.id === row.id)).toBe(true);
+      expect(jobs.find((j) => j.id === row.id)?.collection_scope ?? null).toBeNull();
+    });
+
+    it("queueForSource stores typed collection_scope on the job", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Container Job Host",
+          target_identifier: "parity-container-job-host",
+          source_type: "linux_host",
+          expected_artifact_type: "container-diagnostics",
+        })
+      );
+      const { row } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, {
+          request_reason: "container parity test",
+          collection_scope: {
+            kind: "container_target",
+            runtime: "docker",
+            container_ref: "api",
+          },
+        })
+      );
+      expect(row.collection_scope?.kind).toBe("container_target");
+    });
+
+    it("queueForSource uses source default_collection_scope when job override is absent", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Default scope source",
+          target_identifier: "parity-default-scope-source",
+          source_type: "linux_host",
+          expected_artifact_type: "kubernetes-bundle",
+          default_collection_scope: {
+            kind: "kubernetes_scope",
+            scope_level: "namespace",
+            namespace: "payments",
+          },
+        })
+      );
+      const { row } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, { request_reason: "default scope parity test" })
+      );
+      expect(row.collection_scope?.kind).toBe("kubernetes_scope");
+    });
+
+    it("queueForSource idempotency returns the existing job before validating a replay payload", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Idempotent scope source",
+          target_identifier: "parity-idempotent-scope-source",
+          source_type: "linux_host",
+          expected_artifact_type: "kubernetes-bundle",
+          default_collection_scope: {
+            kind: "kubernetes_scope",
+            scope_level: "namespace",
+            namespace: "payments",
+          },
+        })
+      );
+      const first = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, { idempotency_key: "replay-me" })
+      );
+      const replay = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, {
+          idempotency_key: "replay-me",
+          collection_scope: { kind: "linux_host" },
+        })
+      );
+      expect(first.inserted).toBe(true);
+      expect(replay.inserted).toBe(false);
+      expect(replay.row.id).toBe(first.row.id);
+      expect(replay.row.collection_scope?.kind).toBe("kubernetes_scope");
     });
 
     it("cancel a queued job", async () => {
