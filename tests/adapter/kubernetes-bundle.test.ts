@@ -267,6 +267,16 @@ describe("KubernetesBundleAdapter", () => {
       )
     ).toBe(true);
     expect(
+      findings.some((finding) =>
+        finding.title.includes("externally exposed workload uses the default service account with token automount")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("externally exposed workload mounts projected service account token volumes")
+      )
+    ).toBe(true);
+    expect(
       findings.some((finding) => finding.title.includes("injects Secret values into environment variables"))
     ).toBe(true);
     expect(

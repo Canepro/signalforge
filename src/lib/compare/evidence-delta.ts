@@ -185,10 +185,12 @@ type KubernetesEvidenceSummary = {
   service_account_token_automount_count: number;
   writable_root_filesystem_workload_count: number;
   default_service_account_automount_workload_count: number;
+  externally_exposed_default_service_account_automount_workload_count: number;
   secret_env_reference_count: number;
   secret_env_from_reference_count: number;
   secret_volume_mount_count: number;
   projected_service_account_token_volume_count: number;
+  externally_exposed_projected_service_account_token_volume_count: number;
   host_network_workload_count: number;
   host_pid_workload_count: number;
   host_ipc_workload_count: number;
@@ -550,10 +552,12 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       service_account_token_automount_count: 0,
       writable_root_filesystem_workload_count: 0,
       default_service_account_automount_workload_count: 0,
+      externally_exposed_default_service_account_automount_workload_count: 0,
       secret_env_reference_count: 0,
       secret_env_from_reference_count: 0,
       secret_volume_mount_count: 0,
       projected_service_account_token_volume_count: 0,
+      externally_exposed_projected_service_account_token_volume_count: 0,
       host_network_workload_count: 0,
       host_pid_workload_count: 0,
       host_ipc_workload_count: 0,
@@ -581,10 +585,12 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let serviceAccountTokenAutomountCount = 0;
   let writableRootFilesystemWorkloadCount = 0;
   let defaultServiceAccountAutomountWorkloadCount = 0;
+  let externallyExposedDefaultServiceAccountAutomountWorkloadCount = 0;
   let secretEnvReferenceCount = 0;
   let secretEnvFromReferenceCount = 0;
   let secretVolumeMountCountTotal = 0;
   let projectedServiceAccountTokenVolumeCountTotal = 0;
+  let externallyExposedProjectedServiceAccountTokenVolumeCountTotal = 0;
   let hostNetworkWorkloadCount = 0;
   let hostPidWorkloadCount = 0;
   let hostIpcWorkloadCount = 0;
@@ -699,11 +705,19 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (workload.pod_spec?.hostIPC) hostIpcWorkloadCount += 1;
         const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
         const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
+        const workloadNamespace = workload.namespace?.trim();
+        const workloadInExposedNamespace =
+          workloadNamespace !== undefined &&
+          workloadNamespace.length > 0 &&
+          externalServiceNamespaces.has(workloadNamespace);
         if (
           workload.pod_spec?.automountServiceAccountToken !== false &&
           serviceAccountName === "default"
         ) {
           defaultServiceAccountAutomountWorkloadCount += 1;
+          if (workloadInExposedNamespace) {
+            externallyExposedDefaultServiceAccountAutomountWorkloadCount += 1;
+          }
         }
         if (
           workloadServiceAccountKey &&
@@ -715,11 +729,6 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
           (workloadServiceAccountKey &&
             serviceAccountRoleBindings.get(workloadServiceAccountKey)) ||
           new Set<string>();
-        const workloadNamespace = workload.namespace?.trim();
-        const workloadInExposedNamespace =
-          workloadNamespace !== undefined &&
-          workloadNamespace.length > 0 &&
-          externalServiceNamespaces.has(workloadNamespace);
         const wildcardBindingCount = Array.from(workloadRoleBindings).filter((bindingRoleKey) =>
           wildcardRoleKeys.has(bindingRoleKey)
         ).length;
@@ -763,6 +772,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         secretVolumeMountCountTotal += secretVolumeMountCount(workload);
         projectedServiceAccountTokenVolumeCountTotal +=
           projectedServiceAccountTokenVolumeCount(workload);
+        if (workloadInExposedNamespace) {
+          externallyExposedProjectedServiceAccountTokenVolumeCountTotal +=
+            projectedServiceAccountTokenVolumeCount(workload);
+        }
         hostPathVolumeMountCountTotal += hostPathVolumeMountCount(workload);
         addedCapabilityCountTotal += addedCapabilityCount(workload);
         privilegedInitContainerCountTotal += privilegedInitContainerCount(workload);
@@ -803,10 +816,14 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     service_account_token_automount_count: serviceAccountTokenAutomountCount,
     writable_root_filesystem_workload_count: writableRootFilesystemWorkloadCount,
     default_service_account_automount_workload_count: defaultServiceAccountAutomountWorkloadCount,
+    externally_exposed_default_service_account_automount_workload_count:
+      externallyExposedDefaultServiceAccountAutomountWorkloadCount,
     secret_env_reference_count: secretEnvReferenceCount,
     secret_env_from_reference_count: secretEnvFromReferenceCount,
     secret_volume_mount_count: secretVolumeMountCountTotal,
     projected_service_account_token_volume_count: projectedServiceAccountTokenVolumeCountTotal,
+    externally_exposed_projected_service_account_token_volume_count:
+      externallyExposedProjectedServiceAccountTokenVolumeCountTotal,
     host_network_workload_count: hostNetworkWorkloadCount,
     host_pid_workload_count: hostPidWorkloadCount,
     host_ipc_workload_count: hostIpcWorkloadCount,
@@ -1023,6 +1040,13 @@ function buildFamilyMetrics(
         "kubernetes-bundle"
       ),
       metricRow(
+        "externally_exposed_default_service_account_automount_workload_count",
+        "Externally exposed workloads using the default service account with token automount",
+        previous.externally_exposed_default_service_account_automount_workload_count,
+        next.externally_exposed_default_service_account_automount_workload_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
         "secret_env_reference_count",
         "Secret-backed environment references",
         previous.secret_env_reference_count,
@@ -1048,6 +1072,13 @@ function buildFamilyMetrics(
         "Mounted projected service account token volumes",
         previous.projected_service_account_token_volume_count,
         next.projected_service_account_token_volume_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "externally_exposed_projected_service_account_token_volume_count",
+        "Projected service account token volumes on externally exposed workloads",
+        previous.externally_exposed_projected_service_account_token_volume_count,
+        next.externally_exposed_projected_service_account_token_volume_count,
         "kubernetes-bundle"
       ),
       metricRow(

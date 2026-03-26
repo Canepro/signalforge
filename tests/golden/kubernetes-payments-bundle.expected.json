@@ -89,6 +89,16 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "externally exposed workload uses the default service account with token automount",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "externally exposed workload mounts projected service account token volumes",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "injects Secret values into environment variables",
       "severity": "medium",
       "category": "kubernetes"
@@ -180,6 +190,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 34,
-  "max_findings": 34
+  "min_findings": 36,
+  "max_findings": 36
 }

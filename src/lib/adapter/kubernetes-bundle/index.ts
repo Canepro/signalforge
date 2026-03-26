@@ -593,6 +593,26 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             });
           }
 
+          if (
+            workloadInExposedNamespace &&
+            workload.pod_spec?.automountServiceAccountToken !== false &&
+            serviceAccountName === "default"
+          ) {
+            findings.push({
+              title: `Kubernetes externally exposed workload uses the default service account with token automount: ${label}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                externally_exposed_namespace: workloadNamespace,
+                service_account: serviceAccountName,
+                automount_service_account_token: true,
+              }),
+              rule_id: "kubernetes.exposed_workload_default_service_account_automount",
+            });
+          }
+
           const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
           if (
             workloadServiceAccountKey &&
@@ -924,6 +944,21 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
                 projected_service_account_token_volume_count: workloadProjectedTokenVolumeCount,
               }),
               rule_id: "kubernetes.workload_projected_service_account_token_volumes",
+            });
+          }
+
+          if (workloadInExposedNamespace && workloadProjectedTokenVolumeCount > 0) {
+            findings.push({
+              title: `Kubernetes externally exposed workload mounts projected service account token volumes: ${label} (${workloadProjectedTokenVolumeCount} mounts)`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                workload,
+                projected_service_account_token_volume_count: workloadProjectedTokenVolumeCount,
+                externally_exposed_namespace: workloadNamespace,
+              }),
+              rule_id: "kubernetes.exposed_workload_projected_service_account_token_volumes",
             });
           }
 

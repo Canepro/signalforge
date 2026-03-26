@@ -271,6 +271,13 @@ describe("findings-diff", () => {
     ).toBe("kubernetes workload mounts secret volumes: payments/payments-api");
     expect(
       normalizeFindingTitle(
+        "Kubernetes externally exposed workload mounts projected service account token volumes: payments/payments-api (2 mounts)"
+      )
+    ).toBe(
+      "kubernetes externally exposed workload mounts projected service account token volumes: payments/payments-api"
+    );
+    expect(
+      normalizeFindingTitle(
         "Kubernetes workload adds Linux capabilities: payments/payments-api (4 capabilities)"
       )
     ).toBe("kubernetes workload adds linux capabilities: payments/payments-api");

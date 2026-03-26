@@ -94,6 +94,7 @@ function normalizeKubernetesCountStableTitle(normalized: string): string | null 
     /^(kubernetes workload bulk-imports secret data into environment variables: .+?) \(\d+ refs\)$/,
     /^(kubernetes workload mounts secret volumes: .+?) \(\d+ mounts\)$/,
     /^(kubernetes workload mounts projected service account token volumes: .+?) \(\d+ mounts\)$/,
+    /^(kubernetes externally exposed workload mounts projected service account token volumes: .+?) \(\d+ mounts\)$/,
     /^(kubernetes workload mounts hostpath volumes: .+?) \(\d+ mounts\)$/,
     /^(kubernetes workload adds linux capabilities: .+?) \(\d+ capabilities\)$/,
     /^(kubernetes workload uses privileged init containers: .+?) \(\d+ containers\)$/,

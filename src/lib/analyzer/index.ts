@@ -224,6 +224,20 @@ function containerTitlePriority(title: string): number {
 
 function kubernetesTitlePriority(title: string): number {
   const normalized = title.toLowerCase();
+  if (
+    normalized.includes(
+      "externally exposed workload uses the default service account with token automount"
+    )
+  ) {
+    return 12;
+  }
+  if (
+    normalized.includes(
+      "externally exposed workload mounts projected service account token volumes"
+    )
+  ) {
+    return 11;
+  }
   if (normalized.includes("externally exposed workload service account is bound to cluster-admin")) {
     return 13;
   }
@@ -339,6 +353,12 @@ function summarizeFallbackFinding(finding: Finding): string {
   }
   if (finding.category === "kubernetes") {
     const title = finding.title.toLowerCase();
+    if (title.includes("externally exposed workload uses the default service account with token automount")) {
+      return `${finding.title}, which combines public workload reachability with the namespace default pod identity and live Kubernetes API credentials.`;
+    }
+    if (title.includes("externally exposed workload mounts projected service account token volumes")) {
+      return `${finding.title}, which places Kubernetes API credentials on disk inside a publicly reachable workload boundary.`;
+    }
     if (title.includes("externally exposed workload service account is bound to cluster-admin")) {
       return `${finding.title}, which combines public service reachability with cluster-admin identity on the same workload boundary.`;
     }
@@ -581,6 +601,12 @@ function buildActionForFinding(
 
   if (finding.category === "kubernetes") {
     const tl = finding.title.toLowerCase();
+    if (tl.includes("externally exposed workload uses the default service account with token automount")) {
+      return "Move this exposed workload off the default service account, disable token automount unless it truly needs Kubernetes API access, and keep any remaining pod identity narrowly scoped.";
+    }
+    if (tl.includes("externally exposed workload mounts projected service account token volumes")) {
+      return "Remove projected service account token volumes from externally reachable workloads unless there is a reviewed API-access need, and keep any remaining tokens tightly audience-scoped.";
+    }
     if (tl.includes("externally exposed workload service account is bound to cluster-admin")) {
       return "Remove the workload from public exposure or move it to a narrowly scoped service account first, then delete the cluster-admin grant from that pod identity.";
     }

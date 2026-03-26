@@ -1030,6 +1030,20 @@ for (const backend of backends) {
             status: "changed",
           }),
           expect.objectContaining({
+            key: "externally_exposed_default_service_account_automount_workload_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "externally_exposed_projected_service_account_token_volume_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
             key: "network_policy_count",
             family: "kubernetes-bundle",
             previous: 0,
