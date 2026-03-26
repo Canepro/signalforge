@@ -317,6 +317,7 @@ async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string):
         }) === currentMatchKey
     );
     if (hit) return hit;
+    return null;
   }
   return candidates.find((c) => c.artifact_id === current.artifact_id) ?? null;
 }

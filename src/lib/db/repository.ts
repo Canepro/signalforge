@@ -387,6 +387,7 @@ export function findPreviousRunForSameTarget(
         }) === currentMatchKey
     );
     if (hit) return hit;
+    return null;
   }
 
   return findPreviousRunForSameArtifact(db, currentRunId);
