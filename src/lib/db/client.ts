@@ -1,17 +1,38 @@
 import initSqlJs, { type Database } from "sql.js";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 
 export type { Database } from "sql.js";
 
 let _db: Database | null = null;
 let _dbPath: string | null = null;
+let _dbMtimeMs: number | null = null;
 
 /** When set, `getDb()` returns this instance (tests only). */
 let _dbOverride: Database | null = null;
 
 export function setDbOverride(db: Database | null): void {
   _dbOverride = db;
+}
+
+function resolveDbPath(): string {
+  return process.env.DATABASE_PATH ?? join(process.cwd(), "signalforge.db");
+}
+
+function getDbMtimeMs(dbPath: string): number | null {
+  if (!existsSync(dbPath)) return null;
+  return statSync(dbPath).mtimeMs;
+}
+
+async function loadDbFromPath(dbPath: string): Promise<Database> {
+  const SQL = await initSqlJs(sqlJsInitOptions());
+  const db = existsSync(dbPath)
+    ? new SQL.Database(readFileSync(dbPath))
+    : new SQL.Database();
+  migrate(db);
+  _dbPath = dbPath;
+  _dbMtimeMs = getDbMtimeMs(dbPath);
+  return db;
 }
 
 function sqlJsInitOptions(): { locateFile: (file: string) => string } {
@@ -32,20 +53,53 @@ export async function initSqlJsForApp(): Promise<Awaited<ReturnType<typeof initS
 
 export async function getDb(): Promise<Database> {
   if (_dbOverride) return _dbOverride;
-  if (_db) return _db;
-  const SQL = await initSqlJs(sqlJsInitOptions());
-  const dbPath = process.env.DATABASE_PATH ?? join(process.cwd(), "signalforge.db");
-  _dbPath = dbPath;
-
-  if (existsSync(dbPath)) {
-    const buffer = readFileSync(dbPath);
-    _db = new SQL.Database(buffer);
-  } else {
-    _db = new SQL.Database();
+  const dbPath = resolveDbPath();
+  if (_db && _dbPath === dbPath) {
+    const diskMtimeMs = getDbMtimeMs(dbPath);
+    if (diskMtimeMs === _dbMtimeMs) {
+      return _db;
+    }
   }
-
-  migrate(_db);
+  _db = await loadDbFromPath(dbPath);
   return _db;
+}
+
+export async function reloadDbFromDisk(): Promise<Database> {
+  if (_dbOverride) return _dbOverride;
+  const dbPath = resolveDbPath();
+  _db = await loadDbFromPath(dbPath);
+  return _db;
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function withDbFileLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (_dbOverride) return fn();
+
+  const dbPath = resolveDbPath();
+  const lockPath = `${dbPath}.lock`;
+  const deadline = Date.now() + 10_000;
+
+  while (true) {
+    try {
+      const fd = openSync(lockPath, "wx");
+      try {
+        return await fn();
+      } finally {
+        closeSync(fd);
+        unlinkSync(lockPath);
+      }
+    } catch (error) {
+      if (Date.now() >= deadline) {
+        throw new Error(`Timed out waiting for SQLite lock at ${lockPath}`, {
+          cause: error,
+        });
+      }
+      await sleep(25);
+    }
+  }
 }
 
 export function saveDb(): void {
@@ -53,6 +107,7 @@ export function saveDb(): void {
   if (_db && _dbPath) {
     const data = _db.export();
     writeFileSync(_dbPath, Buffer.from(data));
+    _dbMtimeMs = getDbMtimeMs(_dbPath);
   }
 }
 
@@ -61,6 +116,7 @@ export function resetDb(): void {
     _db.close();
     _db = null;
     _dbPath = null;
+    _dbMtimeMs = null;
   }
 }
 
