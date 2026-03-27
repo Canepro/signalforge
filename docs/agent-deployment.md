@@ -29,11 +29,11 @@ The preferred deployment model is:
 - deployed near the execution surface
 - managed by the local init or platform, not by an operator shell session
 
-Today, that means:
+The preferred long-running form is environment-specific, not one-size-fits-all:
 
-- Linux and WSL: prefer a hardened `systemd` service on the target host
-- container host environments: prefer the same host-service model on the runtime host, or a dedicated nearby runner with explicit runtime access
-- Kubernetes: keep push-first as the honest default until Phase 9 scope handling is complete; once job-driven Kubernetes becomes first-class, prefer a dedicated cluster-side runner with explicit RBAC over operator laptops or ambient `kubectl`
+- Linux and WSL host audit: prefer a hardened `systemd` service on the target host
+- container diagnostics: prefer a containerized runner on the runtime host when that host already operates Docker or Podman and the socket-trust tradeoff is acceptable
+- Kubernetes bundle collection: prefer a dedicated cluster-side Deployment with explicit kubeconfig or future in-cluster identity over operator laptops or ambient `kubectl`
 
 Current implementation status in the sibling `signalforge-agent` repo:
 
@@ -104,21 +104,11 @@ For Linux and WSL, prefer `systemd` hardening such as:
 
 ## Honest current status
 
-Current best path:
-
-- Linux host job-driven collection is the cleanest fully general deployment path today
-- that path now has a first-class hardened install and preflight flow in `signalforge-agent`
-
-Current limited paths:
-
-- `container-diagnostics` job-driven collection can work from a prepared host agent, but runtime access must be explicit
-- `kubernetes-bundle` job-driven collection can work from a prepared host agent with explicit kubeconfig and context handling, but it is still not as operationally clean as the future dedicated cluster-side runner story
-
 Current honest recommendation:
 
-- Linux: job-driven via long-running host service
-- container: push-first or carefully prepared host service
-- Kubernetes: push-first first, then dedicated cluster-side runner once Phase 9 is complete
+- Linux: job-driven via long-running host `systemd` service
+- container: job-driven via a long-running containerized runner on the runtime host, with explicit socket access and capability pinning
+- Kubernetes: job-driven via a long-running cluster-side Deployment, with explicit kubeconfig today and scoped in-cluster identity later
 
 ## Phase 9 relationship
 
