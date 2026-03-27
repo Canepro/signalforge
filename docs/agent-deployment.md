@@ -44,6 +44,7 @@ Current implementation status in the sibling `signalforge-agent` repo:
 - the service install flow now supports an optional managed kubeconfig path for Kubernetes-capable runners, wired into the installed env file instead of relying on a mutable operator context
 - the agent now supports explicit `SIGNALFORGE_KUBECTL_BIN` and `SIGNALFORGE_KUBECONFIG` overrides so Kubernetes-capable services can pin both the binary and the kubeconfig path
 - this service path has been smoke-tested under a real user `systemd` execution context via `systemd-run --user`, not only through static unit rendering
+- container-capable readiness now requires actual Docker or Podman access during capability derivation and `preflight`, not only a runtime binary on `PATH`
 
 ## Why this is the preferred model
 
@@ -79,6 +80,8 @@ These may be useful for smoke tests or debugging, but they are not the normal pr
 - use a dedicated local service account
 - grant only the file, group, and socket access that host actually needs
 - treat container-runtime access as a higher-trust host profile, not the default
+- for Docker-capable hosts, validate daemon-socket reachability as that service account, not only `docker` binary presence
+- for Podman-capable hosts, validate `podman info` in the intended rootless or privileged mode before advertising `container-diagnostics`
 
 ### Service hardening
 
