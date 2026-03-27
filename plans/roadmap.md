@@ -153,12 +153,11 @@ The live SignalForge instance is deployed on **Vercel** with a **Neon Postgres**
 Recommended near-term choices:
 
 1. Use the system with more real submissions and collect friction.
-2. Finish the Phase 8 honesty and merge cleanup across README, docs, and plan files so `main` can catch up to branch reality.
-3. Land the Phase 9 job-scoped collection-parameter slice across `signalforge`, `signalforge-agent`, and `signalforge-collectors` instead of leaving non-Linux job-driven collection dependent on host-local environment.
+2. Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
+3. Close the remaining Phase 9 validation tail: live Postgres parity for the new scope columns, plus production-like container-host and cluster-side deployment smoke after the repo-local Linux, container, and Kubernetes job-driven flows. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
 4. Continue agent hardening: keep the environment-specific deployment matrix explicit, preserve the new managed-kubeconfig and user-`systemd` validation path, and carry the stricter container-runtime access checks into a production-like host install smoke plus live container-host and cluster-side deployment validation.
 5. Plan and implement the next diagnostics-enrichment tranche so SignalForge expands beyond posture-only evidence for containers and Kubernetes, and update the dashboard and findings experience so that richer evidence is visible and useful instead of hidden. Source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md).
-6. Execute the documented frontend redesign and interaction-polish pass so SignalForge feels like a deliberate operator workstation rather than a summary-heavy internal dashboard. Source of truth: [`phase-9c-frontend-operator-workstation-polish.md`](./phase-9c-frontend-operator-workstation-polish.md).
-7. Add lint to CI.
+6. Add lint to CI.
 
 ## Future Phases
 

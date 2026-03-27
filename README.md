@@ -83,6 +83,11 @@ If you are integrating with SignalForge:
 - [`docs/external-submit.md`](docs/external-submit.md)
 - [`docs/schemas/README.md`](docs/schemas/README.md)
 
+If you are operating Sources, agents, or collection jobs:
+
+- [`docs/operators/README.md`](docs/operators/README.md)
+- [`docs/agent-deployment.md`](docs/agent-deployment.md)
+
 ## 5-Minute First Run
 
 Install dependencies:
@@ -121,54 +126,16 @@ For the fuller step-by-step version, use [`docs/getting-started.md`](docs/gettin
 
 ## How People Use SignalForge Today
 
-### 1. UI workflow
+- **Upload and review**: submit an artifact, inspect run detail, reanalyze if needed, and compare runs.
+- **API and CLI consumption**: push evidence to `POST /api/runs` or use the helper scripts for submit and read flows.
+- **Operator-managed collection**: register Sources, queue collection jobs, and run `signalforge-agent` near the target while collectors stay external.
 
-- upload an artifact
-- inspect the run detail page
-- **Sources** (`/sources`): register a target, request **Collect Fresh Evidence** jobs (queued until a thin external agent claims them via the Phase **6d** agent API; the preferred deployment model is a long-running agent service on the execution host, not an operator laptop or ad hoc one-shot shell session, so it can heartbeat and long-poll for work reliably — see [`docs/api-contract.md`](docs/api-contract.md) and [`plans/phase-6b-source-job-api-contract.md`](plans/phase-6b-source-job-api-contract.md))
-- reanalyze the same stored artifact if needed
-- compare runs
+Operator detail lives in the docs, not this README:
 
-### 2. CLI workflow
-
-Submit an artifact:
-
-```bash
-./scripts/analyze.sh tests/fixtures/wsl-mar2026-full.log
-```
-
-Read run, report, or compare JSON:
-
-```bash
-./scripts/signalforge-read.sh run <run-id>
-./scripts/signalforge-read.sh report <run-id>
-./scripts/signalforge-read.sh compare <run-id>
-```
-
-### 3. External collector workflow
-
-External tools push evidence to `POST /api/runs`.
-
-Reference path:
-
-- [signalforge-collectors](https://github.com/Canepro/signalforge-collectors) — `submit-to-signalforge.sh` (repo root)
-- `signalforge-agent` (sibling repo, not yet published) — thin execution-plane agent (heartbeat, poll, claim, run collectors, upload artifacts)
-
-Preferred job-driven deployment stance:
-
-- run `signalforge-agent` as an always-on service near the target
-- use a dedicated local service identity and least privilege
-- avoid workstation kubeconfig, ambient shell context, and command-line secrets as the normal production model
-
-Deployment guidance:
-
-- [`docs/agent-deployment.md`](docs/agent-deployment.md)
-
-More detail: [`docs/agent-deployment.md`](docs/agent-deployment.md)
-
-Contract docs:
-
-- [`docs/external-submit.md`](docs/external-submit.md)
+- collection paths by environment: [`docs/operators/collection-paths.md`](docs/operators/collection-paths.md)
+- Sources, enrollment, and job lifecycle: [`docs/operators/sources-and-agents.md`](docs/operators/sources-and-agents.md)
+- typed collection scope and current non-Linux limits: [`docs/operators/job-scoped-collection.md`](docs/operators/job-scoped-collection.md)
+- deployment and security posture: [`docs/agent-deployment.md`](docs/agent-deployment.md)
 
 ## Compare, Reanalyze, and Fresh Evidence
 
@@ -349,6 +316,7 @@ Postgres schema changes must follow the checked-in migration policy: [`docs/post
 
 - beginner setup and usage: [`docs/getting-started.md`](docs/getting-started.md)
 - docs index: [`docs/README.md`](docs/README.md)
+- operator docs: [`docs/operators/README.md`](docs/operators/README.md)
 - HTTP routes and response shapes: [`docs/api-contract.md`](docs/api-contract.md)
 - Postgres migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md)
 - Postgres validation runbook: [`docs/postgres-validation.md`](docs/postgres-validation.md)

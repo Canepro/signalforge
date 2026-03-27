@@ -1,6 +1,6 @@
 # Phase 9 Design: Job-Scoped Collection Parameters
 
-> Status: active follow-on after Phase 8 analyzer and collection-plane parity work. SignalForge repo contract and operator UI work are implemented; sibling repo agent and collector integration is materially advanced, including typed scope mapping, collector input wiring, and a hardened host-service deployment baseline in `signalforge-agent`, with managed kubeconfig support and a real user-`systemd` smoke for the preferred service path.
+> Status: functionally implemented across SignalForge, `signalforge-agent`, and `signalforge-collectors`, with local end-to-end validation for Linux, container, and Kubernetes job-driven flows. Remaining follow-on is live Postgres parity for the new scope columns in a real Postgres environment plus production-like host or cluster runtime smoke outside this workstation.
 
 ## Why this exists
 
@@ -362,7 +362,7 @@ This checklist is the source of truth for the actual Phase 9 implementation. Do 
 - [x] Extend source detail and dashboard request flows to submit typed per-job scope overrides.
 - [x] Show source default scope and resolved job scope in the operator UI so queued work is inspectable.
 - [ ] Run live Postgres parity for the new scope columns in an environment with a real Postgres URL.
-- [ ] Update Sources UI to display and edit defaults and to show the resolved job scope clearly.
+- [x] Update Sources UI to display and edit defaults and to show the resolved job scope clearly.
 
 ### Repo 2: `signalforge-agent`
 
@@ -370,7 +370,7 @@ This checklist is the source of truth for the actual Phase 9 implementation. Do 
 - [x] Map `linux_host` scope directly to the Linux collector path with no extra operator input.
 - [x] Map `container_target` scope to explicit collector inputs instead of relying on pre-set process-local environment.
 - [x] Map `kubernetes_scope` scope to explicit collector inputs instead of relying on ambient `kubectl` context alone.
-- [ ] Make the claimed scope visible in agent logs so support/debugging is self-explanatory.
+- [x] Make the claimed scope visible in agent logs so support/debugging is self-explanatory.
 - [x] Keep capability advertisement at the artifact-family layer unless a narrower scope-capability split is deliberately introduced.
 - [x] Add tests for each scope kind and for invalid/missing scope handling.
 - [x] Ship a first-class hardened `systemd` service form for the always-on host deployment path.
@@ -380,43 +380,49 @@ This checklist is the source of truth for the actual Phase 9 implementation. Do 
 
 ### Repo 3: `signalforge-collectors`
 
-- [ ] Accept a stable, documented input mapping for each supported scope kind.
-- [ ] Keep the Linux collector path unchanged except for explicit no-op support of `linux_host`.
-- [ ] Add documented container collector inputs for `runtime`, `container_ref`, and optional `host_hint`.
-- [ ] Add documented Kubernetes collector inputs for `scope_level`, `namespace`, `kubectl_context`, `cluster_name`, and `provider`.
-- [ ] Remove any requirement that operators manually pre-bake per-job family target state into host environment for the supported job-driven path.
-- [ ] Add examples showing push-first and job-driven invocation for container and Kubernetes collection.
-- [ ] Keep collector inputs explicit enough that the agent does not have to rely on a mutable shell session or ambient `kubectl current-context`.
+- [x] Accept a stable, documented input mapping for each supported scope kind.
+- [x] Keep the Linux collector path unchanged except for explicit no-op support of `linux_host`.
+- [x] Add documented container collector inputs for `runtime`, `container_ref`, and optional `host_hint`.
+- [x] Add documented Kubernetes collector inputs for `scope_level`, `namespace`, `kubectl_context`, `cluster_name`, and `provider`.
+- [x] Remove any requirement that operators manually pre-bake per-job family target state into host environment for the supported job-driven path.
+- [x] Add examples showing push-first and job-driven invocation for container and Kubernetes collection.
+- [x] Keep collector inputs explicit enough that the agent does not have to rely on a mutable shell session or ambient `kubectl current-context`.
 
 ### Docs and drift control
 
 - [x] Document the local Postgres parity helper in beginner-facing docs, not only migration policy docs.
 - [x] Make Phase 8 branch reality explicit in README, docs, and plans.
-- [ ] Add a dedicated operator-facing document for job-scoped collection parameters once the agent and collector mapping is implemented.
+- [x] Add a dedicated operator-facing document for job-scoped collection parameters once the agent and collector mapping is implemented.
 - [x] Add a dedicated operator-facing document for the preferred `signalforge-agent` deployment model and security baseline in `signalforge` so the cross-repo stance does not live only in thread history.
 - [x] Add a first-class `signalforge-agent preflight` command plus a dry-run systemd installer path so operators can validate config, capability readiness, and rendered units before enabling the service.
 - [ ] Add a sibling-repo handoff note linking the exact SignalForge, agent, and collector changes that shipped together.
 
 ### Validation gates
 
-- [ ] `signalforge`: targeted API, repository, parity, and typecheck validation pass.
+- [x] `signalforge`: targeted API, repository, parity, and typecheck validation pass.
 - [x] `signalforge-agent`: family-aware scope mapping tests pass.
-- [ ] `signalforge-collectors`: documented and tested invocation examples for Linux, container, and Kubernetes.
-- [ ] At least one end-to-end operator flow is exercised for:
+- [x] `signalforge-collectors`: documented and tested invocation examples for Linux, container, and Kubernetes.
+- [x] At least one end-to-end operator flow is exercised for:
   - Linux host job
   - container target job
   - Kubernetes namespace or cluster-scoped job
 
-## Partial completion note
+## Completion note
 
-The current branch has already completed the first server-side portion of this phase:
+The current repos now complete the practical cross-repo portion of this phase:
 
 - typed `CollectionScope` contract exists in `signalforge`
 - source defaults and job overrides are persisted
 - `jobs/next` returns the resolved scope
 - API docs, schemas, and targeted tests are updated
+- `signalforge-agent` maps the resolved scope to collector invocation and logs the claimed scope clearly
+- `signalforge-collectors` documents and validates the stable Linux, container, and Kubernetes input contract
+- repo-local end-to-end smoke covers Linux, container, and Kubernetes job-driven flows against a live SignalForge dev server, with mocked runtime and kubeconfig shims for the non-Linux paths
 
-Phase 9 is **not** complete until the agent and collectors consume the same typed scope contract and the end-to-end operator path is documented and validated.
+The remaining hardening tail is narrower:
+
+- run live Postgres parity for the new scope columns in an environment with a real Postgres URL
+- run production-like container-host and cluster-side smoke on the intended execution environments, not only repo-local mocked runtime and kubeconfig shims
 
 ## Definition of done
 

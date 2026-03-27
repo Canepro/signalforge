@@ -5,7 +5,7 @@ This file tracks **implemented** work and **recommended next steps**.
 For the canonical long-lived roadmap, see [`roadmap.md`](./roadmap.md).
 For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked historical at the top).
 
-Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at `431ec32`. The `codex/phase-8-implementation` branch has progressed further and the Phase 8 rows below describe the current branch reality rather than released `main`.
+This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, and the merged Phase 9c frontend redesign.
 
 ## Implemented phases
 
@@ -33,10 +33,12 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 | 6e-agent | `signalforge-agent` repo (Bun + TypeScript): heartbeat, poll, claim, run `first-audit.sh`, upload artifact, fail with explicit codes. Fatal lease-loss (abort + POST fail). Snapshot-based artifact selection (no stale logs). Validated E2E against live SignalForge. | Done |
 | Sources UI polish | Unified sidebar+topbar layout (matches dashboard), health indicators, job status badges, property grids, source settings (rename/enable/version), agent enrollment info, action feedback (loading/saved states), cancel confirmation, staggered animations, gradient accents | Done |
 | CI + migration discipline | GitHub Actions workflow (`ci.yml`): typecheck, test, build + Postgres parity job (fresh `postgres:16-alpine`, apply migrations, `test:parity`). Checked-in migration policy (`docs/postgres-migrations.md`): append-only files, checksum enforcement, no-down stance, release discipline. Upgrade-path migration test scaffold (activates once `002_*` exists). | Done |
-| 8a | Multi-artifact compare uplift: shared `evidence_delta`, family-aware metrics, target-aware compare support for stable evidence drift | Done on branch |
-| 8b | `container-diagnostics`: adapter, ingestion, compare, fixtures/golden tests, container-aware fallback wording and metrics | Done on branch |
-| 8c | `kubernetes-bundle` push path: locked `kubernetes-bundle.v1` manifest, adapter, ingestion, compare, fixtures/golden tests, scope-aware target identity | Done on branch |
-| 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, compare normalization, deterministic platform noise, and exposure-plus-identity joins | Done on branch |
+| 8a | Multi-artifact compare uplift: shared `evidence_delta`, family-aware metrics, target-aware compare support for stable evidence drift | Done |
+| 8b | `container-diagnostics`: adapter, ingestion, compare, fixtures/golden tests, container-aware fallback wording and metrics | Done |
+| 8c | `kubernetes-bundle` push path: locked `kubernetes-bundle.v1` manifest, adapter, ingestion, compare, fixtures/golden tests, scope-aware target identity | Done |
+| 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, compare normalization, deterministic platform noise, and exposure-plus-identity joins | Done |
+| 9 (repo-local) | Typed job-scoped collection parameters in SignalForge: source defaults, per-job overrides, resolved `collection_scope` in `jobs/next`, published schemas, Sources UI visibility, and contract tests | Done |
+| 9c | Frontend operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources | Done |
 
 ## Product snapshot
 
@@ -49,12 +51,12 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 - **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, Vercel.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
 
-## Phase 8 branch snapshot
+## Multi-artifact snapshot
 
 - `container-diagnostics` is a shipped artifact family in this checkout with credible first-slice findings around exposure, privilege, mounts, secrets, identity, and runtime hardening.
 - `kubernetes-bundle` is a shipped artifact family in this checkout using the text-carried `kubernetes-bundle.v1` JSON manifest shape, not raw archive ingestion.
 - the Kubernetes bundle now accepts optional operational diagnostics documents for warning events, bounded unhealthy-workload log excerpts, node health, rollout state, `kubectl top`, HPA state, PodDisruptionBudget state, ResourceQuota state, LimitRange defaults, and PVC/PV state in addition to the original posture-focused docs
-- Kubernetes analysis on this branch currently covers public Service exposure, namespace isolation gaps, RBAC over-breadth, workload-to-identity joins, exposed-workload-to-identity joins, token/Secret usage, workload hardening, host-escape style settings, probes, and resource governance.
+- Kubernetes analysis now covers public Service exposure, namespace isolation gaps, RBAC over-breadth, workload-to-identity joins, exposed-workload-to-identity joins, token/Secret usage, workload hardening, host-escape style settings, probes, and resource governance.
 - The strongest remaining Phase 8 architectural risk is unchanged: the current execution model is still effectively one registration per source, which may be too narrow for future Kubernetes or mixed-scope execution forms.
 
 ## Known limitations
@@ -66,31 +68,16 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 
 ## Recommended next work (high level)
 
+- Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare/export hardening (small, targeted).
-- Finish the Phase 8 merge cleanup before new Phase 9 code spreads further. The merge gate is now:
-  - README, docs index, roadmap, and current-plan all reflect three shipped artifact families in this branch
-  - control-plane honesty is explicit: Linux is the cleanest end-to-end path; container and Kubernetes have push-first parity and host-agent limits
-  - branch-local validation for Phase 8 and the current `collection_scope` contract stays green
-- Phase 8 next-step prep is in place in [phase-8-containers-k8s.md](/home/vincent/src/signalforge/plans/phase-8-containers-k8s.md). Current branch work has completed Phase 0, the container slices, the Kubernetes push path, and the first substantial Kubernetes findings-quality pass. The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
+- Phase 8 next-step prep remains in place in [`phase-8-containers-k8s.md`](./phase-8-containers-k8s.md). The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
 - For Kubernetes specifically, prefer a higher quality bar over the smallest possible demo: use official upstream guidance, relevant local skills, realistic fixtures, and read-only live-cluster inspection when that materially improves rule credibility. Use richer platform examples when helpful, but keep the actual detections and wording anchored in plain Kubernetes primitives so the product still fits operators with simpler clusters.
-- Best next implementation move after the Phase 8 merge gate is closed: execute the documented Phase 9 cross-repo slice for job-scoped collection parameters so container and Kubernetes jobs stop depending on hidden host-local environment. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
-- Phase 9 repo-local progress is now ahead of the original API-only slice:
-  - Sources create/edit flows can store typed `default_collection_scope`
-  - source detail and dashboard request flows can send typed per-job `collection_scope` overrides
-  - operator UI now shows stored source default scope and resolved job scope
-  - dashboard home now surfaces a real `Collection Pulse` heatmap instead of the old `Environment Mix` filler card
-  - run detail now includes a findings overview band with operator-facing signal buckets plus severity and signal filters
-  - the remaining Phase 9 work is cross-repo: `signalforge-agent` and `signalforge-collectors` still need to consume the same typed scope contract end to end
-- The next frontend quality bar is now documented as a separate source-of-truth design instead of being described from memory:
-  - source of truth: [`phase-9c-frontend-operator-workstation-polish.md`](./phase-9c-frontend-operator-workstation-polish.md)
-  - scope: operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources
-  - first implementation slice: shared UI tokens and interaction primitives, then dashboard/run-detail/compare, then Sources parity
-  - post-implementation gate: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md) for preview QA, real-browser signoff, and automation prerequisites
+- Phase 9 job-scoped collection is now wired across `signalforge`, `signalforge-agent`, and `signalforge-collectors`, with repo-local end-to-end validation for Linux plus shim-backed container and Kubernetes flows. The remaining Phase 9 follow-on is narrower: live Postgres parity for the new scope columns plus production-like host or cluster runtime smoke outside this workstation. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
 - The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
   - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
-  - the current branch already includes the first end-to-end Kubernetes operational tranche beyond events and node pressure: bounded unhealthy-workload log excerpts, HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV signals now feed deterministic findings, compare metrics, and run-detail or dashboard evidence cards
+  - the current implementation already includes the first end-to-end Kubernetes operational tranche beyond events and node pressure: bounded unhealthy-workload log excerpts, HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV signals now feed deterministic findings, compare metrics, and run-detail or dashboard evidence cards
   - richer container runtime-health diagnostics such as state, health, restart, OOM, bounded unhealthy log excerpts, memory limits/reservations, and one-shot CPU/memory stats
   - findings and dashboard presentation that surfaces this evidence instead of burying it
   - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)

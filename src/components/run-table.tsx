@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { SeverityBar } from "./severity-badge";
 import { StatusBadge } from "./status-badge";
 import { getArtifactTypeLabel, getSourceTypeLabel } from "@/lib/source-catalog";
@@ -14,9 +15,17 @@ interface RunTableProps {
 }
 
 export function RunTable({ runs }: RunTableProps) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [isRefreshing, startRefreshTransition] = useTransition();
   const hasMore = runs.length > DEFAULT_VISIBLE;
   const visibleRuns = expanded ? runs : runs.slice(0, DEFAULT_VISIBLE);
+
+  function handleRefresh() {
+    startRefreshTransition(() => {
+      router.refresh();
+    });
+  }
 
   if (runs.length === 0) {
     return (
@@ -40,9 +49,35 @@ export function RunTable({ runs }: RunTableProps) {
             Recent Diagnostic Runs
           </h4>
         </div>
-        <span className="text-xs font-semibold text-primary">
-          {runs.length} {runs.length === 1 ? "run" : "runs"}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="sf-btn-ghost px-2.5 py-1.5 text-xs text-primary"
+            title="Refresh the dashboard queue now. Automatic refresh is still enabled."
+            aria-label={isRefreshing ? "Refreshing diagnostic runs" : "Refresh diagnostic runs"}
+          >
+            <svg
+              className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M20 11a8 8 0 10-2.34 5.66M20 5v6h-6"
+              />
+            </svg>
+            {isRefreshing ? "Refreshing…" : "Refresh"}
+          </button>
+          <span className="text-xs font-semibold text-primary">
+            {runs.length} {runs.length === 1 ? "run" : "runs"}
+          </span>
+        </div>
       </div>
 
       <div className="divide-y divide-surface-container-low md:hidden">
@@ -126,14 +161,18 @@ export function RunTable({ runs }: RunTableProps) {
                 key={run.id}
                 className="sf-table-row align-top"
               >
-                <td className="px-3 py-3">
+                <td className="min-w-0 px-3 py-3">
                   <Link
                     href={`/runs/${run.id}`}
-                    className="text-sm font-semibold text-on-surface transition-colors hover:text-primary"
+                    className="block truncate text-sm font-semibold text-on-surface transition-colors hover:text-primary"
+                    title={run.filename.replace(/\.(log|txt|json)$/i, "")}
                   >
                     {run.filename.replace(/\.(log|txt|json)$/i, "")}
                   </Link>
-                  <div className="mt-0.5 truncate font-mono text-xs text-outline-variant">
+                  <div
+                    className="mt-0.5 truncate font-mono text-xs text-outline-variant"
+                    title={run.filename}
+                  >
                     {run.filename}
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-xs text-on-surface-variant lg:hidden">
