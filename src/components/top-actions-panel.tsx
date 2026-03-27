@@ -25,9 +25,9 @@ export function TopActionsPanel({
   if (!showToolbar && !showGrid) return null;
 
   return (
-    <section className="bg-surface-container-lowest border-b border-surface-container shadow-sm shrink-0">
+    <section className="shrink-0 border-b border-outline-variant/10 bg-surface-container-lowest shadow-sm">
       {(showToolbar || showGrid) && (
-        <div className="flex items-center justify-between px-4 lg:px-6 py-2.5 border-b border-surface-container-low bg-surface-container-low/50">
+        <div className="flex flex-col gap-3 border-b border-outline-variant/10 bg-surface-container-low/60 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex items-center gap-2 min-w-0">
             <svg
               className="h-3.5 w-3.5 text-severity-critical shrink-0"
@@ -41,71 +41,74 @@ export function TopActionsPanel({
                 clipRule="evenodd"
               />
             </svg>
-            <span className="text-[10px] font-bold text-severity-critical uppercase tracking-widest truncate">
-              {showGrid ? "Top Actions Now" : "Run actions"}
-            </span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-severity-critical">
+                {showGrid ? "Top Actions Now" : "Run actions"}
+              </div>
+              <p className="text-xs text-on-surface-variant">
+                Reanalyze, compare, or export this run without relying on icon-only controls.
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0" role="toolbar" aria-label="Run actions">
-            <button
-              type="button"
-              onClick={() => void onReanalyze?.()}
-              disabled={!onReanalyze || reanalyzePending}
-              aria-busy={reanalyzePending || undefined}
-              aria-label={reanalyzePending ? "Reanalyzing artifact" : "Reanalyze artifact"}
-              className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant disabled:text-outline-variant disabled:cursor-not-allowed transition-colors"
-              title={reanalyzePending ? "Reanalyzing…" : "Reanalyze artifact"}
-            >
-              {reanalyzePending ? (
-                <svg
-                  className="h-4 w-4 animate-spin"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
+          <div className="flex flex-wrap items-center gap-2 shrink-0" role="toolbar" aria-label="Run actions">
+            {onReanalyze ? (
+              <button
+                type="button"
+                onClick={() => void onReanalyze?.()}
+                disabled={reanalyzePending}
+                aria-busy={reanalyzePending || undefined}
+                className="sf-btn-secondary"
+                title={reanalyzePending ? "Reanalyzing…" : "Reanalyze artifact"}
+              >
+                {reanalyzePending ? (
+                  <svg
+                    className="h-4 w-4 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
                     stroke="currentColor"
-                    strokeDasharray="32"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    className="opacity-90"
-                    d="M4 12a8 8 0 018-8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              )}
-              <span className="sr-only">
-                {reanalyzePending ? "Reanalyzing artifact" : "Reanalyze artifact"}
-              </span>
-            </button>
+                    strokeWidth={2}
+                    aria-hidden
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeDasharray="32"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      className="opacity-90"
+                      d="M4 12a8 8 0 018-8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                )}
+                {reanalyzePending ? "Reanalyzing…" : "Reanalyze"}
+              </button>
+            ) : null}
             {compareHref ? (
-              <div className="flex items-center gap-0.5">
+              <>
                 <Link
                   href={compareHref}
-                  aria-label="Compare this run against the previous run for the same target"
-                  className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant transition-colors"
-                  title="Compare drift — implicit baseline is the latest older run for the same target (not always the reanalyze parent)"
+                  className="sf-btn-secondary"
+                  title="Compare against the latest older run for the same target"
                 >
                   <svg
                     className="h-4 w-4"
@@ -121,53 +124,53 @@ export function TopActionsPanel({
                       d="M8 7h12M8 12h12m-12 5h12M4 7h.01M4 12h.01M4 17h.01"
                     />
                   </svg>
-                  <span className="sr-only">Compare against previous run</span>
+                  Compare run
                 </Link>
                 {compareToParentHref ? (
                   <Link
                     href={compareToParentHref}
-                    className="px-1.5 py-0.5 text-[10px] font-semibold rounded hover:bg-surface-container-high text-primary whitespace-nowrap"
-                    title="Compare to the run this was reanalyzed from (explicit baseline)"
+                    className="sf-btn-ghost px-3 py-2 text-primary"
+                    title="Compare to the run this was reanalyzed from"
                   >
-                    vs parent
+                    Compare vs parent
                   </Link>
                 ) : null}
-              </div>
+              </>
             ) : null}
-            <button
-              type="button"
-              onClick={onExport}
-              disabled={!onExport}
-              aria-label="Export report JSON"
-              className="p-1.5 hover:bg-surface-container-high rounded text-on-surface-variant disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Export report JSON"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden
+            {onExport ? (
+              <button
+                type="button"
+                onClick={onExport}
+                className="sf-btn-ghost"
+                title="Export report JSON"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              <span className="sr-only">Export report JSON</span>
-            </button>
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Export JSON
+              </button>
+            ) : null}
           </div>
         </div>
       )}
 
       {showGrid ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-surface-container-low">
+        <div className="grid grid-cols-1 divide-y divide-surface-container-low md:grid-cols-3 md:divide-x md:divide-y-0">
           {actions.map((action, i) => (
-            <div key={i} className="flex gap-3 px-4 lg:px-5 py-3.5">
+            <div key={i} className="flex gap-3 px-4 py-4 lg:px-5">
               <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                   i === 0
                     ? "bg-severity-critical/10 text-severity-critical border border-severity-critical/20"
                     : "bg-surface-container-high text-on-surface-variant"
@@ -175,7 +178,7 @@ export function TopActionsPanel({
               >
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <p className="text-[13px] font-semibold text-on-surface leading-snug">{action}</p>
+              <p className="text-sm font-semibold leading-snug text-on-surface">{action}</p>
             </div>
           ))}
         </div>

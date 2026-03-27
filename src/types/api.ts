@@ -42,6 +42,7 @@ export interface RunDetail {
   collector_type: string | null;
   collector_version: string | null;
   collected_at: string | null;
+  collected_at_label?: string | null;
   created_at: string;
   created_at_label?: string;
   status: string;

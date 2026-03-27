@@ -83,6 +83,11 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
   - dashboard home now surfaces a real `Collection Pulse` heatmap instead of the old `Environment Mix` filler card
   - run detail now includes a findings overview band with operator-facing signal buckets plus severity and signal filters
   - the remaining Phase 9 work is cross-repo: `signalforge-agent` and `signalforge-collectors` still need to consume the same typed scope contract end to end
+- The next frontend quality bar is now documented as a separate source-of-truth design instead of being described from memory:
+  - source of truth: [`phase-9c-frontend-operator-workstation-polish.md`](./phase-9c-frontend-operator-workstation-polish.md)
+  - scope: operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources
+  - first implementation slice: shared UI tokens and interaction primitives, then dashboard/run-detail/compare, then Sources parity
+  - post-implementation gate: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md) for preview QA, real-browser signoff, and automation prerequisites
 - The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
   - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
   - the current branch already includes the first end-to-end Kubernetes operational tranche beyond events and node pressure: bounded unhealthy-workload log excerpts, HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV signals now feed deterministic findings, compare metrics, and run-detail or dashboard evidence cards

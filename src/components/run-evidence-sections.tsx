@@ -22,11 +22,11 @@ export function RunEvidenceSections({
   if (sections.length === 0) return null;
 
   return (
-    <section className="rounded-lg border border-surface-container bg-surface-container-lowest shadow-sm">
-      <div className="border-b border-surface-container bg-surface-container-low px-5 py-3">
+    <section className="sf-panel">
+      <div className="sf-panel-header">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+            <div className="sf-kicker">
               {heading}
             </div>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
@@ -44,10 +44,10 @@ export function RunEvidenceSections({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-outline-variant">
+                <div className="sf-kicker text-outline-variant">
                   {section.title}
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
+                <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
                   {section.summary}
                 </p>
               </div>
@@ -59,11 +59,11 @@ export function RunEvidenceSections({
                   key={`${section.id}-${entry.label}-${entry.value}`}
                   className="rounded-lg border border-outline-variant/10 bg-surface-container-lowest px-3 py-2"
                 >
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-outline-variant">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                     {entry.label}
                   </div>
                   <div
-                    className={`mt-1 whitespace-pre-wrap text-[12px] leading-relaxed ${
+                    className={`mt-1 whitespace-pre-wrap text-sm leading-relaxed ${
                       entry.emphasis ? "font-semibold text-on-surface" : "text-on-surface-variant"
                     }`}
                   >

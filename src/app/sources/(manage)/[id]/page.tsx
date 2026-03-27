@@ -56,7 +56,7 @@ function ScopeDetails({
   return (
     <div className="space-y-2">
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">{label}</p>
         <p className="mt-1 text-sm font-medium text-on-surface">{scope ? summarizeCollectionScope(scope) : emptyLabel}</p>
       </div>
       {scope ? (
@@ -64,7 +64,7 @@ function ScopeDetails({
           {detailCollectionScope(scope).map((item) => (
             <span
               key={item}
-              className="rounded-md bg-surface-container px-2 py-1 text-[10px] font-mono text-on-surface-variant"
+              className="rounded-lg bg-surface-container px-2 py-1 text-[11px] font-mono text-on-surface-variant"
             >
               {item}
             </span>
@@ -139,9 +139,9 @@ export default async function SourceDetailPage({
           },
           { label: "Last seen", value: relativeTime(source.last_seen_at) },
         ].map((prop) => (
-          <div key={prop.label} className="relative overflow-hidden rounded-lg bg-surface-container-lowest p-3 shadow-sm">
+          <div key={prop.label} className="sf-panel relative overflow-hidden p-3">
             <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/30" />
-            <dt className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{prop.label}</dt>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">{prop.label}</dt>
             <dd className="text-sm font-medium text-on-surface mt-1 truncate">{prop.value}</dd>
           </div>
         ))}
@@ -175,17 +175,19 @@ export default async function SourceDetailPage({
       )}
 
       {/* Collect Fresh Evidence */}
-      <section className="relative rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm space-y-4 overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-primary/60 to-transparent" />
-        <h2 className="font-headline text-lg font-bold text-on-surface tracking-tight">Collect Fresh Evidence</h2>
-        <p className="text-sm text-on-surface-variant leading-relaxed">
+      <section className="sf-panel space-y-4 p-6">
+        <div>
+          <p className="sf-kicker">Queue work</p>
+          <h2 className="font-headline text-lg font-bold tracking-tight text-on-surface">Collect Fresh Evidence</h2>
+        </div>
+        <p className="text-sm leading-relaxed text-on-surface-variant">
           Creates a <strong>queued</strong> collection job. A thin external agent (enrolled below) must{" "}
           <strong>claim</strong> the job, run your collector, and upload the artifact.
           Collection runs <strong>outside</strong> SignalForge. If the agent is running continuously, it should pick this up
-          on its next poll. If you only run <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">once</code> or cron,
+          on its next poll. If you only run <code className="sf-inline-code">once</code> or cron,
           the job waits until that next invocation.
         </p>
-        <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3">
+        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3">
           <ScopeDetails
             label="Source default scope"
             scope={source.default_collection_scope}
@@ -201,9 +203,11 @@ export default async function SourceDetailPage({
       </section>
 
       {/* Agent enrollment */}
-      <section className="relative rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm space-y-3 overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-secondary via-secondary/40 to-transparent" />
-        <h2 className="font-headline text-lg font-bold text-on-surface tracking-tight">Agent enrollment</h2>
+      <section className="sf-panel space-y-3 p-6">
+        <div>
+          <p className="sf-kicker">Execution plane</p>
+          <h2 className="font-headline text-lg font-bold tracking-tight text-on-surface">Agent enrollment</h2>
+        </div>
         {registration ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -213,24 +217,24 @@ export default async function SourceDetailPage({
                 { label: "Agent version", value: registration.last_agent_version ?? "—" },
                 { label: "Instance", value: registration.last_instance_id?.slice(0, 16) ?? "—" },
               ].map((prop) => (
-                <div key={prop.label} className="rounded-lg bg-surface-container-low px-3 py-2">
-                  <dt className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{prop.label}</dt>
+                <div key={prop.label} className="rounded-xl bg-surface-container-low px-3 py-2.5">
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">{prop.label}</dt>
                   <dd className="text-xs font-medium text-on-surface mt-0.5 truncate font-mono">{prop.value}</dd>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-on-surface-variant">
+            <p className="text-xs text-on-surface-variant">
               One registration per source in v1. Reissue creates a new token for this same registration if the original was missed.
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant">
-              <span className="font-bold uppercase tracking-widest">Agent id</span>
-              <code className="rounded bg-surface-container px-1.5 py-0.5 font-mono text-on-surface">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+              <span className="font-semibold uppercase tracking-[0.14em]">Agent id</span>
+              <code className="rounded-lg bg-surface-container px-1.5 py-0.5 font-mono text-on-surface">
                 {registration.id}
               </code>
               <CopyTextButton
                 value={registration.id}
                 idleLabel="Copy agent id"
-                className="rounded-md border border-outline-variant/20 bg-surface-container-low px-2 py-1 font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container"
+                className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface hover:bg-surface-container"
               />
             </div>
             <p className="text-xs text-on-surface-variant">
@@ -241,7 +245,7 @@ export default async function SourceDetailPage({
         ) : (
           <>
             <p className="text-sm text-on-surface-variant">
-              One agent token per source. Use <code className="text-[10px] font-mono bg-surface-container px-1.5 py-0.5 rounded">POST /api/agent/registrations</code> with
+              One agent token per source. Use <code className="sf-inline-code">POST /api/agent/registrations</code> with
               admin auth, or enroll here.
             </p>
             <AgentEnrollClient sourceId={id} hasRegistration={false} />
@@ -254,7 +258,7 @@ export default async function SourceDetailPage({
         <div className="flex items-center justify-between">
           <h2 className="font-headline text-lg font-bold text-on-surface tracking-tight">Collection jobs</h2>
           {jobs.length > 0 && (
-            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+            <span className="text-sm font-semibold text-primary">
               {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
             </span>
           )}
@@ -266,7 +270,7 @@ export default async function SourceDetailPage({
           </p>
         ) : null}
         {jobs.length === 0 ? (
-          <div className="relative rounded-xl border border-dashed border-outline-variant/30 px-6 py-10 text-center overflow-hidden">
+          <div className="relative overflow-hidden rounded-xl border border-dashed border-outline-variant/30 px-6 py-10 text-center">
             <div className="absolute inset-0 bg-gradient-to-b from-surface-container-low/30 to-transparent pointer-events-none" />
             <p className="relative text-sm text-on-surface-variant">No jobs yet. Request one above and an agent will claim it.</p>
           </div>
@@ -286,12 +290,12 @@ export default async function SourceDetailPage({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <JobStatusBadge status={j.status} />
-                      <span className="text-[10px] text-on-surface-variant">{shortTimestamp(j.created_at)}</span>
+                      <span className="text-[11px] text-on-surface-variant">{shortTimestamp(j.created_at)}</span>
                     </div>
-                    <span className="font-mono text-[9px] text-outline-variant truncate select-all">{j.id}</span>
+                    <span className="font-mono text-[11px] text-outline-variant truncate select-all">{j.id}</span>
                   </div>
 
-                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-on-surface-variant">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-on-surface-variant">
                     <span className="font-medium">{j.artifact_type}</span>
                     {j.request_reason && (
                       <span className="italic text-outline">"{j.request_reason}"</span>
@@ -308,7 +312,7 @@ export default async function SourceDetailPage({
                       </Link>
                     )}
                     {j.result_analysis_status && (
-                      <span className="text-[10px]">
+                      <span className="text-xs">
                         analysis: <strong>{j.result_analysis_status}</strong>
                       </span>
                     )}

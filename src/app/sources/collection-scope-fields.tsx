@@ -42,9 +42,9 @@ export function CollectionScopeFields({
   }, [allowedKind]);
 
   return (
-    <div className="space-y-4 rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-4">
+    <div className="space-y-4 rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-4">
       <label className="block">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+        <span className="sf-field-label">
           Collection scope
         </span>
         <select
@@ -52,13 +52,13 @@ export function CollectionScopeFields({
           name={`${prefix}_kind`}
           value={kind}
           onChange={(event) => setKind(event.target.value as CollectionScope["kind"] | "")}
-          className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+          className="sf-field"
         >
           <option value="">{emptyLabel}</option>
           <option value={allowedKind}>{kindLabel(allowedKind)}</option>
         </select>
         {caption ? (
-          <span className="mt-1 block text-[10px] leading-snug text-on-surface-variant">{caption}</span>
+          <span className="sf-field-help">{caption}</span>
         ) : null}
       </label>
 
@@ -71,24 +71,24 @@ export function CollectionScopeFields({
       {kind === "container_target" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block sm:col-span-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Container reference
             </span>
             <input
               name={`${prefix}_container_ref`}
               defaultValue={initialScope?.kind === "container_target" ? initialScope.container_ref : ""}
               placeholder="e.g. payments-api"
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Runtime (optional)
             </span>
             <select
               name={`${prefix}_runtime`}
               defaultValue={initialScope?.kind === "container_target" ? initialScope.runtime ?? "" : ""}
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             >
               <option value="">Auto / not pinned</option>
               <option value="docker">Docker</option>
@@ -96,14 +96,14 @@ export function CollectionScopeFields({
             </select>
           </label>
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Host hint (optional)
             </span>
             <input
               name={`${prefix}_host_hint`}
               defaultValue={initialScope?.kind === "container_target" ? initialScope.host_hint ?? "" : ""}
               placeholder="e.g. runtime-host-a"
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             />
           </label>
         </div>
@@ -112,60 +112,60 @@ export function CollectionScopeFields({
       {kind === "kubernetes_scope" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Scope level
             </span>
             <select
               name={`${prefix}_scope_level`}
               defaultValue={initialScope?.kind === "kubernetes_scope" ? initialScope.scope_level : "namespace"}
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             >
               <option value="namespace">Namespace</option>
               <option value="cluster">Cluster</option>
             </select>
           </label>
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Namespace
             </span>
             <input
               name={`${prefix}_namespace`}
               defaultValue={initialScope?.kind === "kubernetes_scope" ? initialScope.namespace ?? "" : ""}
               placeholder="Required for namespace scope"
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               kubectl context (optional)
             </span>
             <input
               name={`${prefix}_kubectl_context`}
               defaultValue={initialScope?.kind === "kubernetes_scope" ? initialScope.kubectl_context ?? "" : ""}
               placeholder="e.g. prod-eu-1"
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Cluster name (optional)
             </span>
             <input
               name={`${prefix}_cluster_name`}
               defaultValue={initialScope?.kind === "kubernetes_scope" ? initialScope.cluster_name ?? "" : ""}
               placeholder="e.g. prod-eu-1"
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Provider (optional)
             </span>
             <input
               name={`${prefix}_provider`}
               defaultValue={initialScope?.kind === "kubernetes_scope" ? initialScope.provider ?? "" : ""}
               placeholder="e.g. aks, eks, gke"
-              className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+              className="sf-field"
             />
           </label>
         </div>

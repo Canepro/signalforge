@@ -31,7 +31,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
       setDragging(false);
       setUploading(false);
       setError(null);
-      setAdvancedOpen(false);
+      setAdvancedOpen(true);
       setArtifactType("");
       setTargetIdentifier("");
       setSourceLabel("");
@@ -85,7 +85,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
         <div className="flex items-center justify-between">
           <h2
             id="upload-title"
-            className="font-headline text-lg font-bold text-on-surface"
+            className="font-headline text-xl font-bold tracking-tight text-on-surface"
           >
             Upload Artifact
           </h2>
@@ -93,7 +93,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-outline-variant hover:text-on-surface text-lg leading-none p-1 rounded hover:bg-surface-container-high transition-colors"
+            className="sf-btn-icon h-10 w-10 text-lg leading-none"
           >
             &times;
           </button>
@@ -131,13 +131,13 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                   <div className="text-sm font-medium text-on-surface">
                     Drop an artifact file here
                   </div>
-                  <div className="mt-1 text-xs text-on-surface-variant">
+                  <div className="mt-1 text-sm text-on-surface-variant">
                     Accepts `.log`, `.txt`, and `.json` files
                   </div>
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="mt-4 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3.5 py-2 text-xs font-semibold text-on-surface shadow-sm transition-colors hover:bg-surface-container-high"
+                    className="sf-btn-secondary mt-4 px-3.5 py-2"
                   >
                     Choose file
                   </button>
@@ -171,9 +171,9 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                 aria-expanded={advancedOpen}
               >
                 <div>
-                  <div className="text-sm font-semibold text-on-surface">Advanced metadata</div>
-                  <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                    Optional, but strongly recommended for repeat uploads and multi-artifact compare.
+                  <div className="text-base font-semibold text-on-surface">Target and compare metadata</div>
+                  <div className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+                    Recommended for repeat uploads. Stable identity here makes compare and drift far more useful.
                   </div>
                 </div>
                 <svg
@@ -190,11 +190,11 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
               {advancedOpen ? (
                 <div className="grid gap-4 border-t border-outline-variant/15 px-4 py-4">
                   <label className="block">
-                    <span className="text-[11px] font-semibold text-on-surface">Artifact family</span>
+                    <span className="sf-field-label">Artifact family</span>
                     <select
                       value={artifactType}
                       onChange={(event) => setArtifactType(event.target.value)}
-                      className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface"
+                      className="sf-field"
                     >
                       <option value="">Infer from content</option>
                       {artifactFamilies.map((family) => (
@@ -206,31 +206,31 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                   </label>
 
                   <label className="block">
-                    <span className="text-[11px] font-semibold text-on-surface">Target identifier</span>
+                    <span className="sf-field-label">Target identifier</span>
                     <input
                       value={targetIdentifier}
                       onChange={(event) => setTargetIdentifier(event.target.value)}
                       placeholder={selectedFamily?.targetIdentifierExample ?? "e.g. host:prod-web-01"}
-                      className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm font-mono text-on-surface"
+                      className="sf-field font-mono"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="text-[11px] font-semibold text-on-surface">Source label</span>
+                    <span className="sf-field-label">Source label</span>
                     <input
                       value={sourceLabel}
                       onChange={(event) => setSourceLabel(event.target.value)}
                       placeholder="e.g. laptop, CI runner, jump host"
-                      className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface"
+                      className="sf-field"
                     />
                   </label>
 
-                  <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-3 text-xs leading-relaxed text-on-surface-variant">
+                  <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-3 text-sm leading-relaxed text-on-surface-variant">
                     {selectedFamily ? (
                       <>
                         <div className="font-semibold text-on-surface">{selectedFamily.label}</div>
                         <div className="mt-1">{selectedFamily.targetIdentifierHint}</div>
-                        <div className="mt-2 font-mono text-[11px] text-outline-variant">
+                        <div className="mt-2 font-mono text-xs text-outline-variant">
                           Example: {selectedFamily.targetIdentifierExample}
                         </div>
                       </>
@@ -247,7 +247,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
           </div>
 
           <div className="space-y-3 rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
-            <div className="text-[11px] font-semibold text-on-surface-variant">
+            <div className="text-sm font-semibold text-on-surface-variant">
               Supported artifact families
             </div>
             <div className="space-y-2">
@@ -264,12 +264,12 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-semibold text-on-surface">{family.label}</div>
-                      <code className="text-[11px] text-outline-variant">{family.value}</code>
+                      <code className="text-xs text-outline-variant">{family.value}</code>
                     </div>
-                    <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    <div className="mt-1 text-sm leading-relaxed text-on-surface-variant">
                       {family.description}
                     </div>
-                    <div className="mt-2 text-[11px] leading-relaxed text-outline-variant">
+                    <div className="mt-2 text-xs leading-relaxed text-outline-variant">
                       {family.uploadShape}
                     </div>
                   </div>
@@ -277,7 +277,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
               })}
             </div>
 
-            <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-3 text-xs leading-relaxed text-on-surface-variant">
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-3 text-sm leading-relaxed text-on-surface-variant">
               For richer metadata such as collector type, collector version, and collected timestamp, the CLI and external submit path remain the best fit.
             </div>
           </div>

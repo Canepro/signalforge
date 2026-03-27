@@ -20,7 +20,7 @@ export default async function NewSourcePage({
   const artifactFamilies = listArtifactFamilyPresentations();
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-5xl space-y-6">
       <div>
         <Link href="/sources" className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary transition-colors">
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -35,17 +35,17 @@ export default async function NewSourcePage({
       </div>
 
       {sp.error === "duplicate" && (
-        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
-          A source with this <code className="text-xs">target_identifier</code> already exists (among enabled sources).
+        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-700 dark:text-red-300">
+          A source with this <code className="sf-inline-code">target_identifier</code> already exists (among enabled sources).
         </p>
       )}
       {(sp.error === "missing" || sp.error === "type") && (
-        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-700 dark:text-red-300">
           Please fill all required fields and pick a valid source type.
         </p>
       )}
       {(sp.error === "artifact_type" || sp.error === "invalid_default_collection_scope") && (
-        <p className="text-sm text-red-700 dark:text-red-300 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5">
+        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-700 dark:text-red-300">
           {sp.error === "artifact_type" ?
             "Please choose a supported artifact family for this source."
           : "Default collection scope did not match the selected artifact family."}

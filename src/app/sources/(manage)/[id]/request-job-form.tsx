@@ -31,13 +31,13 @@ export function RequestJobForm({
       <input type="hidden" name="source_id" value={sourceId} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
         <label className="block text-sm text-on-surface">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span className="sf-field-label">
             Reason (optional)
           </span>
           <input
             name="request_reason"
             placeholder="e.g. pre-deploy check"
-            className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+            className="sf-field bg-surface-container-lowest"
           />
         </label>
         <CollectionScopeFields
@@ -55,7 +55,7 @@ export function RequestJobForm({
         <button
           type="submit"
           disabled={!enabled || isPending}
-          className="rounded-lg bg-gradient-to-b from-primary to-primary-dim px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-on-primary hover:brightness-110 hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm whitespace-nowrap transition-all"
+          className="sf-btn-primary whitespace-nowrap"
         >
           {isPending ? "Submitting…" : "Request job"}
         </button>

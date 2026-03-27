@@ -64,7 +64,7 @@ function ScopeSummary({
 }) {
   if (!scope) {
     return (
-      <p className="text-[11px] leading-relaxed text-on-surface-variant">
+      <p className="text-xs leading-relaxed text-on-surface-variant">
         This source has no stored default scope. Leaving the override blank will queue the job without an explicit scope payload.
       </p>
     );
@@ -72,14 +72,15 @@ function ScopeSummary({
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] leading-relaxed text-on-surface-variant">
-        This source will default to <span className="font-semibold text-on-surface">{summarizeCollectionScope(scope)}</span> if you do not override the request below.
+      <p className="text-xs leading-relaxed text-on-surface-variant">
+        This source defaults to <span className="font-semibold text-on-surface">{summarizeCollectionScope(scope)}</span>.
+        Leave the override blank to inherit that stored scope for this request.
       </p>
       <div className="flex flex-wrap gap-1.5">
         {detailCollectionScope(scope).map((item) => (
           <span
             key={item}
-            className="rounded-md bg-surface-container px-2 py-1 text-[10px] font-mono text-on-surface-variant"
+            className="rounded-lg bg-surface-container px-2 py-1 text-[11px] font-mono text-on-surface-variant"
           >
             {item}
           </span>
@@ -118,88 +119,94 @@ export function RequestCollectionModal({
       open={open}
       onClose={onClose}
       titleId="request-collection-title"
-      maxWidthClassName="max-w-lg"
+      maxWidthClassName="max-w-4xl"
     >
-        <div className="flex items-start justify-between gap-3 border-b border-surface-container px-5 pt-5 pb-4">
-          <div>
-            <h2 id="request-collection-title" className="font-headline text-lg font-bold text-on-surface">
-              Request collection
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              Queue a collection job for a live source. A continuously running agent should claim it on its next poll.
-              If the source only uses <code className="text-[10px] bg-surface-container px-1 py-0.5 rounded">once</code> or cron,
-              the job waits until the next invocation.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded p-1 text-on-surface-variant hover:bg-surface-container-high"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div className="flex items-start justify-between gap-3 border-b border-outline-variant/15 px-5 pb-4 pt-5">
+        <div>
+          <h2 id="request-collection-title" className="font-headline text-xl font-bold tracking-tight text-on-surface">
+            Request collection
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
+            Queue a collection job for a live source. A continuously running agent should claim it on its next poll.
+            If the source only uses <code className="sf-inline-code">once</code> or cron, the job waits until the next invocation.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="sf-btn-icon h-10 w-10 shrink-0"
+          aria-label="Close"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
-        <div className="space-y-5 px-5 py-4">
-          {result?.ok ? (
-            <div className="space-y-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
-              <div>
-                <p className="text-sm font-semibold text-on-surface">Collection job queued.</p>
-                <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                  {result.source_name} now has a queued job. A running agent should claim it shortly; one-shot or cron setups
-                  will pick it up on the next run.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/sources/${result.source_id}?job=${result.job_id}`}
-                  onClick={onClose}
-                  className="rounded-lg bg-gradient-to-b from-primary to-primary-dim px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-primary"
-                >
-                  Open source
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResult(null);
-                    reasonRef.current?.focus();
-                  }}
-                  className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface"
-                >
-                  Queue another
-                </button>
-              </div>
+      <div className="space-y-5 px-5 py-5">
+        {result?.ok ? (
+          <div className="space-y-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-5">
+            <div>
+              <p className="text-base font-semibold text-on-surface">Collection job queued.</p>
+              <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+                {result.source_name} now has a queued job. A running agent should claim it shortly; one-shot or cron setups
+                will pick it up on the next run.
+              </p>
             </div>
-          ) : (
-            <form
-              action={(formData) => {
-                startTransition(() => {
-                  void requestCollectionFromDashboardAction(formData).then(setResult);
-                });
-              }}
-              className="space-y-4"
-            >
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  Live source
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/sources/${result.source_id}?job=${result.job_id}`}
+                onClick={onClose}
+                className="sf-btn-primary"
+              >
+                Open source
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setResult(null);
+                  reasonRef.current?.focus();
+                }}
+                className="sf-btn-secondary"
+              >
+                Queue another
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form
+            action={(formData) => {
+              startTransition(() => {
+                void requestCollectionFromDashboardAction(formData).then(setResult);
+              });
+            }}
+            className="space-y-5"
+          >
+            <input type="hidden" name="source_id" value={selectedSourceId} />
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+              <div className="space-y-3">
+                <div>
+                  <div className="sf-kicker">Live source</div>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    Pick the target that should receive this job. Selection is both visual and semantic.
+                  </p>
                 </div>
-                <input type="hidden" name="source_id" value={selectedSourceId} />
-                <div className="space-y-2">
+                <div
+                  className="space-y-2"
+                  role="radiogroup"
+                  aria-label="Live sources available for collection"
+                >
                   {sources.map((source) => {
                     const active = source.id === selectedSourceId;
                     return (
                       <button
                         key={source.id}
                         type="button"
+                        role="radio"
+                        aria-checked={active}
                         onClick={() => setSelectedSourceId(source.id)}
-                        className={`w-full rounded-lg border px-3 py-3 text-left transition-all ${
-                          active
-                            ? "border-primary/40 bg-primary/[0.06] shadow-sm"
-                            : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/30 hover:bg-surface-container"
-                        }`}
+                        className={`sf-select-card w-full ${active ? "border-primary/35 bg-primary/[0.07] shadow-sm" : ""}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -207,15 +214,15 @@ export function RequestCollectionModal({
                             <div className="mt-1 truncate text-xs font-mono text-on-surface-variant">
                               {source.target_identifier}
                             </div>
-                            <div className="mt-1 text-[10px] uppercase tracking-widest text-outline-variant">
+                            <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                               {getArtifactTypeLabel(source.expected_artifact_type)}
                             </div>
                           </div>
                           <div className="shrink-0 text-right">
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
                               online
                             </div>
-                            <div className="mt-1 text-[10px] text-on-surface-variant">
+                            <div className="mt-1 text-[11px] text-on-surface-variant">
                               last seen {relativeTime(source.last_seen_at)}
                             </div>
                           </div>
@@ -224,32 +231,42 @@ export function RequestCollectionModal({
                     );
                   })}
                 </div>
-              {selectedSource ? (
-                  <div className="space-y-2 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-3">
-                    <p className="text-[11px] leading-relaxed text-on-surface-variant">
-                      {selectedSource.display_name} is the current target for this request. This source expects{" "}
-                      <span className="font-semibold text-on-surface">
-                        {getArtifactTypeLabel(selectedSource.expected_artifact_type)}
-                      </span>{" "}
-                      collection jobs.
-                    </p>
-                    <ScopeSummary scope={selectedSource.default_collection_scope} />
-                  </div>
-                ) : null}
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.95fr)]">
+              <div className="space-y-4">
+                {selectedSource ? (
+                  <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-4">
+                    <div className="sf-kicker">Resolved target</div>
+                    <div className="mt-2 text-base font-semibold text-on-surface">
+                      {selectedSource.display_name}
+                    </div>
+                    <div className="mt-1 break-all text-sm font-mono text-on-surface-variant">
+                      {selectedSource.target_identifier}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                        Scope and artifact family
+                      </div>
+                      <div className="mt-1 text-sm text-on-surface">
+                        {getArtifactTypeLabel(selectedSource.expected_artifact_type)}
+                      </div>
+                      <div className="mt-2">
+                        <ScopeSummary scope={selectedSource.default_collection_scope} />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <label className="block">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Reason (optional)
-                  </span>
+                  <span className="sf-field-label">Reason (optional)</span>
                   <input
                     ref={reasonRef}
                     name="request_reason"
                     placeholder="e.g. pre-deploy check"
-                    className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                    className="sf-field"
                   />
                 </label>
+
                 {selectedSource ? (
                   <CollectionScopeFields
                     key={`${selectedSource.id}:${selectedSource.expected_artifact_type}`}
@@ -257,48 +274,49 @@ export function RequestCollectionModal({
                     prefix="collection_scope"
                     emptyLabel="Use source default / no override"
                     caption={
-                      selectedSource.default_collection_scope ?
-                        "Optional. Leave blank to inherit the source default scope, or override it for this one dashboard request."
-                      : "Optional. Leave blank to queue the job without an explicit scope payload."
+                      selectedSource.default_collection_scope
+                        ? "Optional. Leave blank to inherit the stored source default scope, or override it for this one dashboard request."
+                        : "Optional. Leave blank to queue the job without an explicit scope payload."
                     }
                   />
                 ) : null}
               </div>
+            </div>
 
-              {result && !result.ok ? (
-                <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-                  {result.error === "admin_required" ? "Admin sign-in is required to queue jobs from the dashboard."
-                  : result.error === "not_ready" ? "That source is no longer live and ready for collection."
-                  : result.error === "disabled" ? "That source is disabled and cannot accept new jobs."
-                  : result.error === "not_found" ? "That source no longer exists."
-                  : result.error === "invalid_collection_scope" ? "The chosen collection scope does not match this source's artifact family."
-                  : "Choose a source to queue a collection job."}
-                </p>
-              ) : null}
+            {result && !result.ok ? (
+              <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                {result.error === "admin_required" ? "Admin sign-in is required to queue jobs from the dashboard."
+                : result.error === "not_ready" ? "That source is no longer live and ready for collection."
+                : result.error === "disabled" ? "That source is disabled and cannot accept new jobs."
+                : result.error === "not_found" ? "That source no longer exists."
+                : result.error === "invalid_collection_scope" ? "The chosen collection scope does not match this source's artifact family."
+                : "Choose a source to queue a collection job."}
+              </p>
+            ) : null}
 
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] leading-relaxed text-on-surface-variant">
-                  Need setup help instead? Use <span className="font-semibold text-on-surface">How to collect</span> in the side rail.
-                  For interactive use, keep the agent running continuously on the source machine.
-                </p>
-                <button
-                  type="submit"
-                  disabled={!selectedSource || isPending}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-b from-primary to-primary-dim px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-on-primary shadow-sm transition-all hover:brightness-110 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {isPending ? (
-                    <>
-                      <Spinner className="h-3.5 w-3.5" />
-                      Requesting…
-                    </>
-                  ) : (
-                    "Request job"
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+            <div className="flex flex-col gap-3 border-t border-outline-variant/10 pt-4 lg:flex-row lg:items-end lg:justify-between">
+              <p className="max-w-2xl text-xs leading-relaxed text-on-surface-variant">
+                Need setup help instead? Use <span className="font-semibold text-on-surface">How to collect</span> in the shell.
+                For interactive use, keep the agent running continuously on the source machine so queued jobs are claimed promptly.
+              </p>
+              <button
+                type="submit"
+                disabled={!selectedSource || isPending}
+                className="sf-btn-primary"
+              >
+                {isPending ? (
+                  <>
+                    <Spinner className="h-3.5 w-3.5" />
+                    Requesting…
+                  </>
+                ) : (
+                  "Request job"
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </ModalShell>
   );
 }

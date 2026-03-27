@@ -157,7 +157,8 @@ Recommended near-term choices:
 3. Land the Phase 9 job-scoped collection-parameter slice across `signalforge`, `signalforge-agent`, and `signalforge-collectors` instead of leaving non-Linux job-driven collection dependent on host-local environment.
 4. Continue agent hardening: keep the environment-specific deployment matrix explicit, preserve the new managed-kubeconfig and user-`systemd` validation path, and carry the stricter container-runtime access checks into a production-like host install smoke plus live container-host and cluster-side deployment validation.
 5. Plan and implement the next diagnostics-enrichment tranche so SignalForge expands beyond posture-only evidence for containers and Kubernetes, and update the dashboard and findings experience so that richer evidence is visible and useful instead of hidden. Source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md).
-6. Add lint to CI.
+6. Execute the documented frontend redesign and interaction-polish pass so SignalForge feels like a deliberate operator workstation rather than a summary-heavy internal dashboard. Source of truth: [`phase-9c-frontend-operator-workstation-polish.md`](./phase-9c-frontend-operator-workstation-polish.md).
+7. Add lint to CI.
 
 ## Future Phases
 
@@ -229,6 +230,19 @@ Possible scope:
 - plan how collectors identify themselves
 - design without turning the app into an execution engine
 - Phase 9 should explicitly resolve the execution-scope model before multi-scope container/Kubernetes automation work. Phase 8 push-first work can proceed without this change.
+
+### Phase 9c: Frontend Operator Workstation Redesign and Interaction Polish
+
+Source of truth:
+
+- [`phase-9c-frontend-operator-workstation-polish.md`](./phase-9c-frontend-operator-workstation-polish.md)
+
+Possible scope:
+
+- shared UI-system cleanup for buttons, cards, nav, rows, tokens, and typography
+- dashboard redesign so the run queue and attention-driving content carry more visual weight than KPI filler
+- run-detail and compare redesign for action clarity, baseline selection, and lower chip count
+- Sources and request-collection cleanup so target identity and collection scope read like first-class operator decisions
 
 ### Phase 10: Fresh-Evidence Orchestration
 

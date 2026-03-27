@@ -35,11 +35,11 @@ export function FindingsOverview({
   const filtersActive = activeSignal !== "all" || activeSeverity !== "all";
 
   return (
-    <section className="rounded-lg border border-surface-container bg-surface-container-lowest shadow-sm">
-      <div className="border-b border-surface-container bg-surface-container-low px-5 py-3">
+    <section className="sf-panel">
+      <div className="sf-panel-header">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+            <div className="sf-kicker">
               Findings overview
             </div>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
@@ -47,8 +47,8 @@ export function FindingsOverview({
               narrow the table without losing the full evidence trail.
             </p>
           </div>
-          <div className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-2 text-right">
-            <div className="text-[9px] font-bold uppercase tracking-wider text-outline-variant">
+          <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-2 text-right">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
               Visible now
             </div>
             <div className="mt-0.5 text-sm font-bold text-on-surface">
@@ -70,17 +70,17 @@ export function FindingsOverview({
               <button
                 key={item.signal}
                 type="button"
-                className={`rounded-lg border px-4 py-4 text-left transition-colors ${
+                className={`rounded-xl border px-4 py-4 text-left transition-[background-color,border-color,box-shadow] duration-150 ${
                   selected
-                    ? "border-primary/30 bg-primary/[0.07]"
-                    : "border-outline-variant/15 bg-surface-container-low hover:bg-surface-container"
+                    ? "border-primary/30 bg-primary/[0.07] shadow-sm"
+                    : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/25 hover:bg-surface-container hover:shadow-sm"
                 } ${muted ? "opacity-60" : ""}`}
                 onClick={() => onSignalChange(selected ? "all" : item.signal)}
                 aria-pressed={selected}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-outline-variant">
+                    <div className="sf-kicker text-outline-variant">
                       {item.label}
                     </div>
                     <div className="mt-1 text-2xl font-bold leading-none text-on-surface">
@@ -90,20 +90,20 @@ export function FindingsOverview({
                   {item.highestSeverity ? (
                     <SeverityBadge severity={item.highestSeverity} />
                   ) : (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-outline-variant">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                       Clear
                     </span>
                   )}
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant">
+                <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
                   {item.description}
                 </p>
                 {item.sampleTitle ? (
-                  <div className="mt-3 rounded-md border border-outline-variant/10 bg-surface-container-lowest px-2.5 py-2 text-[11px] leading-relaxed text-on-surface">
+                  <div className="mt-3 rounded-md border border-outline-variant/10 bg-surface-container-lowest px-2.5 py-2 text-xs leading-relaxed text-on-surface">
                     {item.sampleTitle}
                   </div>
                 ) : (
-                  <div className="mt-3 text-[10px] font-medium text-outline-variant">
+                  <div className="mt-3 text-xs font-medium text-outline-variant">
                     No findings in this bucket.
                   </div>
                 )}
@@ -114,12 +114,12 @@ export function FindingsOverview({
 
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-outline-variant">
+            <span className="sf-kicker text-outline-variant">
               Filter by signal
             </span>
             <button
               type="button"
-              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeSignal === "all"
                   ? "border-primary/30 bg-primary/[0.08] text-primary"
                   : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -132,7 +132,7 @@ export function FindingsOverview({
               <button
                 key={definition.signal}
                 type="button"
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   activeSignal === definition.signal
                     ? "border-primary/30 bg-primary/[0.08] text-primary"
                     : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -145,12 +145,12 @@ export function FindingsOverview({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-outline-variant">
+            <span className="sf-kicker text-outline-variant">
               Filter by severity
             </span>
             <button
               type="button"
-              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeSeverity === "all"
                   ? "border-primary/30 bg-primary/[0.08] text-primary"
                   : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -163,7 +163,7 @@ export function FindingsOverview({
               <button
                 key={severity}
                 type="button"
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   activeSeverity === severity
                     ? "border-primary/30 bg-primary/[0.08] text-primary"
                     : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -179,7 +179,7 @@ export function FindingsOverview({
           </div>
 
           {filtersActive ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-outline-variant/15 bg-surface-container-low px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-3">
               <p className="text-xs leading-relaxed text-on-surface-variant">
                 Showing {filteredCount} of {findings.length} findings with{" "}
                 <span className="font-semibold text-on-surface">
@@ -193,7 +193,7 @@ export function FindingsOverview({
               </p>
               <button
                 type="button"
-                className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container"
+                className="sf-btn-secondary px-3 py-2 text-xs"
                 onClick={() => {
                   onSignalChange("all");
                   onSeverityChange("all");

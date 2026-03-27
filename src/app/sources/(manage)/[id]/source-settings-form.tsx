@@ -44,25 +44,25 @@ export function SourceSettingsForm({
       <input type="hidden" name="source_id" value={sourceId} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span className="sf-field-label">
             Display name
           </span>
           <input
             name="display_name"
             defaultValue={displayName}
             maxLength={256}
-            className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+            className="sf-field bg-surface-container-lowest"
           />
         </label>
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <span className="sf-field-label">
             Collector version
           </span>
           <input
             name="default_collector_version"
             defaultValue={collectorVersion ?? ""}
             placeholder="e.g. 1.2.0"
-            className="mt-1.5 block w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm font-mono text-on-surface placeholder:text-outline-variant focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+            className="sf-field bg-surface-container-lowest font-mono"
           />
         </label>
       </div>
@@ -74,7 +74,7 @@ export function SourceSettingsForm({
         caption="Optional. Jobs requested without an explicit override will inherit this scope."
       />
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-3 cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-3">
           <span className="relative inline-flex items-center">
             <input type="hidden" name="enabled" value="0" />
             <input
@@ -101,7 +101,7 @@ export function SourceSettingsForm({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg border border-outline-variant/30 bg-surface-container-high px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container-highest disabled:opacity-50 transition-all"
+            className="sf-btn-secondary"
           >
             {isPending ? "Saving…" : "Save changes"}
           </button>

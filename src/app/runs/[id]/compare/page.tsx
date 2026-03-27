@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { CompareRunSnapshot } from "@/lib/compare/build-compare";
 import { CompareClient, type CompareRunHeader } from "./compare-client";
 import { getStorage } from "@/lib/storage";
+import { preferredTargetMatchKey } from "@/lib/target-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,32 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
   const { payload } = result;
   const current = headerFromSnapshot(payload.current);
   const baseline = payload.baseline ? headerFromSnapshot(payload.baseline) : null;
+  const allRuns = await storage.runs.listSummaries();
+  const currentKey = preferredTargetMatchKey({
+    target_identifier: payload.current.target_identifier,
+    environment_hostname: payload.current.environment_hostname,
+  });
+  const baselineCandidates =
+    currentKey === null
+      ? []
+      : allRuns
+          .filter((run) => run.id !== currentId)
+          .filter((run) => new Date(run.created_at).getTime() < new Date(payload.current.created_at).getTime())
+          .filter(
+            (run) =>
+              preferredTargetMatchKey({
+                target_identifier: run.target_identifier,
+                environment_hostname: run.hostname,
+                artifact_type: run.artifact_type,
+              }) === currentKey
+          )
+          .slice(0, 6)
+          .map((run) => ({
+            id: run.id,
+            filename: run.filename,
+            created_at_label: run.created_at_label ?? formatRunTimestamp(run.created_at),
+            target_name: run.target_identifier ?? run.hostname,
+          }));
 
   return (
     <CompareClient
@@ -49,6 +76,8 @@ export default async function ComparePage({ params, searchParams }: ComparePageP
       evidenceDelta={payload.evidence_delta}
       targetMismatch={payload.target_mismatch}
       baselineMissing={payload.baseline_missing}
+      baselineSelection={payload.baseline_selection}
+      baselineCandidates={baselineCandidates}
     />
   );
 }

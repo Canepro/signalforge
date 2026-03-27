@@ -34,11 +34,11 @@ export function SeverityBadge({ severity, count }: SeverityBadgeProps) {
   return (
     <div className="flex items-center gap-1.5">
       <div className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-      <span className={`text-[11px] font-bold uppercase ${text}`}>
+      <span className={`text-xs font-bold uppercase ${text}`}>
         {severity}
       </span>
       {count !== undefined && (
-        <span className="text-[11px] font-bold text-on-surface-variant">
+        <span className="text-xs font-bold text-on-surface-variant">
           ({count})
         </span>
       )}
@@ -57,17 +57,17 @@ export function SeveritySummary({ counts, compact }: SeveritySummaryProps) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   if (visible.length === 0) {
-    return <span className="text-[10px] text-outline-variant">No findings</span>;
+    return <span className="text-xs text-outline-variant">No findings</span>;
   }
 
   if (compact) {
     return (
-      <div className="flex items-center gap-1 rounded border border-surface-container bg-surface-container-lowest shadow-sm">
-        <div className="px-3 py-2 border-r border-surface-container-low">
-          <div className="text-[9px] font-bold uppercase tracking-wider text-outline-variant">
+      <div className="flex items-center gap-1 rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm">
+        <div className="border-r border-outline-variant/10 px-3 py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
             Findings
           </div>
-          <div className="text-sm font-headline font-bold text-on-surface leading-none mt-0.5">
+          <div className="mt-0.5 text-base font-headline font-bold leading-none text-on-surface">
             {total}
           </div>
         </div>
@@ -75,13 +75,13 @@ export function SeveritySummary({ counts, compact }: SeveritySummaryProps) {
           const c = counts[sev] ?? 0;
           if (c === 0) return null;
           return (
-            <div key={sev} className="text-center px-2.5 py-2">
+            <div key={sev} className="px-2.5 py-2.5 text-center">
               <div
                 className={`text-base font-headline font-bold leading-none ${textColors[sev]}`}
               >
                 {c}
               </div>
-              <div className="text-[8px] font-bold uppercase text-outline-variant mt-0.5">
+              <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-outline-variant">
                 {sev}
               </div>
             </div>

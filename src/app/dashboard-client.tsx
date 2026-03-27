@@ -174,23 +174,25 @@ export function DashboardClient({
           onCollectEvidenceClick={() => setCollectOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
           {/* Action Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
             <div>
-              <h2 className="font-headline text-2xl font-bold text-on-surface tracking-tight">
+              <p className="sf-kicker">Operator workstation</p>
+              <h2 className="font-headline text-3xl font-bold text-on-surface tracking-tight">
                 Diagnostics Overview
               </h2>
-              <p className="text-sm text-on-surface-variant">
+              <p className="mt-1 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
                 Review uploaded evidence, queue fresh collection, and track drift across hosts, containers, and Kubernetes targets.
               </p>
             </div>
-            <div className="flex flex-col items-start gap-2 md:items-end">
+            <div className="flex flex-col items-start gap-2 lg:items-end">
               <button
                 type="button"
                 onClick={handlePrimaryCollectionAction}
                 disabled={isQuickRequestPending}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-b from-primary to-primary-dim px-4 py-2 text-sm font-semibold text-on-primary shadow-md transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                className="sf-btn-primary"
                 title={
                   !hasLiveCollectionSource ? "Set up external collection for SignalForge"
                   : canQuickRequest ? "Queue a collection job for the live source"
@@ -209,7 +211,7 @@ export function DashboardClient({
                 : "Request collection"}
               </button>
               {hasLiveCollectionSource ? (
-                <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                <p className="max-w-xl text-xs leading-relaxed text-on-surface-variant">
                   {canQuickRequest ?
                     `${quickSource!.display_name} is live. One click queues work for its next agent poll.`
                   : singleSource ?
@@ -217,13 +219,13 @@ export function DashboardClient({
                   : `${collectionSources.length} live sources are ready. Choose one to queue work for its next agent poll.`}
                 </p>
               ) : (
-                <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                <p className="max-w-xl text-xs leading-relaxed text-on-surface-variant">
                   No live sources yet. Complete setup once, then this becomes an operational action.
                 </p>
               )}
               {quickRequestFeedback ? (
                 <p
-                  className={`text-[11px] font-medium ${
+                  className={`text-xs font-medium ${
                     quickRequestFeedback.tone === "success" ? "text-emerald-700 dark:text-emerald-300"
                     : "text-amber-800 dark:text-amber-200"
                   }`}
@@ -231,18 +233,18 @@ export function DashboardClient({
                   {quickRequestFeedback.message}
                 </p>
               ) : null}
-              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 {latestRun ? (
                   <>
                     <Link
                       href={`/runs/${latestRun.id}`}
-                      className="rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 font-medium text-on-surface hover:bg-surface-container"
+                      className="sf-btn-secondary px-3 py-2"
                     >
                       Open latest run
                     </Link>
                     <Link
                       href={`/runs/${latestRun.id}/compare`}
-                      className="rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 font-medium text-on-surface hover:bg-surface-container"
+                      className="sf-btn-secondary px-3 py-2"
                     >
                       Compare latest
                     </Link>
@@ -251,40 +253,13 @@ export function DashboardClient({
                 <button
                   type="button"
                   onClick={() => setCollectOpen(true)}
-                  className="rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 font-medium text-on-surface hover:bg-surface-container"
+                  className="sf-btn-ghost px-3 py-2"
                 >
                   How to collect
                 </button>
               </div>
             </div>
           </div>
-
-          {/* KPI Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard
-              label="Total Runs"
-              value={totalRuns}
-              accentColor="bg-primary"
-            />
-            <KpiCard
-              label="New Critical Findings"
-              value={criticalFindings}
-              accentColor="bg-severity-critical"
-            />
-            <KpiCard
-              label="Targets analyzed"
-              value={environmentsAnalyzed}
-              accentColor="bg-secondary"
-            />
-            <KpiCard
-              label="Suppressed Noise"
-              value={suppressedNoise > 999 ? `${(suppressedNoise / 1000).toFixed(1)}k` : suppressedNoise}
-              subtitle="Filtered expected"
-              accentColor="bg-outline"
-            />
-          </div>
-
-          <DashboardOperationalWatch lanes={operationalWatch} />
 
           {/* Main Grid: Table + Right Rail */}
           <div className="grid grid-cols-12 gap-6">
@@ -295,21 +270,43 @@ export function DashboardClient({
 
             {/* Right Rail */}
             <div className="col-span-12 space-y-4 xl:col-span-4">
-              <CollectionPulse pulse={collectionPulse} />
-              <DashboardOperationalHighlights highlights={operationalHighlights} />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                <KpiCard
+                  label="Total Runs"
+                  value={totalRuns}
+                  accentColor="bg-primary"
+                />
+                <KpiCard
+                  label="New Critical Findings"
+                  value={criticalFindings}
+                  accentColor="bg-severity-critical"
+                />
+                <KpiCard
+                  label="Targets analyzed"
+                  value={environmentsAnalyzed}
+                  accentColor="bg-secondary"
+                />
+                <KpiCard
+                  label="Suppressed Noise"
+                  value={suppressedNoise > 999 ? `${(suppressedNoise / 1000).toFixed(1)}k` : suppressedNoise}
+                  subtitle="Filtered expected"
+                  accentColor="bg-outline"
+                />
+              </div>
 
-              <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+              <div className="sf-panel p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h4 className="font-headline text-sm font-bold text-on-surface">
-                      Posture at a glance
+                    <p className="sf-kicker">Attention queue</p>
+                    <h4 className="font-headline text-base font-bold tracking-tight text-on-surface">
+                      Runs worth opening next
                     </h4>
-                    <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
-                      Use this rail to spot where attention should go before drilling into the run table.
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                      Prioritized by severity weight so the queue reflects real operator urgency instead of decorative summary cards.
                     </p>
                   </div>
-                  <div className="rounded-md border border-outline-variant/15 bg-surface-container-low px-3 py-2 text-right">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-outline-variant">
+                  <div className="rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-2 text-right">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                       Total findings
                     </div>
                     <div className="mt-0.5 text-lg font-bold leading-none text-on-surface">
@@ -325,7 +322,7 @@ export function DashboardClient({
                     const pct = Math.round((count / maxCount) * 100);
                     return (
                       <div key={sev} className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                        <div className="flex justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
                           <span>{sev}</span>
                           <span>{count}</span>
                         </div>
@@ -340,15 +337,15 @@ export function DashboardClient({
                   })}
                 </div>
 
-                <div className="mt-6 border-t border-surface-container pt-4">
+                <div className="mt-6 border-t border-outline-variant/10 pt-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h5 className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                      Attention queue
+                    <h5 className="text-sm font-semibold text-on-surface">
+                      Queue
                     </h5>
                     {latestRun ? (
                       <Link
                         href={`/runs/${latestRun.id}`}
-                        className="text-[10px] font-semibold text-primary hover:underline"
+                        className="text-xs font-semibold text-primary hover:underline"
                       >
                         Latest run
                       </Link>
@@ -364,36 +361,36 @@ export function DashboardClient({
                           <Link
                             key={run.id}
                             href={`/runs/${run.id}`}
-                            className="block rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-3 transition-colors hover:bg-surface-container"
+                            className="block rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-outline-variant/25 hover:bg-surface-container hover:shadow-sm"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="truncate text-[12px] font-semibold text-on-surface">
+                                <div className="truncate text-sm font-semibold text-on-surface">
                                   {run.filename}
                                 </div>
-                                <div className="mt-1 line-clamp-2 break-all text-[10px] text-on-surface-variant">
+                                <div className="mt-1 line-clamp-2 break-all text-xs text-on-surface-variant">
                                   {run.target_identifier ?? run.hostname ?? "Target not recorded"}
                                 </div>
                               </div>
                               <div className="shrink-0 text-right">
-                                <div className="text-[10px] font-bold text-on-surface-variant">
+                                <div className="text-[11px] font-medium text-on-surface-variant">
                                   {run.created_at_label ?? run.created_at}
                                 </div>
-                                <div className="mt-1 text-[10px] font-semibold text-on-surface">
+                                <div className="mt-1 text-xs font-semibold text-on-surface">
                                   {criticalHigh > 0 ? `${criticalHigh} critical/high` : `${mediumLow} medium/low`}
                                 </div>
                               </div>
                             </div>
                             <div className="mt-3 flex items-center gap-3">
-                              <span className="flex items-center gap-1 text-[10px] font-medium text-on-surface-variant">
+                              <span className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
                                 <span className="h-2 w-2 rounded-full bg-severity-critical" />
                                 {run.severity_counts.critical ?? 0}
                               </span>
-                              <span className="flex items-center gap-1 text-[10px] font-medium text-on-surface-variant">
+                              <span className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
                                 <span className="h-2 w-2 rounded-full bg-severity-high" />
                                 {run.severity_counts.high ?? 0}
                               </span>
-                              <span className="flex items-center gap-1 text-[10px] font-medium text-on-surface-variant">
+                              <span className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
                                 <span className="h-2 w-2 rounded-full bg-severity-medium" />
                                 {run.severity_counts.medium ?? 0}
                               </span>
@@ -403,13 +400,19 @@ export function DashboardClient({
                       })}
                     </div>
                   ) : (
-                    <p className="mt-3 text-[11px] text-on-surface-variant">
+                    <p className="mt-3 text-xs text-on-surface-variant">
                       No elevated runs yet. Fresh uploads will appear here when they carry findings worth attention.
                     </p>
                   )}
                 </div>
               </div>
+
+              <CollectionPulse pulse={collectionPulse} />
             </div>
+          </div>
+
+          <DashboardOperationalWatch lanes={operationalWatch} />
+          <DashboardOperationalHighlights highlights={operationalHighlights} />
           </div>
         </main>
       </div>

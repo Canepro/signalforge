@@ -26,7 +26,7 @@ export function SourcesShell({ children }: { children: React.ReactNode }) {
             <form action={logoutAdminAction}>
               <button
                 type="submit"
-                className="inline-flex w-full items-center justify-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 text-sm font-medium text-on-surface"
+                className="sf-btn-secondary w-full rounded-xl"
               >
                 Sign out
               </button>

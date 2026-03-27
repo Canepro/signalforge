@@ -29,18 +29,18 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-outline-variant">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
           {label}
         </span>
         <button
           type="button"
           onClick={() => void copy()}
-          className="text-[10px] font-bold uppercase tracking-wider text-primary hover:underline"
+          className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary hover:underline"
         >
           {done ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="text-[11px] leading-relaxed font-mono bg-surface-container-low p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all border border-outline-variant/20 text-on-surface">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-outline-variant/20 bg-surface-container-low p-3 font-mono text-xs leading-relaxed text-on-surface">
         {text}
       </pre>
     </div>
@@ -133,17 +133,17 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     >
         <div className="px-5 pt-5 pb-4 border-b border-surface-container flex items-start justify-between gap-3">
           <div>
-            <h2 id="collect-evidence-title" className="font-headline text-lg font-bold text-on-surface">
+            <h2 id="collect-evidence-title" className="font-headline text-xl font-bold tracking-tight text-on-surface">
               Collect evidence
             </h2>
-            <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+            <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
               SignalForge analyzes evidence, but collection runs outside the app. Use a <strong>push-first</strong> path when you already have an artifact, or a <strong>job-driven</strong> path when you want a running agent to poll and collect on demand.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded p-1 text-on-surface-variant hover:bg-surface-container-high"
+            className="sf-btn-icon h-10 w-10 shrink-0"
             aria-label="Close"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -153,8 +153,8 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
         </div>
 
         <div className="px-5 py-4 space-y-5">
-          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               How the repos fit together
             </h3>
             <div className="space-y-2">
@@ -177,8 +177,8 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             </div>
           </div>
 
-          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               Supported artifact families
             </h3>
             <div className="space-y-2">
@@ -207,11 +207,11 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           </div>
 
           {/* Job-driven path — lead with this */}
-          <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-primary">
+          <div className="rounded-xl border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
               Recommended: installed agent service
             </h3>
-            <ol className="text-[11px] text-on-surface-variant leading-relaxed space-y-1 list-decimal list-inside">
+            <ol className="list-inside list-decimal space-y-1 text-xs leading-relaxed text-on-surface-variant">
               <li>
                 Open{" "}
                 <Link href="/sources" onClick={onClose} className="font-semibold text-primary hover:underline">
@@ -228,12 +228,12 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                 Request collection from the UI. The running agent heartbeats, long-polls for work, and claims queued jobs automatically.
               </li>
             </ol>
-            <p className="text-[11px] leading-relaxed text-on-surface-variant">
+            <p className="text-xs leading-relaxed text-on-surface-variant">
               This is the normal operator setup.{" "}
               <span className="font-semibold text-on-surface">run</span> stays alive in the background;{" "}
               <span className="font-semibold text-on-surface">once</span> is only for smoke tests, debugging, or cron-style schedules.
             </p>
-            <p className="text-[11px] leading-relaxed text-on-surface-variant">
+            <p className="text-xs leading-relaxed text-on-surface-variant">
               Linux host sources are the cleanest fit for this model. Container and Kubernetes sources should now prefer typed source defaults and per-job scope in SignalForge. Host-local target env remains a fallback until the agent and collectors finish the Phase 9 scope mapping.
             </p>
           </div>
@@ -245,10 +245,10 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <CopyBlock label="Check service status" text={agentServiceCheck} />
 
           <div className="border-t border-outline-variant/20 pt-4 space-y-1">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               Fallback: manual agent commands
             </h3>
-            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+            <p className="text-xs leading-relaxed text-on-surface-variant">
               Use these only when you are testing or debugging agent behavior directly from a shell. They are not the preferred long-running production setup, and shell-exported tokens should not be your durable secret-handling path.
             </p>
           </div>
@@ -258,8 +258,8 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <CopyBlock label="Agent one-shot (debug or cron)" text={agentOnce} />
 
           <div className="border-t border-outline-variant/20 pt-4 space-y-1">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Alternative: direct push</h3>
-            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Alternative: direct push</h3>
+            <p className="text-xs leading-relaxed text-on-surface-variant">
               If you already have a compatible diagnostic artifact and don&apos;t need job tracking, push it directly.
               This is the most flexible path for container and Kubernetes because you can choose target scope explicitly.
             </p>
@@ -273,7 +273,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
           <CopyBlock label="Reference push: Kubernetes bundle" text={collectorPushKubernetes} />
 
-          <p className="text-[10px] text-outline-variant leading-snug">
+          <p className="text-xs leading-snug text-outline-variant">
             Docs: <span className="font-mono">docs/external-submit.md</span>,{" "}
             <span className="font-mono">docs/getting-started.md</span>,{" "}
             <span className="font-mono">docs/agent-deployment.md</span>

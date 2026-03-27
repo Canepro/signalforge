@@ -35,7 +35,7 @@ export default async function SourcesListPage({
     <div className="space-y-6">
       <LivePageRefresh intervalMs={10000} />
       {sp?.deleted === "1" && (
-        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
+        <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
           Source deleted.
         </p>
       )}
@@ -49,7 +49,7 @@ export default async function SourcesListPage({
         </div>
         <Link
           href="/sources/new"
-          className="group inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-primary to-primary-dim px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-on-primary shadow-md hover:shadow-lg hover:brightness-110 transition-all"
+          className="sf-btn-primary group"
         >
           <svg className="h-4 w-4 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -59,7 +59,7 @@ export default async function SourcesListPage({
       </div>
 
       {sources.length === 0 ? (
-        <div className="relative rounded-xl border border-dashed border-outline-variant/40 p-16 text-center overflow-hidden">
+        <div className="relative overflow-hidden rounded-xl border border-dashed border-outline-variant/40 p-16 text-center">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent pointer-events-none" />
           <div className="relative">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-container-high shadow-inner">
@@ -70,16 +70,19 @@ export default async function SourcesListPage({
             <p className="text-sm text-on-surface-variant">
               No sources yet. Create one to use <span className="font-semibold text-on-surface">Collect Fresh Evidence</span>.
             </p>
-            <p className="text-[10px] text-outline-variant mt-1">
+            <p className="mt-1 text-xs text-outline-variant">
               A source represents a target machine or environment you want to monitor.
             </p>
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm">
-          <div className="px-5 py-3 flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-low/50">
-            <h2 className="font-headline font-bold text-on-surface text-sm tracking-tight">Registered Sources</h2>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+        <div className="sf-panel overflow-hidden">
+          <div className="flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-low/70 px-5 py-4">
+            <div>
+              <p className="sf-kicker">Registered targets</p>
+              <h2 className="font-headline text-base font-bold tracking-tight text-on-surface">Evidence sources</h2>
+            </div>
+            <span className="text-sm font-semibold text-primary">
               {sources.length} {sources.length === 1 ? "source" : "sources"}
             </span>
           </div>
@@ -88,7 +91,7 @@ export default async function SourcesListPage({
               <li key={s.id} style={{ animationDelay: `${i * 50}ms` }} className="animate-[fadeIn_0.3s_ease_both]">
                 <Link
                   href={`/sources/${s.id}`}
-                  className="group flex items-center gap-4 px-5 py-4 hover:bg-primary/[0.03] transition-all duration-200"
+                  className="group flex items-center gap-4 px-5 py-4 transition-[background-color,border-color,box-shadow] duration-150 hover:bg-primary/[0.03]"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2.5">
@@ -96,24 +99,20 @@ export default async function SourcesListPage({
                         {s.display_name}
                       </span>
                       {!s.enabled && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant bg-surface-container-high px-1.5 py-0.5 rounded-md">
+                        <span className="rounded-lg bg-surface-container-high px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant">
                           disabled
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 text-xs text-on-surface-variant">
+                    <div className="mt-1 text-sm text-on-surface-variant">
                       <span className="font-semibold text-on-surface-variant">Target:</span>{" "}
                       <span className="inline-block max-w-full truncate font-mono">
                         {s.target_identifier}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
-                      <span className="rounded-full border border-outline-variant/15 bg-surface-container-low px-2 py-0.5 font-semibold uppercase tracking-wider text-on-surface-variant">
-                        {getSourceTypeLabel(s.source_type)}
-                      </span>
-                      <span className="rounded-full border border-outline-variant/15 bg-surface-container-low px-2 py-0.5 font-semibold uppercase tracking-wider text-on-surface-variant">
-                        {getArtifactTypeLabel(s.expected_artifact_type)}
-                      </span>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+                      <span>{getSourceTypeLabel(s.source_type)}</span>
+                      <span>{getArtifactTypeLabel(s.expected_artifact_type)}</span>
                       {s.last_seen_at && (
                         <span className="text-outline-variant/80">
                           seen {relativeTime(s.last_seen_at)}

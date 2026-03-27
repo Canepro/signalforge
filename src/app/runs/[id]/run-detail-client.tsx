@@ -138,18 +138,18 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
 
           <div className="flex-1 overflow-y-auto">
             {/* Run Identity Strip */}
-            <div className="border-b border-surface-container px-4 lg:px-6 py-4">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_auto] lg:items-start">
-                <div className="space-y-3">
+            <div className="border-b border-outline-variant/10 bg-surface-container-low/40">
+              <div className="mx-auto grid max-w-[1440px] gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1.4fr)_320px] lg:items-start lg:px-6">
+                <div className="space-y-4">
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-outline-variant">
+                    <div className="sf-kicker">
                       {targetLabel}
                     </div>
-                    <div className="mt-1 text-base font-bold text-on-surface break-words">
+                    <div className="mt-1 text-2xl font-bold tracking-tight text-on-surface break-words">
                       {targetValue}
                     </div>
                     {run.environment?.hostname ? (
-                      <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                      <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                         Hostname snapshot:{" "}
                         <span className="font-mono text-on-surface">
                           {run.environment.hostname}
@@ -163,61 +163,89 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                         ) : null}
                       </div>
                     ) : targetDetail ? (
-                      <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                      <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                         {targetDetail}
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 font-semibold text-on-surface">
-                      {artifactFamilyLabel}
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 font-mono text-on-surface-variant">
-                      {run.artifact_type}
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-on-surface-variant">
-                      source: {run.source_type}
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-on-surface-variant">
-                      {run.created_at_label ?? run.created_at}
-                    </span>
-                  </div>
-
-                  <div className="grid gap-2 text-[11px] text-on-surface-variant sm:grid-cols-2">
-                    <div className="rounded-md border border-outline-variant/15 bg-surface-container-low px-3 py-2">
-                      <div className="font-bold uppercase tracking-widest text-outline-variant">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                        Artifact family
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-on-surface">
+                        {artifactFamilyLabel}
+                      </div>
+                      <div className="mt-1 text-xs font-mono text-on-surface-variant">
+                        {run.artifact_type}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                        Source
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-on-surface">
+                        {run.source_type}
+                      </div>
+                      <div className="mt-1 text-xs text-on-surface-variant">
+                        {run.created_at_label ?? run.created_at}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                         Artifact source
                       </div>
-                      <div className="mt-1 break-words">
+                      <div className="mt-1 break-words text-sm font-medium text-on-surface">
                         {run.source_label ? (
-                          <span className="font-mono text-on-surface">
-                            {run.source_label}
-                          </span>
+                          <span className="font-mono">{run.source_label}</span>
                         ) : (
                           "Not recorded"
                         )}
                       </div>
                     </div>
-                    <div className="rounded-md border border-outline-variant/15 bg-surface-container-low px-3 py-2">
-                      <div className="font-bold uppercase tracking-widest text-outline-variant">
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                         Collector
                       </div>
-                      <div className="mt-1 break-words">
+                      <div className="mt-1 break-words text-sm font-medium text-on-surface">
                         {run.collector_type ? (
-                          <span className="font-mono text-on-surface">
-                            {run.collector_type}
-                          </span>
+                          <span className="font-mono">{run.collector_type}</span>
                         ) : (
                           "Direct upload"
                         )}
+                      </div>
+                      {run.collector_version ? (
+                        <div className="mt-1 text-xs font-mono text-on-surface-variant">
+                          {run.collector_version}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                        Target identifier
+                      </div>
+                      <div className="mt-1 break-words text-sm font-medium text-on-surface">
+                        {run.target_identifier ? (
+                          <span className="font-mono">{run.target_identifier}</span>
+                        ) : (
+                          "Not recorded"
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                        Collected at
+                      </div>
+                      <div className="mt-1 text-sm font-medium text-on-surface">
+                        {run.collected_at_label ?? "Not recorded"}
                       </div>
                     </div>
                   </div>
 
                   {run.parent_run ? (
-                    <div className="space-y-1 rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-2">
-                      <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-3">
+                      <p className="text-xs leading-relaxed text-on-surface-variant">
                         Reanalyzed from{" "}
                         <Link
                           href={`/runs/${run.parent_run.id}`}
@@ -229,11 +257,11 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                           ({run.parent_run.id.slice(0, 8)}…)
                         </span>
                       </p>
-                      <p className="text-[10px] leading-snug text-on-surface-variant">
+                      <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                         Compare defaults to the latest older run for the same
                         target, which may differ from this parent. Use{" "}
                         <span className="font-semibold text-on-surface">
-                          vs parent
+                          Compare vs parent
                         </span>{" "}
                         to diff against the source run that produced this
                         reanalyze.
@@ -241,18 +269,35 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                     </div>
                   ) : null}
                 </div>
-                <div className="lg:pt-1">
+
+                <div className="space-y-3">
                   <SeveritySummary counts={run.severity_counts} compact />
+                  <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                      Run status
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-on-surface">
+                      {run.status}
+                    </div>
+                    <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                      {run.analysis_error
+                        ? "Analysis completed with an error state."
+                        : run.is_incomplete
+                          ? "Evidence was incomplete. Findings and summary reflect the bounded artifact."
+                          : "Analysis completed successfully for this artifact snapshot."}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="px-4 lg:px-6 py-6 space-y-6">
+            <div className="mx-auto max-w-[1440px] px-4 py-6 lg:px-6">
+            <div className="space-y-6">
               {/* Summary */}
               {report?.summary && report.summary.length > 0 && (
-                <div className="rounded-lg bg-surface-container-lowest p-5 shadow-sm border-l-4 border-primary">
-                  <h3 className="font-headline text-sm font-bold text-on-surface mb-2">
+                <div className="sf-panel border-l-4 border-l-primary p-5">
+                  <h3 className="mb-2 font-headline text-base font-bold tracking-tight text-on-surface">
                     Analysis Summary
                   </h3>
                   <ul className="space-y-1.5">
@@ -299,6 +344,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
 
               {/* Environment */}
               {run.environment && <EnvironmentBanner env={run.environment} />}
+            </div>
             </div>
           </div>
         </div>

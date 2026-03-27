@@ -29,6 +29,7 @@ export function buildRunDetail(
     collector_type: row.collector_type ?? null,
     collector_version: row.collector_version ?? null,
     collected_at: row.collected_at ?? null,
+    collected_at_label: row.collected_at ? formatRunTimestamp(row.collected_at) : null,
     created_at: row.created_at,
     created_at_label: formatRunTimestamp(row.created_at),
     status: row.status,

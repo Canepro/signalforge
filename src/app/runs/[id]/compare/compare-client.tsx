@@ -19,6 +19,7 @@ import {
   type EvidenceMetricFocus,
 } from "@/lib/compare/evidence-delta-presentation";
 import { RunEvidenceSections } from "@/components/run-evidence-sections";
+import type { BaselineSelection } from "@/lib/compare/build-compare";
 
 export interface CompareRunHeader {
   id: string;
@@ -34,6 +35,8 @@ interface CompareClientProps {
   evidenceDelta: EvidenceDeltaPayload | null;
   targetMismatch?: boolean;
   baselineMissing?: boolean;
+  baselineSelection: BaselineSelection;
+  baselineCandidates: CompareRunHeader[];
 }
 
 function statusLabel(s: FindingsDriftResult["rows"][0]["status"]): string {
@@ -54,15 +57,15 @@ function statusLabel(s: FindingsDriftResult["rows"][0]["status"]): string {
 function statusPillClass(s: FindingsDriftResult["rows"][0]["status"]): string {
   switch (s) {
     case "new":
-      return "bg-red-50 text-red-800 border-red-200";
+      return "border-red-200 bg-red-50 text-red-800";
     case "resolved":
-      return "bg-emerald-50 text-emerald-800 border-emerald-200";
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
     case "severity_up":
-      return "bg-orange-50 text-orange-800 border-orange-200";
+      return "border-orange-200 bg-orange-50 text-orange-800";
     case "severity_down":
-      return "bg-sky-50 text-sky-800 border-sky-200";
+      return "border-sky-200 bg-sky-50 text-sky-800";
     default:
-      return "bg-surface-container-high text-on-surface-variant";
+      return "border-outline-variant/20 bg-surface-container-low text-on-surface-variant";
   }
 }
 
@@ -105,6 +108,28 @@ function prettyMetadataLabel(
   }
 }
 
+function baselineSelectionLabel(selection: BaselineSelection): string {
+  switch (selection) {
+    case "explicit":
+      return "Explicit baseline";
+    case "implicit_same_target":
+      return "Automatic same-target baseline";
+    default:
+      return "No baseline yet";
+  }
+}
+
+function baselineSelectionDescription(selection: BaselineSelection): string {
+  switch (selection) {
+    case "explicit":
+      return "This compare view is pinned to a specific older run instead of the automatic same-target default.";
+    case "implicit_same_target":
+      return "SignalForge selected the latest older run for the same logical target. You can switch to another older run below.";
+    default:
+      return "No older same-target run is available yet. Compare will become more useful after another upload or reanalyze for this target.";
+  }
+}
+
 export function CompareClient({
   current,
   baseline,
@@ -112,6 +137,8 @@ export function CompareClient({
   evidenceDelta,
   targetMismatch,
   baselineMissing,
+  baselineSelection,
+  baselineCandidates,
 }: CompareClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
@@ -120,8 +147,8 @@ export function CompareClient({
   const title = useMemo(
     () =>
       baseline
-        ? `Drift: ${baseline.filename} → ${current.filename}`
-        : "Compare runs",
+        ? `Compare drift: ${baseline.filename} → ${current.filename}`
+        : "Compare drift",
     [baseline, current.filename],
   );
 
@@ -147,6 +174,11 @@ export function CompareClient({
   }, [activeMetricFocus, evidenceDelta]);
   const currentTargetName = current.target_name ?? "Target not recorded";
   const baselineTargetName = baseline?.target_name ?? "Target not recorded";
+  const evidenceChangeCount = evidenceDelta
+    ? evidenceDelta.summary.metadata_changed +
+      evidenceDelta.summary.metric_changes +
+      (evidenceDelta.summary.artifact_changed ? 1 : 0)
+    : 0;
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -160,7 +192,7 @@ export function CompareClient({
         onClose={() => setCollectOpen(false)}
       />
 
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar
           onUploadClick={() => setUploadOpen(true)}
           onCollectEvidenceClick={() => setCollectOpen(true)}
@@ -183,197 +215,234 @@ export function CompareClient({
         />
 
         <main className="flex-1 overflow-y-auto bg-surface text-on-surface">
-          <div className="border-b border-outline-variant/20 bg-surface-container-lowest/80 px-4 lg:px-6 py-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div className="border-b border-outline-variant/10 bg-surface-container-low/40">
+            <div className="mx-auto max-w-[1440px] space-y-5 px-4 py-5 lg:px-6">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
-                  <h1 className="font-headline text-lg font-bold tracking-tight">
+                  <p className="sf-kicker">Drift review</p>
+                  <h1 className="font-headline text-2xl font-bold tracking-tight text-on-surface">
                     {title}
                   </h1>
-                  <p className="mt-1 max-w-2xl text-xs leading-relaxed text-on-surface-variant">
-                    Diff-style review of normalized findings plus stable
-                    evidence drift. The default baseline is the latest older run
-                    for the same logical target, not necessarily the reanalyze
-                    parent. Use{" "}
-                    <code className="rounded bg-surface-container-high px-1 font-mono text-[10px]">
-                      ?against=&lt;runId&gt;
-                    </code>{" "}
-                    or{" "}
-                    <span className="font-semibold text-on-surface">
-                      vs parent
-                    </span>{" "}
-                    for an explicit baseline.
+                  <p className="mt-1 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
+                    Compare normalized findings and stable evidence drift without relying on hidden query-string knowledge.
+                    Automatic baseline selection uses the latest older run for the same logical target when one exists.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 text-[11px] font-mono text-on-surface-variant">
-                  <span className="rounded border border-outline-variant/30 bg-surface-container-low px-2 py-1">
-                    current:{" "}
-                    <Link href={`/runs/${current.id}`} className="text-primary">
-                      {current.id.slice(0, 8)}…
-                    </Link>
-                  </span>
+                <div className="flex flex-wrap gap-2">
+                  <Link href={`/runs/${current.id}`} className="sf-btn-secondary">
+                    Open current run
+                  </Link>
                   {baseline ? (
-                    <span className="rounded border border-outline-variant/30 bg-surface-container-low px-2 py-1">
-                      baseline:{" "}
-                      <Link
-                        href={`/runs/${baseline.id}`}
-                        className="text-primary"
-                      >
-                        {baseline.id.slice(0, 8)}…
-                      </Link>
-                    </span>
+                    <Link href={`/runs/${baseline.id}`} className="sf-btn-secondary">
+                      Open baseline
+                    </Link>
                   ) : null}
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Current run
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="sf-panel px-4 py-4">
+                    <p className="sf-kicker">Current run</p>
+                    <div className="mt-2 text-base font-semibold text-on-surface">
+                      {current.filename}
+                    </div>
+                    <div className="mt-1 text-sm text-on-surface-variant">
+                      Target: <span className="font-semibold text-on-surface">{currentTargetName}</span>
+                    </div>
+                    <div className="mt-2 text-xs font-mono text-outline-variant">
+                      {current.created_at_label}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-on-surface">
-                    {current.filename}
-                  </div>
-                  <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
-                    Target:{" "}
-                    <span className="font-semibold text-on-surface">
-                      {currentTargetName}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-[10px] font-mono text-outline-variant">
-                    {current.created_at_label}
+                  <div className="sf-panel px-4 py-4">
+                    <p className="sf-kicker">Baseline</p>
+                    <div className="mt-2 text-base font-semibold text-on-surface">
+                      {baseline?.filename ?? "No baseline selected"}
+                    </div>
+                    <div className="mt-1 text-sm text-on-surface-variant">
+                      Target: <span className="font-semibold text-on-surface">{baselineTargetName}</span>
+                    </div>
+                    <div className="mt-2 text-xs font-mono text-outline-variant">
+                      {baseline?.created_at_label ?? "Waiting for older same-target run"}
+                    </div>
                   </div>
                 </div>
-                <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Baseline
+
+                <div className="sf-panel-muted px-4 py-4">
+                  <p className="sf-kicker">Baseline selection</p>
+                  <div className="mt-2 text-base font-semibold text-on-surface">
+                    {baselineSelectionLabel(baselineSelection)}
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-on-surface">
-                    {baseline?.filename ?? "No baseline"}
-                  </div>
-                  <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
-                    Target:{" "}
-                    <span className="font-semibold text-on-surface">
-                      {baselineTargetName}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-[10px] font-mono text-outline-variant">
-                    {baseline?.created_at_label ??
-                      "Waiting for older same-target run"}
-                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    {baselineSelectionDescription(baselineSelection)}
+                  </p>
+
+                  {baselineCandidates.length > 0 ? (
+                    <div className="mt-4 space-y-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                        Choose another older run
+                      </div>
+                      <div className="space-y-2">
+                        {baselineCandidates.map((candidate) => {
+                          const selected = baseline?.id === candidate.id;
+                          return (
+                            <Link
+                              key={candidate.id}
+                              href={`/runs/${current.id}/compare?against=${candidate.id}`}
+                              className={`block rounded-xl border px-3 py-3 transition-[background-color,border-color,box-shadow] duration-150 ${
+                                selected
+                                  ? "border-primary/30 bg-primary/[0.07] shadow-sm"
+                                  : "border-outline-variant/15 bg-surface-container-lowest hover:border-outline-variant/25 hover:bg-surface-container hover:shadow-sm"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-on-surface">
+                                    {candidate.filename}
+                                  </div>
+                                  <div className="mt-1 line-clamp-2 break-all text-xs text-on-surface-variant">
+                                    {candidate.target_name ?? "Target not recorded"}
+                                  </div>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                  {selected ? (
+                                    <div className="text-[11px] font-semibold text-primary">
+                                      Selected
+                                    </div>
+                                  ) : null}
+                                  <div className="mt-1 text-[11px] text-on-surface-variant">
+                                    {candidate.created_at_label}
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-xs leading-relaxed text-on-surface-variant">
+                      No other older same-target runs are currently available. Deep-link compares still support{" "}
+                      <code className="sf-inline-code">?against=&lt;runId&gt;</code> when you need to pin a specific run.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="px-4 lg:px-6 py-6 space-y-6 max-w-[1400px]">
+          <div className="mx-auto max-w-[1440px] space-y-6 px-4 py-6 lg:px-6">
             {targetMismatch ? (
               <div
-                className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                 role="alert"
               >
-                These runs appear to be from different logical targets
-                (identifier or hostname does not match)
+                These runs appear to represent different logical targets
                 {current.target_name || baseline?.target_name
                   ? ` (${[current.target_name, baseline?.target_name].filter(Boolean).join(" vs ")})`
                   : ""}
-                . You can still compare explicit run IDs, but interpret the
-                drift carefully. Add{" "}
-                <code className="font-mono text-xs bg-black/20 px-1 rounded">
-                  ?against=&lt;runId&gt;
-                </code>{" "}
-                to choose a different baseline.
+                . This compare is still allowed, but treat the drift as an explicit cross-target review rather than a same-target timeline.
               </div>
             ) : null}
 
             {baselineMissing ? (
               <div
-                className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface-variant"
+                className="sf-panel px-4 py-4"
                 role="status"
               >
-                No older run exists for this target yet. Upload fresh evidence
-                or reanalyze again later, or open{" "}
-                <code className="font-mono text-xs text-on-surface">
-                  ?against=&lt;runId&gt;
-                </code>{" "}
-                to compare against a specific baseline.
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="sf-kicker">Baseline missing</p>
+                    <div className="mt-1 text-base font-semibold text-on-surface">
+                      No older run exists for this target yet
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+                      Upload fresh evidence or reanalyze this target again later. Compare becomes more valuable once there is another same-target snapshot to diff against.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/runs/${current.id}`} className="sf-btn-secondary">
+                      Open current run
+                    </Link>
+                    <button type="button" onClick={() => setUploadOpen(true)} className="sf-btn-primary">
+                      Upload next snapshot
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : null}
 
             {baseline ? (
               <>
                 {evidenceDelta ? (
-                  <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest overflow-hidden">
-                    <div className="flex flex-col gap-3 border-b border-outline-variant/15 bg-surface-container-low/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="sf-panel overflow-hidden">
+                    <div className="flex flex-col gap-3 border-b border-outline-variant/15 bg-surface-container-low/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                          Evidence delta
-                        </span>
-                        <div className="mt-1 text-xs text-on-surface-variant">
-                          Stable evidence and metadata drift for the selected
-                          baseline.
+                        <div className="sf-kicker">Evidence delta</div>
+                        <div className="mt-1 text-sm text-on-surface-variant">
+                          Stable evidence and metadata drift for the selected baseline.
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-on-surface-variant">
-                        <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2 py-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+                        <span className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-3 py-1.5">
                           Metadata {evidenceDelta.summary.metadata_changed}
                         </span>
-                        <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2 py-1">
+                        <span className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-3 py-1.5">
                           Metrics {evidenceDelta.summary.metric_changes}
                         </span>
-                        <span className="rounded-full border border-outline-variant/20 bg-surface-container-low px-2 py-1">
-                          Artifact{" "}
-                          {evidenceDelta.summary.artifact_changed
-                            ? "changed"
-                            : "same"}
+                        <span className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-3 py-1.5">
+                          Artifact {evidenceDelta.summary.artifact_changed ? "changed" : "same"}
                         </span>
                       </div>
-                      </div>
+                    </div>
 
                     {!evidenceDelta.changed ? (
-                      <div className="px-4 py-6 text-sm text-on-surface-variant">
-                        Evidence bytes, submission metadata, and stable
-                        aggregate metrics were unchanged.
+                      <div className="px-5 py-6 text-sm text-on-surface-variant">
+                        Evidence bytes, submission metadata, and stable aggregate metrics were unchanged.
                       </div>
                     ) : (
-                      <div className="space-y-4 px-4 py-4">
+                      <div className="space-y-5 px-5 py-5">
                         <RunEvidenceSections
                           sections={operationalDeltaSections}
                           heading="Operational delta"
-                          description="Stable rollout, pressure, runtime-health, and namespace-guardrail changes pulled out of the evidence delta so you can see operational movement before scanning the raw metric table."
+                          description="Stable rollout, pressure, runtime-health, and namespace-guardrail changes are pulled out first so you can see meaningful movement before scanning the raw metric table."
                         />
 
                         {changedMetadata.length > 0 ? (
-                          <div className="space-y-2">
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                          <div className="space-y-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
                               Metadata changes
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                               {changedMetadata.map(([key, status]) => (
-                                <span
+                                <div
                                   key={key}
-                                  className="inline-flex items-center rounded-full border border-outline-variant/30 bg-surface px-2 py-1 text-[11px] text-on-surface"
+                                  className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3"
                                 >
-                                  {prettyMetadataLabel(
-                                    key as keyof EvidenceDeltaPayload["metadata"],
-                                  )}
-                                  : {evidenceDeltaStatusLabel(status)}
-                                </span>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                                    {prettyMetadataLabel(
+                                      key as keyof EvidenceDeltaPayload["metadata"],
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-sm font-semibold text-on-surface">
+                                    {evidenceDeltaStatusLabel(status)}
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           </div>
                         ) : null}
 
                         {evidenceDelta.metrics.length > 0 ? (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
                                 Stable metric changes
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
                                 <button
                                   type="button"
-                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                                     activeMetricFocus === "all"
                                       ? "border-primary/30 bg-primary/[0.08] text-primary"
                                       : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -390,7 +459,7 @@ export function CompareClient({
                                     <button
                                       key={definition.value}
                                       type="button"
-                                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                                         activeMetricFocus === definition.value
                                           ? "border-primary/30 bg-primary/[0.08] text-primary"
                                           : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -404,19 +473,19 @@ export function CompareClient({
                               </div>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full text-left text-xs">
+                              <table className="w-full text-left text-sm">
                                 <thead>
-                                  <tr className="border-b border-outline-variant/15 text-[10px] uppercase tracking-wider text-on-surface-variant">
-                                    <th className="px-3 py-2 font-semibold w-[180px]">
+                                  <tr className="border-b border-outline-variant/15 text-[11px] uppercase tracking-[0.14em] text-on-surface-variant">
+                                    <th className="w-[180px] px-3 py-2 font-semibold">
                                       Metric
                                     </th>
-                                    <th className="px-3 py-2 font-semibold w-[120px]">
+                                    <th className="w-[120px] px-3 py-2 font-semibold">
                                       Status
                                     </th>
-                                    <th className="px-3 py-2 font-semibold w-[160px]">
+                                    <th className="w-[160px] px-3 py-2 font-semibold">
                                       Before
                                     </th>
-                                    <th className="px-3 py-2 font-semibold w-[160px]">
+                                    <th className="w-[160px] px-3 py-2 font-semibold">
                                       After
                                     </th>
                                   </tr>
@@ -425,7 +494,7 @@ export function CompareClient({
                                   {filteredEvidenceMetrics.map((row) => (
                                     <tr
                                       key={row.key}
-                                      className="border-b border-outline-variant/10 align-top hover:bg-surface-container-low/40"
+                                      className="sf-table-row border-b border-outline-variant/10 align-top"
                                     >
                                       <td className="px-3 py-2 font-semibold text-on-surface">
                                         {row.label}
@@ -461,36 +530,39 @@ export function CompareClient({
                   </div>
                 ) : null}
 
-                <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant/15 bg-surface-container-low/60">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                      Finding changes
-                    </span>
-                    <span className="text-[10px] text-on-surface-variant">
+                <div className="sf-panel overflow-hidden">
+                  <div className="flex flex-col gap-2 border-b border-outline-variant/15 bg-surface-container-low/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="sf-kicker">Finding changes</p>
+                      <div className="mt-1 text-sm text-on-surface-variant">
+                        Drift in normalized findings between the current run and selected baseline.
+                      </div>
+                    </div>
+                    <span className="text-xs text-on-surface-variant">
                       Unchanged: {drift.summary.unchanged}
                     </span>
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                    <table className="w-full text-left text-sm">
                       <thead>
-                        <tr className="border-b border-outline-variant/15 text-[10px] uppercase tracking-wider text-on-surface-variant">
-                          <th className="px-3 py-2 font-semibold w-[120px]">
+                        <tr className="border-b border-outline-variant/15 text-[11px] uppercase tracking-[0.14em] text-on-surface-variant">
+                          <th className="w-[130px] px-3 py-2 font-semibold">
                             Status
                           </th>
-                          <th className="px-3 py-2 font-semibold min-w-[200px]">
+                          <th className="min-w-[220px] px-3 py-2 font-semibold">
                             Title
                           </th>
-                          <th className="px-3 py-2 font-semibold w-[140px]">
+                          <th className="w-[150px] px-3 py-2 font-semibold">
                             Category
                           </th>
-                          <th className="px-3 py-2 font-semibold w-[90px]">
+                          <th className="w-[100px] px-3 py-2 font-semibold">
                             Before
                           </th>
-                          <th className="px-3 py-2 font-semibold w-[90px]">
+                          <th className="w-[100px] px-3 py-2 font-semibold">
                             After
                           </th>
-                          <th className="px-3 py-2 font-semibold min-w-[280px]">
+                          <th className="min-w-[300px] px-3 py-2 font-semibold">
                             Evidence delta
                           </th>
                         </tr>
@@ -503,7 +575,7 @@ export function CompareClient({
                               className="px-4 py-8 text-center text-on-surface-variant"
                             >
                               {evidenceDelta?.changed
-                                ? `Same finding set; evidence changed in ${evidenceDelta.summary.metadata_changed + evidenceDelta.summary.metric_changes + (evidenceDelta.summary.artifact_changed ? 1 : 0)} place${evidenceDelta.summary.metadata_changed + evidenceDelta.summary.metric_changes + (evidenceDelta.summary.artifact_changed ? 1 : 0) === 1 ? "" : "s"}.`
+                                ? `Same finding set; evidence changed in ${evidenceChangeCount} place${evidenceChangeCount === 1 ? "" : "s"}.`
                                 : "No finding changes between these two runs."}
                             </td>
                           </tr>
@@ -511,11 +583,11 @@ export function CompareClient({
                           drift.rows.map((row) => (
                             <tr
                               key={row.match_key}
-                              className="border-b border-outline-variant/10 align-top hover:bg-surface-container-low/40"
+                              className="sf-table-row border-b border-outline-variant/10 align-top"
                             >
                               <td className="px-3 py-2">
                                 <span
-                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusPillClass(row.status)}`}
+                                  className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${statusPillClass(row.status)}`}
                                 >
                                   {statusLabel(row.status)}
                                 </span>
@@ -523,7 +595,7 @@ export function CompareClient({
                               <td className="px-3 py-2 font-semibold text-on-surface">
                                 {row.title}
                               </td>
-                              <td className="px-3 py-2 text-on-surface-variant font-mono text-[11px]">
+                              <td className="px-3 py-2 font-mono text-xs text-on-surface-variant">
                                 {row.category}
                               </td>
                               <td className="px-3 py-2 font-mono capitalize text-on-surface-variant">
@@ -533,10 +605,10 @@ export function CompareClient({
                                 {row.current_severity ?? "—"}
                               </td>
                               <td className="px-3 py-2">
-                                <div className="grid gap-1 text-[11px] leading-snug text-on-surface-variant">
+                                <div className="grid gap-1 text-xs leading-snug text-on-surface-variant">
                                   {row.status === "new" ? (
                                     <div>
-                                      <span className="text-red-700 font-bold mr-1">
+                                      <span className="mr-1 font-bold text-red-700">
                                         +
                                       </span>
                                       {evidenceSnippet(row.evidence_current)}
@@ -544,7 +616,7 @@ export function CompareClient({
                                   ) : null}
                                   {row.status === "resolved" ? (
                                     <div>
-                                      <span className="text-emerald-700 font-bold mr-1">
+                                      <span className="mr-1 font-bold text-emerald-700">
                                         −
                                       </span>
                                       {evidenceSnippet(row.evidence_previous)}
@@ -554,13 +626,13 @@ export function CompareClient({
                                     row.status === "severity_down") && (
                                     <>
                                       <div>
-                                        <span className="text-outline-variant mr-1">
+                                        <span className="mr-1 text-outline-variant">
                                           was:
                                         </span>
                                         {evidenceSnippet(row.evidence_previous)}
                                       </div>
                                       <div>
-                                        <span className="text-outline-variant mr-1">
+                                        <span className="mr-1 text-outline-variant">
                                           now:
                                         </span>
                                         {evidenceSnippet(row.evidence_current)}

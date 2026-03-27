@@ -89,12 +89,8 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
         },
         {
           label: "Collected at",
-          value: run.collected_at
-            ? new Date(run.collected_at).toLocaleString()
-            : null,
-          display: run.collected_at
-            ? new Date(run.collected_at).toLocaleString()
-            : null,
+          value: run.collected_at,
+          display: run.collected_at_label ?? run.collected_at,
         },
       ],
     },
@@ -142,8 +138,8 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
   ];
 
   return (
-    <div className="rounded-lg border border-surface-container bg-surface-container-lowest p-4 shadow-sm">
-      <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase text-on-surface-variant">
+    <div className="sf-panel p-4">
+      <h3 className="mb-3 flex items-center gap-2 text-base font-bold tracking-tight text-on-surface">
         <svg
           className="h-4 w-4 text-outline-variant"
           fill="none"
@@ -164,9 +160,9 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
         {sections.map((section) => (
           <section
             key={section.title}
-            className="rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-3"
+            className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3"
           >
-            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               {section.title}
             </div>
             <dl className="mt-3 space-y-2.5">
@@ -178,9 +174,9 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
                 return (
                   <div
                     key={row.label}
-                    className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-2.5"
+                    className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-2.5"
                   >
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-outline-variant">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                       {row.label}
                     </dt>
                     <dd className="mt-1 flex items-start justify-between gap-3">
@@ -193,7 +189,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
                           {display}
                         </div>
                         {row.secondary ? (
-                          <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                          <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                             {row.secondary}
                           </div>
                         ) : null}
@@ -203,7 +199,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
                           value={value}
                           idleLabel="Copy"
                           doneLabel="Copied"
-                          className="shrink-0 rounded border border-outline-variant/20 bg-surface-container-low px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                          className="shrink-0 rounded-lg border border-outline-variant/20 bg-surface-container-low px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
                         />
                       ) : null}
                     </dd>

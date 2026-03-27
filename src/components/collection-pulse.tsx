@@ -50,12 +50,10 @@ function SummaryMetric({
   hint: string;
 }) {
   return (
-    <div className="rounded-lg border border-outline/15 bg-surface-container-low px-3 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
-        {label}
-      </p>
+    <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3">
+      <p className="sf-kicker">{label}</p>
       <p className="mt-1 text-lg font-bold tracking-tight text-on-surface">{value}</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">{hint}</p>
+      <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{hint}</p>
     </div>
   );
 }
@@ -64,18 +62,18 @@ export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
   const hasActivity = pulse.days.some((day) => day.count > 0);
 
   return (
-    <div className="rounded-lg bg-surface-container-lowest p-5 shadow-sm">
+    <div className="sf-panel p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h4 className="font-headline text-sm font-bold text-on-surface">
+          <h4 className="font-headline text-base font-bold tracking-tight text-on-surface">
             Collection Pulse
           </h4>
-          <p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-on-surface-variant">
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-on-surface-variant">
             Last 42 days of collection activity. Darker cells mean more collected runs.
             Severity stays separate as a small overlay so activity and risk do not blur together.
           </p>
         </div>
-        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-on-surface-variant">
+        <p className="sf-kicker">
           Daily collections with severity overlays
         </p>
       </div>
@@ -90,7 +88,7 @@ export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
                     <div
                       key={day.date}
                       title={dayTitle(day)}
-                      className={`relative h-4 w-4 rounded-[4px] transition-transform hover:scale-110 ${
+                      className={`relative h-4 w-4 rounded-[4px] transition-[box-shadow,filter] duration-150 hover:brightness-95 ${
                         levelClasses[day.level]
                       } ${day.isToday ? "ring-2 ring-inset ring-primary/60" : ""}`}
                       aria-label={dayTitle(day)}
@@ -107,7 +105,7 @@ export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-on-surface-variant">
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-on-surface-variant">
                 <div className="flex items-center gap-2">
                   <span>Collections</span>
                   <div className="flex items-center gap-1">
@@ -134,7 +132,7 @@ export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
               </div>
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-outline/30 bg-surface-container-low px-4 py-6 text-[11px] text-on-surface-variant">
+            <div className="rounded-xl border border-dashed border-outline/30 bg-surface-container-low px-4 py-6 text-xs text-on-surface-variant">
               No collection activity yet. Once runs arrive, this view will show daily collection density and which days produced elevated findings.
             </div>
           )}
