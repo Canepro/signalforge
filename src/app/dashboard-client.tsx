@@ -34,6 +34,22 @@ const sevColors: Record<string, string> = {
   low: "bg-outline-variant",
 };
 
+function runSeverityTotal(
+  counts: Record<string, number>,
+  severities: Array<"critical" | "high" | "medium" | "low">
+) {
+  return severities.reduce((total, severity) => total + (counts[severity] ?? 0), 0);
+}
+
+function runAttentionScore(run: RunSummary) {
+  return (
+    (run.severity_counts.critical ?? 0) * 1000 +
+    (run.severity_counts.high ?? 0) * 100 +
+    (run.severity_counts.medium ?? 0) * 10 +
+    (run.severity_counts.low ?? 0)
+  );
+}
+
 export function DashboardClient({
   runs,
   collectionSources,
@@ -64,6 +80,11 @@ export function DashboardClient({
     (a, b) => a + b,
     0
   );
+  const latestRun = runs[0] ?? null;
+  const attentionRuns = [...runs]
+    .filter((run) => runAttentionScore(run) > 0)
+    .sort((a, b) => runAttentionScore(b) - runAttentionScore(a))
+    .slice(0, 4);
 
   useEffect(() => {
     if (!quickRequestFeedback || quickRequestFeedback.tone !== "success") return;
@@ -200,6 +221,31 @@ export function DashboardClient({
                   {quickRequestFeedback.message}
                 </p>
               ) : null}
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                {latestRun ? (
+                  <>
+                    <Link
+                      href={`/runs/${latestRun.id}`}
+                      className="rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 font-medium text-on-surface hover:bg-surface-container"
+                    >
+                      Open latest run
+                    </Link>
+                    <Link
+                      href={`/runs/${latestRun.id}/compare`}
+                      className="rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 font-medium text-on-surface hover:bg-surface-container"
+                    >
+                      Compare latest
+                    </Link>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setCollectOpen(true)}
+                  className="rounded-md border border-outline-variant/20 bg-surface-container-low px-3 py-1.5 font-medium text-on-surface hover:bg-surface-container"
+                >
+                  How to collect
+                </button>
+              </div>
             </div>
           </div>
 
@@ -228,127 +274,41 @@ export function DashboardClient({
             />
           </div>
 
-          {/* Main Grid: Table (9 cols) + Right Rail (3 cols) */}
+          {/* Main Grid: Table + Right Rail */}
           <div className="grid grid-cols-12 gap-6">
             {/* Runs Table */}
-            <div className="col-span-12 lg:col-span-9">
+            <div className="col-span-12 xl:col-span-8">
               <RunTable runs={runs} />
             </div>
 
             {/* Right Rail */}
-            <div className="col-span-12 lg:col-span-3 space-y-4">
-              {/* Action Buttons */}
-              <div className="space-y-2">
-                {runs.length > 0 ? (
-                  <Link
-                    href={`/runs/${runs[0]!.id}`}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-lg transition-all"
-                    title="Opens your most recent run — use Reanalyze on the run page"
-                  >
-                    <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-xs font-bold leading-tight">
-                        Reanalyze Artifact
-                      </p>
-                      <p className="text-[10px] text-on-surface-variant">
-                        Open latest run, then reanalyze there
-                      </p>
-                    </div>
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-surface-container-high text-on-surface rounded-lg transition-all opacity-60 cursor-not-allowed"
-                  >
-                    <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-xs font-bold leading-tight">
-                        Reanalyze Artifact
-                      </p>
-                      <p className="text-[10px] text-on-surface-variant">
-                        Upload a run first
-                      </p>
-                    </div>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setCollectOpen(true)}
-                  className="flex w-full cursor-pointer items-center gap-3 rounded-lg bg-surface-container-high px-4 py-3 text-on-surface transition-all hover:bg-surface-container-highest"
-                >
-                  <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
-                  <div className="text-left">
-                    <p className="text-xs font-bold leading-tight">
-                      How to collect
-                    </p>
-                    <p className="text-[10px] text-on-surface-variant">
-                      Copy agent, CLI, and collector commands
+            <div className="col-span-12 space-y-4 xl:col-span-4">
+              <CollectionPulse pulse={collectionPulse} />
+
+              <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-headline text-sm font-bold text-on-surface">
+                      Posture at a glance
+                    </h4>
+                    <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                      Use this rail to spot where attention should go before drilling into the run table.
                     </p>
                   </div>
-                </button>
-                {runs.length > 0 ? (
-                  <Link
-                    href={`/runs/${runs[0]!.id}/compare`}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-lg transition-all"
-                    title="Drift view for the latest run (auto baseline = prior same-target run if any)"
-                  >
-                    <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-xs font-bold leading-tight">
-                        Compare to Previous
-                      </p>
-                      <p className="text-[10px] text-on-surface-variant">
-                        Latest run vs prior (same target)
-                      </p>
+                  <div className="rounded-md border border-outline-variant/15 bg-surface-container-low px-3 py-2 text-right">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-outline-variant">
+                      Total findings
                     </div>
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-surface-container-high text-on-surface rounded-lg transition-all opacity-60 cursor-not-allowed"
-                  >
-                    <svg className="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-xs font-bold leading-tight">
-                        Compare to Previous
-                      </p>
-                      <p className="text-[10px] text-on-surface-variant">
-                        Upload a run first
-                      </p>
+                    <div className="mt-0.5 text-lg font-bold leading-none text-on-surface">
+                      {totalFindings}
                     </div>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+                  </div>
+                </div>
 
-          {/* Lower Supporting Section */}
-          <div className="grid grid-cols-1 gap-6 pb-6 md:grid-cols-2 lg:grid-cols-12">
-            {/* Severity Distribution */}
-            <div className="rounded-lg bg-surface-container-lowest p-5 shadow-sm lg:col-span-3">
-              <h4 className="font-headline font-bold text-on-surface mb-5 text-sm">
-                Severity Distribution
-              </h4>
-              <div className="space-y-3">
-                {(["critical", "high", "medium", "low"] as const).map(
-                  (sev) => {
+                <div className="mt-5 space-y-3">
+                  {(["critical", "high", "medium", "low"] as const).map((sev) => {
                     const count = severityDistribution[sev] ?? 0;
-                    const maxCount = Math.max(
-                      ...Object.values(severityDistribution),
-                      1
-                    );
+                    const maxCount = Math.max(...Object.values(severityDistribution), 1);
                     const pct = Math.round((count / maxCount) * 100);
                     return (
                       <div key={sev} className="space-y-1">
@@ -364,52 +324,78 @@ export function DashboardClient({
                         </div>
                       </div>
                     );
-                  }
-                )}
-              </div>
-            </div>
-
-            <div className="md:col-span-2 lg:col-span-6">
-              <CollectionPulse pulse={collectionPulse} />
-            </div>
-
-            {/* Diagnostics Feed */}
-            <div className="rounded-lg border-l-4 border-primary bg-surface-container-lowest p-5 shadow-sm md:col-span-2 lg:col-span-3">
-              <h4 className="font-headline font-bold text-on-surface mb-4 text-sm">
-                Diagnostics Feed
-              </h4>
-              {runs.length > 0 ? (
-                <div className="space-y-3">
-                  {runs.slice(0, 5).map((run) => {
-                    const totalSev = Object.values(run.severity_counts).reduce(
-                      (a, b) => a + b,
-                      0
-                    );
-                    return (
-                      <div key={run.id} className="flex gap-3">
-                        <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded bg-surface-container-low">
-                          <svg className="h-3 w-3 text-outline-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div className="text-[11px] min-w-0">
-                          <p className="font-bold text-on-surface truncate">
-                            {run.filename}
-                          </p>
-                          <p className="text-on-surface-variant">
-                            {totalSev} finding{totalSev !== 1 ? "s" : ""}{" "}
-                            recorded
-                          </p>
-                        </div>
-                      </div>
-                    );
                   })}
                 </div>
-              ) : (
-                <p className="text-[10px] text-outline-variant">
-                  No recent activity.
-                </p>
-              )}
+
+                <div className="mt-6 border-t border-surface-container pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h5 className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      Attention queue
+                    </h5>
+                    {latestRun ? (
+                      <Link
+                        href={`/runs/${latestRun.id}`}
+                        className="text-[10px] font-semibold text-primary hover:underline"
+                      >
+                        Latest run
+                      </Link>
+                    ) : null}
+                  </div>
+
+                  {attentionRuns.length > 0 ? (
+                    <div className="mt-3 space-y-3">
+                      {attentionRuns.map((run) => {
+                        const criticalHigh = runSeverityTotal(run.severity_counts, ["critical", "high"]);
+                        const mediumLow = runSeverityTotal(run.severity_counts, ["medium", "low"]);
+                        return (
+                          <Link
+                            key={run.id}
+                            href={`/runs/${run.id}`}
+                            className="block rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-3 transition-colors hover:bg-surface-container"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-[12px] font-semibold text-on-surface">
+                                  {run.filename}
+                                </div>
+                                <div className="mt-1 line-clamp-2 break-all text-[10px] text-on-surface-variant">
+                                  {run.target_identifier ?? run.hostname ?? "Target not recorded"}
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <div className="text-[10px] font-bold text-on-surface-variant">
+                                  {run.created_at_label ?? run.created_at}
+                                </div>
+                                <div className="mt-1 text-[10px] font-semibold text-on-surface">
+                                  {criticalHigh > 0 ? `${criticalHigh} critical/high` : `${mediumLow} medium/low`}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-3 flex items-center gap-3">
+                              <span className="flex items-center gap-1 text-[10px] font-medium text-on-surface-variant">
+                                <span className="h-2 w-2 rounded-full bg-severity-critical" />
+                                {run.severity_counts.critical ?? 0}
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px] font-medium text-on-surface-variant">
+                                <span className="h-2 w-2 rounded-full bg-severity-high" />
+                                {run.severity_counts.high ?? 0}
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px] font-medium text-on-surface-variant">
+                                <span className="h-2 w-2 rounded-full bg-severity-medium" />
+                                {run.severity_counts.medium ?? 0}
+                              </span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-on-surface-variant">
+                      No elevated runs yet. Fresh uploads will appear here when they carry findings worth attention.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </main>
