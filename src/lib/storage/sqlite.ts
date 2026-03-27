@@ -1,5 +1,5 @@
 import type { Database } from "sql.js";
-import { getDb, saveDb } from "@/lib/db/client";
+import { getDb, reloadDbFromDisk, saveDb, withDbFileLock } from "@/lib/db/client";
 import {
   deleteArtifactIfUnreferenced,
   deleteRunById,
@@ -419,29 +419,53 @@ class SqliteAgentsStore implements AgentsStore {
 }
 
 class SqliteStorage implements Storage {
-  readonly runs: RunsStore;
-  readonly sources: SourcesStore;
-  readonly jobs: JobsStore;
-  readonly agents: AgentsStore;
+  constructor(
+    private db: Database,
+    private readonly fileBacked: boolean = true
+  ) {}
 
-  constructor(private readonly db: Database) {
-    this.runs = new SqliteRunsStore(db);
-    this.sources = new SqliteSourcesStore(db);
-    this.jobs = new SqliteJobsStore(db);
-    this.agents = new SqliteAgentsStore(db);
+  get runs(): RunsStore {
+    return new SqliteRunsStore(this.db);
+  }
+
+  get sources(): SourcesStore {
+    return new SqliteSourcesStore(this.db);
+  }
+
+  get jobs(): JobsStore {
+    return new SqliteJobsStore(this.db);
+  }
+
+  get agents(): AgentsStore {
+    return new SqliteAgentsStore(this.db);
   }
 
   async withTransaction<T>(fn: (tx: StorageTx) => Promise<T>): Promise<T> {
-    this.db.run("BEGIN");
-    try {
-      const result = await fn(this);
-      this.db.run("COMMIT");
-      saveDb();
-      return result;
-    } catch (err) {
-      this.db.run("ROLLBACK");
-      throw err;
+    if (!this.fileBacked) {
+      this.db.run("BEGIN");
+      try {
+        const result = await fn(this);
+        this.db.run("COMMIT");
+        return result;
+      } catch (err) {
+        this.db.run("ROLLBACK");
+        throw err;
+      }
     }
+
+    return withDbFileLock(async () => {
+      this.db = await reloadDbFromDisk();
+      this.db.run("BEGIN");
+      try {
+        const result = await fn(this);
+        this.db.run("COMMIT");
+        saveDb();
+        return result;
+      } catch (err) {
+        this.db.run("ROLLBACK");
+        throw err;
+      }
+    });
   }
 }
 
@@ -451,5 +475,5 @@ export async function getSqliteStorage(): Promise<Storage> {
 
 export async function getTestSqliteStorage(): Promise<Storage> {
   const { getTestDb } = await import("@/lib/db/client");
-  return new SqliteStorage(await getTestDb());
+  return new SqliteStorage(await getTestDb(), false);
 }
