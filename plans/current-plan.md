@@ -85,7 +85,7 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
   - the remaining Phase 9 work is cross-repo: `signalforge-agent` and `signalforge-collectors` still need to consume the same typed scope contract end to end
 - The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
   - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
-  - richer container runtime-health diagnostics such as health, restart, OOM, and one-shot stats
+  - richer container runtime-health diagnostics such as state, health, restart, OOM, memory limits/reservations, and one-shot CPU/memory stats
   - findings and dashboard presentation that surfaces this evidence instead of burying it
   - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
 - Preferred deployment stance for `signalforge-agent`: long-running hardened service near the execution surface. Today that means a host `systemd` service is the first-class path. Container and Kubernetes-native packaging remain follow-on work after the scoped job contract and trust boundaries are explicit.

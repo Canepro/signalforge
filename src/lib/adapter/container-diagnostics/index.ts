@@ -3,6 +3,8 @@ import type { EnvironmentContext, NoiseItem, PreFinding } from "../../analyzer/s
 import {
   containerValueFor,
   parseContainerBoolean,
+  parseContainerFloat,
+  parseContainerInteger,
   parseContainerList,
   parseContainerSections,
 } from "./parse";
@@ -48,6 +50,78 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
     const mounts = parseContainerList(sections.mounts);
     const writableMounts = parseContainerList(sections.writable_mounts);
     const secrets = parseContainerList(sections.secrets);
+    const stateStatus = containerValueFor(sections, "state_status").toLowerCase();
+    const healthStatus = containerValueFor(sections, "health_status").toLowerCase();
+    const restartCount = parseContainerInteger(sections.restart_count);
+    const memoryLimitBytes = parseContainerInteger(sections.memory_limit_bytes);
+    const memoryPercent = parseContainerFloat(sections.memory_percent);
+
+    if (stateStatus && stateStatus !== "running") {
+      findings.push({
+        title: `Container runtime state is ${stateStatus}`,
+        severity_hint:
+          stateStatus === "paused" || stateStatus === "created" ? "medium" : "high",
+        category: "container",
+        section_source: "state_status",
+        evidence: sections.state_status,
+        rule_id: "container.runtime_state",
+      });
+    }
+
+    if (healthStatus === "unhealthy") {
+      findings.push({
+        title: "Container health check is failing",
+        severity_hint: "high",
+        category: "container",
+        section_source: "health_status",
+        evidence: sections.health_status,
+        rule_id: "container.health_unhealthy",
+      });
+    }
+
+    if (parseContainerBoolean(sections.oom_killed)) {
+      findings.push({
+        title: "Container was OOM-killed",
+        severity_hint: "high",
+        category: "container",
+        section_source: "oom_killed",
+        evidence: sections.oom_killed,
+        rule_id: "container.oom_killed",
+      });
+    }
+
+    if (restartCount !== null && restartCount >= 3) {
+      findings.push({
+        title: `Container restarted ${restartCount} times`,
+        severity_hint: restartCount >= 10 ? "high" : "medium",
+        category: "container",
+        section_source: "restart_count",
+        evidence: sections.restart_count,
+        rule_id: "container.restart_count",
+      });
+    }
+
+    if (memoryLimitBytes === 0) {
+      findings.push({
+        title: "Container has no memory limit configured",
+        severity_hint: "medium",
+        category: "container",
+        section_source: "memory_limit_bytes",
+        evidence: sections.memory_limit_bytes,
+        rule_id: "container.memory_limit_missing",
+      });
+    }
+
+    if (memoryPercent !== null && memoryPercent >= 90) {
+      findings.push({
+        title: `Container memory usage is elevated (${memoryPercent.toFixed(1)}%)`,
+        severity_hint: memoryPercent >= 95 ? "high" : "medium",
+        category: "resource",
+        section_source: "memory_percent",
+        evidence: sections.memory_percent,
+        rule_id: "container.memory_pressure",
+      });
+    }
 
     if (publishedPorts.length > 0) {
       findings.push({

@@ -163,14 +163,18 @@ Optional bounded runtime evidence:
 
 Second-highest-value slice.
 
-Add optional evidence for:
+Current progress in this checkout:
 
-- container state and health status
-- restart count
-- OOMKilled and exit reason
-- resource limits and reservations if available
-- one-shot runtime stats such as CPU and memory
-- bounded recent log excerpt for unhealthy containers
+- runtime state and health status are now collected and analyzed
+- restart count, OOMKilled, and memory limits/reservations are now collected and analyzed
+- one-shot CPU and memory percentages are now collected; memory pressure can now raise deterministic findings
+- compare now includes stable container runtime-health deltas for state, health, restart count, OOMKilled, and memory limits/reservations
+
+Remaining follow-on:
+
+- broaden runtime-health beyond the first deterministic slice where evidence quality stays credible
+- decide whether bounded recent unhealthy-container logs belong in the same artifact family or a later optional document
+- decide whether CPU pressure should stay informational-only or gain deterministic findings once a less noisy signal is available
 
 ### 3. Linux pressure diagnostics
 

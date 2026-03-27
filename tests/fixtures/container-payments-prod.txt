@@ -6,6 +6,11 @@ uptime: 3d
 container_name: payments-api
 container_id: 7f3a21b9
 image: ghcr.io/acme/payments:latest
+state_status: restarting
+health_status: unhealthy
+restart_count: 7
+oom_killed: true
+exit_code: 137
 published_ports: 8080/tcp, 8443/tcp
 privileged: true
 host_network: false
@@ -15,3 +20,8 @@ allow_privilege_escalation: true
 mounts: /var/run/docker.sock:/var/run/docker.sock,/srv/payments:/app/data
 secrets: /run/secrets/db-password,/run/secrets/jwt-signing-key
 ran_as_root: true
+memory_limit_bytes: 0
+memory_reservation_bytes: 268435456
+cpu_percent: 94.10
+memory_percent: 96.30
+pid_count: 31

@@ -1,6 +1,9 @@
 import type { Severity } from "@/lib/analyzer/schema";
 import { parseEnvironmentHostname, type RunWithArtifactRow } from "@/lib/db/repository";
 import {
+  containerValueFor,
+  parseContainerBoolean,
+  parseContainerInteger,
   parseContainerList,
   parseContainerSections,
 } from "@/lib/adapter/container-diagnostics/parse";
@@ -49,6 +52,12 @@ type ContainerEvidenceSummary = {
   secret_mount_count: number;
   runs_as_root: boolean;
   read_only_rootfs: boolean;
+  state_status: string | null;
+  health_status: string | null;
+  restart_count: number | null;
+  oom_killed: boolean;
+  memory_limit_bytes: number | null;
+  memory_reservation_bytes: number | null;
 };
 
 type KubernetesServiceExposure = {
@@ -353,12 +362,14 @@ function summarizeContainerEvidence(content: string): ContainerEvidenceSummary {
     writable_mount_count: parseContainerList(sections.writable_mounts).length,
     added_capability_count: parseContainerList(sections.added_capabilities).length,
     secret_mount_count: parseContainerList(sections.secrets).length,
-    runs_as_root: ["true", "yes", "1", "on"].includes(
-      (sections.ran_as_root ?? "").trim().toLowerCase()
-    ),
-    read_only_rootfs: ["true", "yes", "1", "on"].includes(
-      (sections.read_only_rootfs ?? "").trim().toLowerCase()
-    ),
+    runs_as_root: parseContainerBoolean(sections.ran_as_root),
+    read_only_rootfs: parseContainerBoolean(sections.read_only_rootfs),
+    state_status: containerValueFor(sections, "state_status") || null,
+    health_status: containerValueFor(sections, "health_status") || null,
+    restart_count: parseContainerInteger(sections.restart_count),
+    oom_killed: parseContainerBoolean(sections.oom_killed),
+    memory_limit_bytes: parseContainerInteger(sections.memory_limit_bytes),
+    memory_reservation_bytes: parseContainerInteger(sections.memory_reservation_bytes),
   };
 }
 
@@ -968,6 +979,50 @@ function buildFamilyMetrics(
         previous.read_only_rootfs,
         next.read_only_rootfs,
         "container-diagnostics"
+      ),
+      metricRow(
+        "state_status",
+        "Container state",
+        previous.state_status,
+        next.state_status,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "health_status",
+        "Container health",
+        previous.health_status,
+        next.health_status,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "restart_count",
+        "Restart count",
+        previous.restart_count,
+        next.restart_count,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "oom_killed",
+        "OOM killed",
+        previous.oom_killed,
+        next.oom_killed,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "memory_limit_bytes",
+        "Memory limit",
+        previous.memory_limit_bytes,
+        next.memory_limit_bytes,
+        "container-diagnostics",
+        "bytes"
+      ),
+      metricRow(
+        "memory_reservation_bytes",
+        "Memory reservation",
+        previous.memory_reservation_bytes,
+        next.memory_reservation_bytes,
+        "container-diagnostics",
+        "bytes"
       ),
     ];
   }

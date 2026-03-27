@@ -3,6 +3,27 @@ export function parseContainerBoolean(value: string | undefined): boolean {
   return ["true", "yes", "1", "on"].includes(value.trim().toLowerCase());
 }
 
+export function parseContainerInteger(value: string | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "unknown" || normalized === "none" || normalized === "--") {
+    return null;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function parseContainerFloat(value: string | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "unknown" || normalized === "none" || normalized === "--") {
+    return null;
+  }
+  const stripped = normalized.endsWith("%") ? normalized.slice(0, -1).trim() : normalized;
+  const parsed = Number.parseFloat(stripped);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function parseContainerList(value: string | undefined): string[] {
   if (!value) return [];
   return value
