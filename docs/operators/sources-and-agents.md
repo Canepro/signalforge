@@ -24,7 +24,7 @@ Set `SIGNALFORGE_ADMIN_TOKEN` in SignalForge to enable:
 
 - `/sources`
 - `/api/sources`
-- `/api/collection-jobs/*`
+- `/api/sources/{id}/collection-jobs`
 - `/api/agent/registrations`
 
 The `/sources/login` page stores this value as an httpOnly session cookie. For raw HTTP, use `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
