@@ -138,8 +138,8 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
   ];
 
   return (
-    <div className="sf-panel p-4">
-      <h3 className="mb-3 flex items-center gap-2 text-base font-bold tracking-tight text-on-surface">
+    <div className="sf-panel p-3">
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-bold tracking-tight text-on-surface">
         <svg
           className="h-4 w-4 text-outline-variant"
           fill="none"
@@ -160,12 +160,12 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
         {sections.map((section) => (
           <section
             key={section.title}
-            className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3"
+            className="rounded-lg border border-outline-variant/15 bg-surface-container-low px-3 py-2.5"
           >
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               {section.title}
             </div>
-            <dl className="mt-3 space-y-2.5">
+            <dl className="mt-2 space-y-2">
               {section.rows.map((row) => {
                 if (row.value === null) return null;
                 const value = row.value;
@@ -174,7 +174,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
                 return (
                   <div
                     key={row.label}
-                    className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-2.5"
+                    className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-2"
                   >
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                       {row.label}

@@ -47,21 +47,13 @@ export function FindingsOverview({
               narrow the table without losing the full evidence trail.
             </p>
           </div>
-          <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-2 text-right">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
-              Visible now
-            </div>
-            <div className="mt-0.5 text-sm font-bold text-on-surface">
-              {filteredCount}
-              <span className="ml-1 text-xs font-medium text-on-surface-variant">
-                of {findings.length}
-              </span>
-            </div>
-          </div>
+          <span className="shrink-0 text-xs font-semibold text-on-surface-variant">
+            {filteredCount} of {findings.length}
+          </span>
         </div>
       </div>
 
-      <div className="space-y-5 px-5 py-5">
+      <div className="space-y-4 px-4 py-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {signalSummary.map((item) => {
             const selected = activeSignal === item.signal;
@@ -70,7 +62,7 @@ export function FindingsOverview({
               <button
                 key={item.signal}
                 type="button"
-                className={`rounded-xl border px-4 py-4 text-left transition-[background-color,border-color,box-shadow] duration-150 ${
+                className={`cursor-pointer rounded-xl border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ${
                   selected
                     ? "border-primary/30 bg-primary/[0.07] shadow-sm"
                     : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/25 hover:bg-surface-container hover:shadow-sm"
@@ -83,7 +75,7 @@ export function FindingsOverview({
                     <div className="sf-kicker text-outline-variant">
                       {item.label}
                     </div>
-                    <div className="mt-1 text-2xl font-bold leading-none text-on-surface">
+                    <div className="mt-1 text-lg font-bold leading-none text-on-surface">
                       {item.count}
                     </div>
                   </div>

@@ -44,10 +44,10 @@
   --color-accent: #525f71;
   --color-accent-hover: #465365;
 
-  /* Fonts */
-  --font-headline: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Fonts — values injected by next/font CSS variables on <html> */
+  --font-headline: var(--font-headline, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  --font-sans: var(--font-sans, "Inter", ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
 }
 
 /*
@@ -146,23 +146,23 @@ body {
   }
 
   .sf-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-primary-dim/60 bg-gradient-to-b from-primary to-primary-dim px-4 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition-[background-color,border-color,color,box-shadow,filter,transform,opacity] duration-150 hover:-translate-y-px hover:border-primary hover:shadow-md hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:brightness-95 active:shadow-sm disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-primary-dim/60 bg-gradient-to-b from-primary to-primary-dim px-4 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition-[background-color,border-color,color,box-shadow,filter,transform,opacity] duration-150 hover:-translate-y-px hover:border-primary hover:shadow-md hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:brightness-95 active:shadow-sm disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .sf-btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-outline-variant/25 bg-surface-container-low px-4 py-2.5 text-sm font-medium text-on-surface shadow-sm transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 hover:-translate-y-px hover:border-outline-variant/40 hover:bg-surface-container-high hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:bg-surface-container-highest active:shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-outline-variant/25 bg-surface-container-low px-4 py-2.5 text-sm font-medium text-on-surface shadow-sm transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-150 hover:-translate-y-px hover:border-outline-variant/40 hover:bg-surface-container-high hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:bg-surface-container-highest active:shadow-none disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .sf-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant transition-[background-color,color,transform] duration-150 hover:-translate-y-px hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant transition-[background-color,color,transform] duration-150 hover:-translate-y-px hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .sf-btn-icon {
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-lg border border-transparent bg-transparent text-on-surface-variant transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-outline-variant/20 hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex cursor-pointer h-10 w-10 items-center justify-center rounded-lg border border-transparent bg-transparent text-on-surface-variant transition-[background-color,border-color,color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-outline-variant/20 hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .sf-shell-link {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-[background-color,color,box-shadow] duration-150;
+    @apply flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-[background-color,color,box-shadow] duration-150;
   }
 
   .sf-field {
@@ -178,7 +178,7 @@ body {
   }
 
   .sf-select-card {
-    @apply rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-outline-variant/30 hover:bg-surface-container hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:shadow-none;
+    @apply cursor-pointer rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-outline-variant/30 hover:bg-surface-container hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-0 active:shadow-none;
   }
 
   .sf-table-row {

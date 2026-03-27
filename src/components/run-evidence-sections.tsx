@@ -36,11 +36,11 @@ export function RunEvidenceSections({
         </div>
       </div>
 
-      <div className="grid gap-4 px-5 py-5 lg:grid-cols-3">
+      <div className="grid gap-3 px-4 py-4 lg:grid-cols-3">
         {sections.map((section) => (
           <article
             key={section.id}
-            className={`rounded-xl border px-4 py-4 shadow-sm ${toneClasses[section.tone]}`}
+            className={`rounded-xl border px-3 py-3 shadow-sm ${toneClasses[section.tone]}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -57,7 +57,7 @@ export function RunEvidenceSections({
               {section.entries.map((entry) => (
                 <div
                   key={`${section.id}-${entry.label}-${entry.value}`}
-                  className="rounded-lg border border-outline-variant/10 bg-surface-container-lowest px-3 py-2"
+                  className="rounded-lg border border-outline-variant/10 bg-surface-container-lowest px-2.5 py-1.5"
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                     {entry.label}

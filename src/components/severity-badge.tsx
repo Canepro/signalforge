@@ -110,12 +110,12 @@ export function SeverityBar({ counts }: SeverityBarProps) {
 
   if (total === 0) {
     return (
-      <div className="h-1.5 w-24 rounded-full bg-surface-container-highest" />
+      <div className="h-1.5 w-16 rounded-full bg-surface-container-highest" />
     );
   }
 
   return (
-    <div className="flex h-1.5 w-24 overflow-hidden rounded-full bg-surface-container-highest">
+    <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-surface-container-highest">
       {order.map((sev) => {
         const c = counts[sev] ?? 0;
         if (c === 0) return null;
