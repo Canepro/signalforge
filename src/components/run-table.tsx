@@ -126,14 +126,18 @@ export function RunTable({ runs }: RunTableProps) {
                 key={run.id}
                 className="sf-table-row align-top"
               >
-                <td className="px-3 py-3">
+                <td className="min-w-0 px-3 py-3">
                   <Link
                     href={`/runs/${run.id}`}
-                    className="text-sm font-semibold text-on-surface transition-colors hover:text-primary"
+                    className="block truncate text-sm font-semibold text-on-surface transition-colors hover:text-primary"
+                    title={run.filename.replace(/\.(log|txt|json)$/i, "")}
                   >
                     {run.filename.replace(/\.(log|txt|json)$/i, "")}
                   </Link>
-                  <div className="mt-0.5 truncate font-mono text-xs text-outline-variant">
+                  <div
+                    className="mt-0.5 truncate font-mono text-xs text-outline-variant"
+                    title={run.filename}
+                  >
                     {run.filename}
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-xs text-on-surface-variant lg:hidden">
