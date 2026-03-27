@@ -212,6 +212,61 @@ const RAW = JSON.stringify(
         ]),
       },
       {
+        path: "storage/persistent-volume-claims.json",
+        kind: "persistent-volume-claims",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-data",
+            phase: "Pending",
+            volume_name: null,
+            storage_class_name: "managed-csi",
+            access_modes: ["ReadWriteOnce"],
+            requested_storage: "20Gi",
+            capacity_storage: null,
+            conditions: [],
+          },
+          {
+            namespace: "payments",
+            name: "payments-cache",
+            phase: "Bound",
+            volume_name: "pvc-payments-cache",
+            storage_class_name: "managed-csi",
+            access_modes: ["ReadWriteOnce"],
+            requested_storage: "8Gi",
+            capacity_storage: "8Gi",
+            conditions: [
+              {
+                type: "FileSystemResizePending",
+                status: "True",
+                reason: "WaitingForNodeExpansion",
+                message: "filesystem resize pending on node",
+              },
+            ],
+          },
+        ]),
+      },
+      {
+        path: "storage/persistent-volumes.json",
+        kind: "persistent-volumes",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            name: "pv-payments-archive",
+            phase: "Released",
+            storage_class_name: "managed-csi",
+            reclaim_policy: "Retain",
+            claim_namespace: "payments",
+            claim_name: "payments-archive",
+            access_modes: ["ReadWriteOnce"],
+            capacity_storage: "100Gi",
+            reason: null,
+            message: null,
+          },
+        ]),
+      },
+      {
         path: "workloads/specs.json",
         kind: "workload-specs",
         media_type: "application/json",
@@ -247,6 +302,18 @@ const RAW = JSON.stringify(
                         },
                       },
                     ],
+                  },
+                },
+                {
+                  name: "payments-data",
+                  persistentVolumeClaim: {
+                    claimName: "payments-data",
+                  },
+                },
+                {
+                  name: "payments-cache",
+                  persistentVolumeClaim: {
+                    claimName: "payments-cache",
                   },
                 },
               ],
@@ -285,6 +352,14 @@ const RAW = JSON.stringify(
                       name: "payments-token",
                       mountPath: "/var/run/secrets/tokens",
                       readOnly: true,
+                    },
+                    {
+                      name: "payments-data",
+                      mountPath: "/var/lib/payments-data",
+                    },
+                    {
+                      name: "payments-cache",
+                      mountPath: "/var/cache/payments",
                     },
                   ],
                   securityContext: {
@@ -410,6 +485,31 @@ describe("KubernetesBundleAdapter", () => {
     expect(
       findings.some((finding) =>
         finding.title.includes("namespace lacks complete LimitRange defaults")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("PersistentVolumeClaim is Pending")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("PersistentVolumeClaim is waiting for filesystem resize")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("PersistentVolume is released without reuse")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("workload depends on a Pending PersistentVolumeClaim")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("workload depends on a PersistentVolumeClaim waiting for filesystem resize")
       )
     ).toBe(true);
     expect(

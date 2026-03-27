@@ -299,6 +299,110 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
       continue;
     }
 
+    if (finding.section_source === "storage/persistent-volume-claims.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const label =
+        [asString(parsed?.namespace), asString(parsed?.name)].filter(Boolean).join("/") ||
+        "unknown-claim";
+      if (finding.title.startsWith("Kubernetes PersistentVolumeClaim is Pending:")) {
+        const value =
+          `Pending`
+          + (asString(parsed?.requested_storage) ? ` · requested ${asString(parsed?.requested_storage)}` : "")
+          + (asString(parsed?.storage_class_name) ? ` · class ${asString(parsed?.storage_class_name)}` : "");
+        const key = `pvc-pending:${label}:${value}`;
+        if (!pressureSeen.has(key)) {
+          pressureEntries.push({
+            label: `PVC ${label}`,
+            value,
+            emphasis: true,
+          });
+          pressureSeen.add(key);
+        }
+      } else if (finding.title.startsWith("Kubernetes PersistentVolumeClaim is lost:")) {
+        const value = "Claim is lost";
+        const key = `pvc-lost:${label}`;
+        if (!pressureSeen.has(key)) {
+          pressureEntries.push({
+            label: `PVC ${label}`,
+            value,
+            emphasis: true,
+          });
+          pressureSeen.add(key);
+        }
+      } else if (
+        finding.title.startsWith(
+          "Kubernetes PersistentVolumeClaim is waiting for filesystem resize:"
+        )
+      ) {
+        const value = "Filesystem resize pending";
+        const key = `pvc-resize:${label}`;
+        if (!pressureSeen.has(key)) {
+          pressureEntries.push({
+            label: `PVC ${label}`,
+            value,
+            emphasis: true,
+          });
+          pressureSeen.add(key);
+        }
+      }
+      continue;
+    }
+
+    if (finding.section_source === "storage/persistent-volumes.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const label = asString(parsed?.name) ?? "unknown-volume";
+      const phase = asString(parsed?.phase) ?? "Degraded";
+      const value =
+        phase + (asString(parsed?.reclaim_policy) ? ` · reclaim ${asString(parsed?.reclaim_policy)}` : "");
+      const key = `pv:${label}:${value}`;
+      if (!pressureSeen.has(key)) {
+        pressureEntries.push({
+          label: `PV ${label}`,
+          value,
+          emphasis: true,
+        });
+        pressureSeen.add(key);
+      }
+      continue;
+    }
+
+    if (
+      finding.section_source === "workloads/specs.json" &&
+      (
+        finding.title.startsWith("Kubernetes workload depends on a Pending PersistentVolumeClaim:") ||
+        finding.title.startsWith(
+          "Kubernetes workload depends on a PersistentVolumeClaim waiting for filesystem resize:"
+        )
+      )
+    ) {
+      const parsed = parseFindingEvidenceJson(finding);
+      const workload = parsed && typeof parsed.workload === "object" && !Array.isArray(parsed.workload)
+        ? (parsed.workload as Record<string, unknown>)
+        : null;
+      const claim = parsed && typeof parsed.persistent_volume_claim === "object" && !Array.isArray(parsed.persistent_volume_claim)
+        ? (parsed.persistent_volume_claim as Record<string, unknown>)
+        : null;
+      const label =
+        [asString(workload?.namespace), asString(workload?.name)].filter(Boolean).join("/") ||
+        "unknown-workload";
+      const claimName =
+        [asString(claim?.namespace), asString(claim?.name)].filter(Boolean).join("/") ||
+        "unknown-claim";
+      const value = finding.title.includes("filesystem resize")
+        ? `Waiting on PVC resize ${claimName}`
+        : `Blocked on pending PVC ${claimName}`;
+      const key = `workload-storage:${label}:${value}`;
+      if (!pressureSeen.has(key)) {
+        pressureEntries.push({
+          label,
+          value,
+          emphasis: true,
+        });
+        pressureSeen.add(key);
+      }
+      continue;
+    }
+
     if (finding.section_source === "quotas/limit-ranges.json") {
       const parsed = parseFindingEvidenceJson(finding);
       const label = asString(parsed?.namespace) ?? "unknown-namespace";

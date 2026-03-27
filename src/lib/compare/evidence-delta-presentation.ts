@@ -59,6 +59,10 @@ export function classifyEvidenceMetricFocus(row: EvidenceDeltaMetricRow): Eviden
         "node_not_ready_count",
         "node_pressure_count",
         "resource_quota_pressure_count",
+        "pending_persistent_volume_claim_count",
+        "persistent_volume_claim_resize_pending_count",
+        "degraded_persistent_volume_count",
+        "workload_pending_persistent_volume_claim_count",
       ].includes(row.key)
     ) {
       return "pressure";

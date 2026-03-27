@@ -8,6 +8,8 @@ import {
   type KubernetesLimitRange,
   type KubernetesNodeTop,
   type KubernetesNodeHealth,
+  type KubernetesPersistentVolume,
+  type KubernetesPersistentVolumeClaim,
   type KubernetesPodDisruptionBudget,
   type KubernetesPodTop,
   type KubernetesResourceQuota,
@@ -95,6 +97,9 @@ type KubernetesProjectedSource = {
 
 type KubernetesVolume = {
   name?: string;
+  persistentVolumeClaim?: {
+    claimName?: string;
+  } | null;
   secret?: {
     secretName?: string;
   } | null;
@@ -275,6 +280,12 @@ function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpe
       }).length,
     0
   );
+}
+
+function persistentVolumeClaimNames(workload: KubernetesWorkloadSpec): string[] {
+  return (workload.pod_spec?.volumes ?? [])
+    .map((volume) => volume.persistentVolumeClaim?.claimName?.trim() ?? "")
+    .filter(Boolean);
 }
 
 function hostPathVolumeMountCount(workload: KubernetesWorkloadSpec): number {
@@ -540,6 +551,8 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     const serviceAccountRoleBindings = new Map<string, Set<string>>();
     const namespacesWithWorkloads = new Set<string>();
     const namespaceLimitRanges = new Map<string, NamespaceResourceDefaults>();
+    const pendingPersistentVolumeClaims = new Map<string, KubernetesPersistentVolumeClaim>();
+    const resizePendingPersistentVolumeClaims = new Map<string, KubernetesPersistentVolumeClaim>();
 
     for (const doc of manifest.documents) {
       if (doc.kind !== "rbac-roles") continue;
@@ -950,6 +963,77 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         }
       }
 
+      if (doc.kind === "persistent-volume-claims") {
+        const claims =
+          parseKubernetesDocumentJson<KubernetesPersistentVolumeClaim[]>(doc) ?? [];
+        for (const claim of claims) {
+          const namespace = claim.namespace?.trim();
+          const name = claim.name?.trim() || "unknown-claim";
+          const label = namespace ? `${namespace}/${name}` : name;
+          const phase = claim.phase?.trim().toLowerCase() ?? "";
+          const claimKey = namespace ? `${namespace}/${name}` : null;
+          const resizePending = (claim.conditions ?? []).find(
+            (condition) =>
+              condition.type?.trim() === "FileSystemResizePending" &&
+              isTrueStatus(condition.status)
+          );
+
+          if (phase === "pending" || phase === "lost") {
+            findings.push({
+              title:
+                phase === "lost"
+                  ? `Kubernetes PersistentVolumeClaim is lost: ${label}`
+                  : `Kubernetes PersistentVolumeClaim is Pending: ${label}`,
+              severity_hint: phase === "lost" ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(claim),
+              rule_id:
+                phase === "lost"
+                  ? "kubernetes.persistent_volume_claim_lost"
+                  : "kubernetes.persistent_volume_claim_pending",
+            });
+            if (claimKey) pendingPersistentVolumeClaims.set(claimKey, claim);
+          }
+
+          if (resizePending) {
+            findings.push({
+              title: `Kubernetes PersistentVolumeClaim is waiting for filesystem resize: ${label}`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(claim),
+              rule_id: "kubernetes.persistent_volume_claim_resize_pending",
+            });
+            if (claimKey) resizePendingPersistentVolumeClaims.set(claimKey, claim);
+          }
+        }
+      }
+
+      if (doc.kind === "persistent-volumes") {
+        const volumes = parseKubernetesDocumentJson<KubernetesPersistentVolume[]>(doc) ?? [];
+        for (const volume of volumes) {
+          const name = volume.name?.trim() || "unknown-volume";
+          const phase = volume.phase?.trim().toLowerCase() ?? "";
+          if (!["failed", "released"].includes(phase)) continue;
+
+          findings.push({
+            title:
+              phase === "failed"
+                ? `Kubernetes PersistentVolume is failed: ${name}`
+                : `Kubernetes PersistentVolume is released without reuse: ${name}`,
+            severity_hint: phase === "failed" ? "high" : "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify(volume),
+            rule_id:
+              phase === "failed"
+                ? "kubernetes.persistent_volume_failed"
+                : "kubernetes.persistent_volume_released",
+          });
+        }
+      }
+
       if (doc.kind === "node-top") {
         const nodes = parseKubernetesDocumentJson<KubernetesNodeTop[]>(doc) ?? [];
         for (const node of nodes) {
@@ -1036,6 +1120,37 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             workloadNamespace !== undefined &&
             workloadNamespace.length > 0 &&
             externalServiceNamespaces.has(workloadNamespace);
+
+          for (const claimName of persistentVolumeClaimNames(workload)) {
+            const claimKey = workloadNamespace ? `${workloadNamespace}/${claimName}` : null;
+            if (claimKey && pendingPersistentVolumeClaims.has(claimKey)) {
+              findings.push({
+                title: `Kubernetes workload depends on a Pending PersistentVolumeClaim: ${label} -> ${claimName}`,
+                severity_hint: "high",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({
+                  workload,
+                  persistent_volume_claim: pendingPersistentVolumeClaims.get(claimKey),
+                }),
+                rule_id: "kubernetes.workload_pending_persistent_volume_claim",
+              });
+            }
+
+            if (claimKey && resizePendingPersistentVolumeClaims.has(claimKey)) {
+              findings.push({
+                title: `Kubernetes workload depends on a PersistentVolumeClaim waiting for filesystem resize: ${label} -> ${claimName}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({
+                  workload,
+                  persistent_volume_claim: resizePendingPersistentVolumeClaims.get(claimKey),
+                }),
+                rule_id: "kubernetes.workload_persistent_volume_claim_resize_pending",
+              });
+            }
+          }
 
           if (workload.pod_spec?.automountServiceAccountToken !== false) {
             findings.push({

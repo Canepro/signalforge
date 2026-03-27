@@ -87,6 +87,38 @@ export interface KubernetesLimitRange {
   has_default_limits?: boolean | null;
 }
 
+export interface KubernetesPersistentVolumeClaimCondition {
+  type?: string | null;
+  status?: string | null;
+  reason?: string | null;
+  message?: string | null;
+}
+
+export interface KubernetesPersistentVolumeClaim {
+  namespace?: string | null;
+  name?: string | null;
+  phase?: string | null;
+  volume_name?: string | null;
+  storage_class_name?: string | null;
+  access_modes?: string[] | null;
+  requested_storage?: string | null;
+  capacity_storage?: string | null;
+  conditions?: KubernetesPersistentVolumeClaimCondition[] | null;
+}
+
+export interface KubernetesPersistentVolume {
+  name?: string | null;
+  phase?: string | null;
+  storage_class_name?: string | null;
+  reclaim_policy?: string | null;
+  claim_namespace?: string | null;
+  claim_name?: string | null;
+  access_modes?: string[] | null;
+  capacity_storage?: string | null;
+  reason?: string | null;
+  message?: string | null;
+}
+
 export interface KubernetesPodTop {
   namespace?: string | null;
   name?: string | null;

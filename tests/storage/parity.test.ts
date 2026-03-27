@@ -838,6 +838,43 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "storage/persistent-volume-claims.json",
+                kind: "persistent-volume-claims",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-data",
+                    phase: "Bound",
+                    volume_name: "pvc-payments-data",
+                    storage_class_name: "managed-csi",
+                    access_modes: ["ReadWriteOnce"],
+                    requested_storage: "20Gi",
+                    capacity_storage: "20Gi",
+                    conditions: [],
+                  },
+                ]),
+              },
+              {
+                path: "storage/persistent-volumes.json",
+                kind: "persistent-volumes",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    name: "pvc-payments-data",
+                    phase: "Bound",
+                    storage_class_name: "managed-csi",
+                    reclaim_policy: "Delete",
+                    claim_namespace: "payments",
+                    claim_name: "payments-data",
+                    access_modes: ["ReadWriteOnce"],
+                    capacity_storage: "20Gi",
+                    reason: null,
+                    message: null,
+                  },
+                ]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -857,13 +894,23 @@ for (const backend of backends) {
                         seccompProfile: { type: "RuntimeDefault" },
                       },
                       automountServiceAccountToken: false,
-                      volumes: [],
+                      volumes: [
+                        {
+                          name: "payments-data",
+                          persistentVolumeClaim: { claimName: "payments-data" },
+                        },
+                      ],
                       containers: [
                         {
                           name: "api",
                           env: [],
                           envFrom: [],
-                          volumeMounts: [],
+                          volumeMounts: [
+                            {
+                              name: "payments-data",
+                              mountPath: "/var/lib/payments-data",
+                            },
+                          ],
                           securityContext: {
                             allowPrivilegeEscalation: false,
                             readOnlyRootFilesystem: true,
@@ -1155,6 +1202,61 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "storage/persistent-volume-claims.json",
+                kind: "persistent-volume-claims",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-data",
+                    phase: "Pending",
+                    volume_name: null,
+                    storage_class_name: "managed-csi",
+                    access_modes: ["ReadWriteOnce"],
+                    requested_storage: "20Gi",
+                    capacity_storage: null,
+                    conditions: [],
+                  },
+                  {
+                    namespace: "payments",
+                    name: "payments-cache",
+                    phase: "Bound",
+                    volume_name: "pvc-payments-cache",
+                    storage_class_name: "managed-csi",
+                    access_modes: ["ReadWriteOnce"],
+                    requested_storage: "8Gi",
+                    capacity_storage: "8Gi",
+                    conditions: [
+                      {
+                        type: "FileSystemResizePending",
+                        status: "True",
+                        reason: "WaitingForNodeExpansion",
+                        message: "filesystem resize pending on node",
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "storage/persistent-volumes.json",
+                kind: "persistent-volumes",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    name: "pv-payments-archive",
+                    phase: "Released",
+                    storage_class_name: "managed-csi",
+                    reclaim_policy: "Retain",
+                    claim_namespace: "payments",
+                    claim_name: "payments-archive",
+                    access_modes: ["ReadWriteOnce"],
+                    capacity_storage: "100Gi",
+                    reason: null,
+                    message: null,
+                  },
+                ]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -1191,6 +1293,14 @@ for (const backend of backends) {
                               },
                             ],
                           },
+                        },
+                        {
+                          name: "payments-data",
+                          persistentVolumeClaim: { claimName: "payments-data" },
+                        },
+                        {
+                          name: "payments-cache",
+                          persistentVolumeClaim: { claimName: "payments-cache" },
                         },
                       ],
                       containers: [
@@ -1229,6 +1339,14 @@ for (const backend of backends) {
                               name: "payments-token",
                               mountPath: "/var/run/secrets/tokens",
                               readOnly: true,
+                            },
+                            {
+                              name: "payments-data",
+                              mountPath: "/var/lib/payments-data",
+                            },
+                            {
+                              name: "payments-cache",
+                              mountPath: "/var/cache/payments",
                             },
                           ],
                           securityContext: {
@@ -1334,6 +1452,34 @@ for (const backend of backends) {
           }),
           expect.objectContaining({
             key: "namespace_without_limit_range_default_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "pending_persistent_volume_claim_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "persistent_volume_claim_resize_pending_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "degraded_persistent_volume_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "workload_pending_persistent_volume_claim_count",
             family: "kubernetes-bundle",
             previous: 0,
             current: 1,

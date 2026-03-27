@@ -48,6 +48,15 @@ const samplePayload: EvidenceDeltaPayload = {
       unit: null,
     },
     {
+      key: "pending_persistent_volume_claim_count",
+      label: "Pending PersistentVolumeClaims",
+      family: "kubernetes-bundle",
+      status: "changed",
+      previous: 0,
+      current: 1,
+      unit: null,
+    },
+    {
       key: "restart_count",
       label: "Restart count",
       family: "container-diagnostics",
@@ -82,9 +91,10 @@ describe("evidence-delta-presentation", () => {
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[0]!)).toBe("rollout");
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[1]!)).toBe("pressure");
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[2]!)).toBe("pressure");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[3]!)).toBe("runtime");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[4]!)).toBe("posture");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[3]!)).toBe("pressure");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[4]!)).toBe("runtime");
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[5]!)).toBe("posture");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[6]!)).toBe("posture");
   });
 
   it("builds operational delta sections for compare surfaces", () => {
@@ -108,6 +118,10 @@ describe("evidence-delta-presentation", () => {
     expect(sections[1]?.entries[1]).toMatchObject({
       label: "ResourceQuotas near exhaustion",
       value: "0 -> 2",
+    });
+    expect(sections[1]?.entries[2]).toMatchObject({
+      label: "Pending PersistentVolumeClaims",
+      value: "0 -> 1",
     });
     expect(sections[2]?.entries[0]).toMatchObject({
       label: "Restart count",

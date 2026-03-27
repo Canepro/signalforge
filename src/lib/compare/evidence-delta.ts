@@ -14,6 +14,8 @@ import {
   type KubernetesHorizontalPodAutoscaler,
   type KubernetesLimitRange,
   type KubernetesNodeHealth,
+  type KubernetesPersistentVolume,
+  type KubernetesPersistentVolumeClaim,
   type KubernetesPodDisruptionBudget,
   type KubernetesResourceQuota,
   type KubernetesWarningEvent,
@@ -133,6 +135,9 @@ type KubernetesProjectedSource = {
 
 type KubernetesVolume = {
   name?: string;
+  persistentVolumeClaim?: {
+    claimName?: string;
+  } | null;
   secret?: {
     secretName?: string;
   } | null;
@@ -191,6 +196,10 @@ type KubernetesEvidenceSummary = {
   pdb_blocking_count: number;
   resource_quota_pressure_count: number;
   namespace_without_limit_range_default_count: number;
+  pending_persistent_volume_claim_count: number;
+  persistent_volume_claim_resize_pending_count: number;
+  degraded_persistent_volume_count: number;
+  workload_pending_persistent_volume_claim_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
   workload_cluster_admin_binding_count: number;
@@ -491,6 +500,12 @@ function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpe
   );
 }
 
+function persistentVolumeClaimNames(workload: KubernetesWorkloadSpec): string[] {
+  return (workload.pod_spec?.volumes ?? [])
+    .map((volume) => volume.persistentVolumeClaim?.claimName?.trim() ?? "")
+    .filter(Boolean);
+}
+
 function hostPathVolumeMountCount(workload: KubernetesWorkloadSpec): number {
   const hostPathVolumeNames = new Set(
     (workload.pod_spec?.volumes ?? [])
@@ -622,6 +637,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       pdb_blocking_count: 0,
       resource_quota_pressure_count: 0,
       namespace_without_limit_range_default_count: 0,
+      pending_persistent_volume_claim_count: 0,
+      persistent_volume_claim_resize_pending_count: 0,
+      degraded_persistent_volume_count: 0,
+      workload_pending_persistent_volume_claim_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
       workload_cluster_admin_binding_count: 0,
@@ -664,6 +683,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let hpaIssueCount = 0;
   let pdbBlockingCount = 0;
   let resourceQuotaPressureCount = 0;
+  let pendingPersistentVolumeClaimCount = 0;
+  let persistentVolumeClaimResizePendingCount = 0;
+  let degradedPersistentVolumeCount = 0;
+  let workloadPendingPersistentVolumeClaimCount = 0;
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
   let workloadClusterAdminBindingCount = 0;
@@ -698,6 +721,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   const namespacesWithNetworkPolicy = new Set<string>();
   const namespacesWithWorkloads = new Set<string>();
   const namespaceLimitRanges = new Map<string, NamespaceResourceDefaults>();
+  const pendingPersistentVolumeClaims = new Set<string>();
   const clusterAdminServiceAccounts = new Set<string>();
   const wildcardRoleKeys = new Set<string>();
   const escalationRoleKeys = new Set<string>();
@@ -802,6 +826,38 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       continue;
     }
 
+    if (doc.kind === "persistent-volume-claims") {
+      for (const claim of parseKubernetesJson<KubernetesPersistentVolumeClaim>(doc)) {
+        const namespace = claim.namespace?.trim();
+        const name = claim.name?.trim();
+        const phase = claim.phase?.trim().toLowerCase() ?? "";
+        if (namespace && name && (phase === "pending" || phase === "lost")) {
+          pendingPersistentVolumeClaims.add(`${namespace}/${name}`);
+          pendingPersistentVolumeClaimCount += 1;
+        }
+        if (
+          (claim.conditions ?? []).some(
+            (condition) =>
+              condition.type?.trim() === "FileSystemResizePending" &&
+              isTrueStatus(condition.status)
+          )
+        ) {
+          persistentVolumeClaimResizePendingCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "persistent-volumes") {
+      for (const volume of parseKubernetesJson<KubernetesPersistentVolume>(doc)) {
+        const phase = volume.phase?.trim().toLowerCase() ?? "";
+        if (phase === "failed" || phase === "released") {
+          degradedPersistentVolumeCount += 1;
+        }
+      }
+      continue;
+    }
+
     if (doc.kind !== "service-exposure") continue;
     for (const service of parseKubernetesJson<KubernetesServiceExposure>(doc)) {
       const serviceType = service.type?.trim();
@@ -902,6 +958,14 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (workload.pod_spec?.hostNetwork) hostNetworkWorkloadCount += 1;
         if (workload.pod_spec?.hostPID) hostPidWorkloadCount += 1;
         if (workload.pod_spec?.hostIPC) hostIpcWorkloadCount += 1;
+        if (
+          workloadNamespace &&
+          persistentVolumeClaimNames(workload).some((claimName) =>
+            pendingPersistentVolumeClaims.has(`${workloadNamespace}/${claimName}`)
+          )
+        ) {
+          workloadPendingPersistentVolumeClaimCount += 1;
+        }
         const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
         const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
         const workloadInExposedNamespace =
@@ -1006,6 +1070,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     pdb_blocking_count: pdbBlockingCount,
     resource_quota_pressure_count: resourceQuotaPressureCount,
     namespace_without_limit_range_default_count: namespaceWithoutLimitRangeDefaultCount,
+    pending_persistent_volume_claim_count: pendingPersistentVolumeClaimCount,
+    persistent_volume_claim_resize_pending_count: persistentVolumeClaimResizePendingCount,
+    degraded_persistent_volume_count: degradedPersistentVolumeCount,
+    workload_pending_persistent_volume_claim_count: workloadPendingPersistentVolumeClaimCount,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
     workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
@@ -1225,6 +1293,34 @@ function buildFamilyMetrics(
         "Namespaces missing full LimitRange defaults",
         previous.namespace_without_limit_range_default_count,
         next.namespace_without_limit_range_default_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "pending_persistent_volume_claim_count",
+        "Pending PersistentVolumeClaims",
+        previous.pending_persistent_volume_claim_count,
+        next.pending_persistent_volume_claim_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "persistent_volume_claim_resize_pending_count",
+        "PersistentVolumeClaims waiting for filesystem resize",
+        previous.persistent_volume_claim_resize_pending_count,
+        next.persistent_volume_claim_resize_pending_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "degraded_persistent_volume_count",
+        "Degraded PersistentVolumes",
+        previous.degraded_persistent_volume_count,
+        next.degraded_persistent_volume_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_pending_persistent_volume_claim_count",
+        "Workloads blocked by pending PersistentVolumeClaims",
+        previous.workload_pending_persistent_volume_claim_count,
+        next.workload_pending_persistent_volume_claim_count,
         "kubernetes-bundle"
       ),
       metricRow(

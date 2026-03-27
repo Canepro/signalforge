@@ -177,6 +177,63 @@ describe("run-evidence-presentation", () => {
           }),
         }
       ),
+      mkFinding(
+        "9",
+        "Kubernetes PersistentVolumeClaim is Pending: payments/payments-data",
+        "medium",
+        {
+          section_source: "storage/persistent-volume-claims.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            name: "payments-data",
+            requested_storage: "20Gi",
+            storage_class_name: "managed-csi",
+          }),
+        }
+      ),
+      mkFinding(
+        "10",
+        "Kubernetes PersistentVolumeClaim is waiting for filesystem resize: payments/payments-cache",
+        "medium",
+        {
+          section_source: "storage/persistent-volume-claims.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            name: "payments-cache",
+          }),
+        }
+      ),
+      mkFinding(
+        "11",
+        "Kubernetes PersistentVolume is released without reuse: pv-payments-archive",
+        "medium",
+        {
+          section_source: "storage/persistent-volumes.json",
+          evidence: JSON.stringify({
+            name: "pv-payments-archive",
+            phase: "Released",
+            reclaim_policy: "Retain",
+          }),
+        }
+      ),
+      mkFinding(
+        "12",
+        "Kubernetes workload depends on a Pending PersistentVolumeClaim: payments/api -> payments-data",
+        "high",
+        {
+          section_source: "workloads/specs.json",
+          evidence: JSON.stringify({
+            workload: {
+              namespace: "payments",
+              name: "api",
+            },
+            persistent_volume_claim: {
+              namespace: "payments",
+              name: "payments-data",
+            },
+          }),
+        }
+      ),
     ]);
 
     expect(sections.map((section) => section.id)).toEqual([
@@ -222,6 +279,26 @@ describe("run-evidence-presentation", () => {
         {
           label: "Quota payments/payments-quota",
           value: "limits.memory at 92.5%",
+          emphasis: true,
+        },
+        {
+          label: "PVC payments/payments-data",
+          value: "Pending · requested 20Gi · class managed-csi",
+          emphasis: true,
+        },
+        {
+          label: "PVC payments/payments-cache",
+          value: "Filesystem resize pending",
+          emphasis: true,
+        },
+        {
+          label: "PV pv-payments-archive",
+          value: "Released · reclaim Retain",
+          emphasis: true,
+        },
+        {
+          label: "payments/api",
+          value: "Blocked on pending PVC payments/payments-data",
           emphasis: true,
         },
       ]),
