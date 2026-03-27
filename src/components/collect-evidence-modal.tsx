@@ -165,7 +165,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                 >
                   <div className="flex items-center justify-between gap-3">
                     <code className="text-[10px] font-mono text-on-surface">{entry.label}</code>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
                       {entry.role}
                     </span>
                   </div>
@@ -194,7 +194,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                   <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
                     {family.description}
                   </p>
-                  <div className="mt-2 space-y-1 text-[10px] leading-snug text-outline-variant">
+                  <div className="mt-2 space-y-1 text-[11px] leading-snug text-outline-variant">
                     <div>Upload shape: {family.uploadShape}</div>
                     <div>Compare hint: {family.targetIdentifierHint}</div>
                     <div>Target id example: <code className="font-mono">{family.targetIdentifierExample}</code></div>

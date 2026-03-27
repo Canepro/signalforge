@@ -44,19 +44,19 @@ export function AgentEnrollClient({
           <CopyTextButton
             value={state.token}
             idleLabel="Copy token"
-            className="rounded-lg border border-primary/20 bg-primary/[0.08] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-primary/[0.12]"
+            className="rounded-lg border border-primary/20 bg-primary/[0.08] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-primary hover:bg-primary/[0.12]"
           />
           <CopyTextButton
             value={state.agent_id}
             idleLabel="Copy agent id"
-            className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container"
+            className="rounded-lg border border-outline-variant/20 bg-surface-container-low px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container"
           />
         </div>
-        <p className="text-[10px] text-on-surface-variant">
+        <p className="text-[11px] text-on-surface-variant">
           Prefix: <code className="font-mono bg-surface-container px-1 py-0.5 rounded">{state.token_prefix}…</code>{" "}
           · agent id: <code className="font-mono bg-surface-container px-1 py-0.5 rounded">{state.agent_id}</code>
         </p>
-        <p className="text-[10px] text-on-surface-variant">
+        <p className="text-[11px] text-on-surface-variant">
           The <strong>agent id</strong> identifies the registration. The <strong>token</strong> above is the secret the machine must use.
         </p>
       </div>
@@ -117,7 +117,7 @@ export function AgentEnrollClient({
         >
           <input type="hidden" name="source_id" value={sourceId} />
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <span className="sf-field-label">
               Agent label (optional)
             </span>
             <input

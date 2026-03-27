@@ -30,7 +30,7 @@ export function TopActionsPanel({
         <div className="flex flex-col gap-3 border-b border-outline-variant/10 bg-surface-container-low/60 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex items-center gap-2 min-w-0">
             <svg
-              className="h-3.5 w-3.5 text-severity-critical shrink-0"
+              className="h-3.5 w-3.5 text-warning shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
               aria-hidden
@@ -42,7 +42,7 @@ export function TopActionsPanel({
               />
             </svg>
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-severity-critical">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warning">
                 {showGrid ? "Top Actions Now" : "Run actions"}
               </div>
               <p className="text-xs text-on-surface-variant">
@@ -172,7 +172,7 @@ export function TopActionsPanel({
               <div
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                   i === 0
-                    ? "bg-severity-critical/10 text-severity-critical border border-severity-critical/20"
+                    ? "bg-warning/10 text-warning border border-warning/20"
                     : "bg-surface-container-high text-on-surface-variant"
                 }`}
               >

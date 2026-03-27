@@ -10,7 +10,7 @@ export function CancelJobButton({ jobId, sourceId }: { jobId: string; sourceId: 
   if (confirming) {
     return (
       <div className="flex items-center gap-3">
-        <span className="text-[10px] text-on-surface-variant">Cancel this job?</span>
+        <span className="text-[11px] text-on-surface-variant">Cancel this job?</span>
         <form
           action={(formData) => {
             startTransition(() => {
@@ -23,7 +23,7 @@ export function CancelJobButton({ jobId, sourceId }: { jobId: string; sourceId: 
           <button
             type="submit"
             disabled={isPending}
-            className="text-[10px] font-bold uppercase tracking-widest text-severity-critical hover:underline disabled:opacity-50"
+            className="text-[11px] font-bold uppercase tracking-widest text-danger hover:underline disabled:opacity-50"
           >
             {isPending ? "Cancelling…" : "Yes, cancel"}
           </button>
@@ -31,7 +31,7 @@ export function CancelJobButton({ jobId, sourceId }: { jobId: string; sourceId: 
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface"
+          className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-on-surface"
         >
           No, keep
         </button>
@@ -43,7 +43,7 @@ export function CancelJobButton({ jobId, sourceId }: { jobId: string; sourceId: 
     <button
       type="button"
       onClick={() => setConfirming(true)}
-      className="text-[10px] font-bold uppercase tracking-widest text-severity-critical/80 hover:text-severity-critical transition-colors"
+      className="text-[11px] font-bold uppercase tracking-widest text-danger/80 hover:text-danger transition-colors"
     >
       Cancel job
     </button>

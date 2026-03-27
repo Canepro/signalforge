@@ -12,10 +12,10 @@ const jobStatusConfig: Record<
 > = {
   queued: {
     label: "Queued",
-    className: "border border-severity-medium/20 bg-severity-medium/[0.08] text-severity-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
-    iconClassName: "bg-severity-medium/10 text-severity-medium",
-    dotClassName: "bg-severity-medium",
-    border: "border-l-severity-medium",
+    className: "border border-status-pending/20 bg-status-pending/[0.08] text-status-pending shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+    iconClassName: "bg-status-pending/10 text-status-pending",
+    dotClassName: "bg-status-pending",
+    border: "border-l-status-pending",
     icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
     live: true,
   },

@@ -18,7 +18,7 @@ export function EnvironmentBanner({ env }: EnvironmentBannerProps) {
       </h3>
       <div className="space-y-2">
         <div>
-          <div className="text-[10px] font-bold text-outline-variant uppercase tracking-widest">
+          <div className="sf-kicker">
             Target Host
           </div>
           <div className="text-sm font-bold text-on-surface">
@@ -28,7 +28,7 @@ export function EnvironmentBanner({ env }: EnvironmentBannerProps) {
             </span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-y-1.5 text-[10px]">
+        <div className="grid grid-cols-2 gap-y-1.5 text-[11px]">
           <div className="text-outline-variant">Kernel</div>
           <div className="text-on-surface-variant font-mono text-right truncate">
             {env.kernel}
@@ -47,7 +47,7 @@ export function EnvironmentBanner({ env }: EnvironmentBannerProps) {
             {tags.map((t) => (
               <span
                 key={t}
-                className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] font-bold text-on-surface-variant"
+                className="rounded bg-surface-container-high px-1.5 py-0.5 text-[11px] font-bold text-on-surface-variant"
               >
                 {t}
               </span>

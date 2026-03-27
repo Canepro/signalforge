@@ -88,7 +88,7 @@ export function SourceSettingsForm({
             <span className="absolute left-0.5 top-0.5 block h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
           </span>
           <span className="text-sm text-on-surface font-medium">Enabled</span>
-          <span className="text-[10px] text-on-surface-variant">
+          <span className="text-[11px] text-on-surface-variant">
             {enabled ? "accepting new jobs" : "new jobs will be rejected"}
           </span>
         </label>

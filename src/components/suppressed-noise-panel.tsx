@@ -45,14 +45,14 @@ export function SuppressedNoisePanel({ items }: SuppressedNoisePanelProps) {
         </svg>
       </summary>
       <div className="p-4 border-t border-surface-container-low space-y-2">
-        <p className="text-[10px] text-outline-variant mb-2">
+        <p className="text-[11px] text-outline-variant mb-2">
           These observations are classified as expected given the environment
           context. Excluded from findings to reduce alert fatigue.
         </p>
         {items.map((item, i) => (
           <div
             key={i}
-            className="flex justify-between text-[10px] text-on-surface-variant py-1.5 border-b border-surface-container-low last:border-0"
+            className="flex justify-between text-[11px] text-on-surface-variant py-1.5 border-b border-surface-container-low last:border-0"
           >
             <span>{item.observation}</span>
             <span className="italic text-outline-variant shrink-0 ml-4">
