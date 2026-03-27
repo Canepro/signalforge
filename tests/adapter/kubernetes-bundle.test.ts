@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { KubernetesBundleAdapter } from "@/lib/adapter/kubernetes-bundle/index";
+import { parseKubernetesBundle } from "@/lib/adapter/kubernetes-bundle/parse";
 
 const RAW = JSON.stringify(
   {
@@ -671,5 +672,18 @@ describe("KubernetesBundleAdapter", () => {
     expect(
       noise.some((item) => item.observation.includes("Kubernetes workload healthy"))
     ).toBe(true);
+  });
+
+  it("rejects manifests with unsupported scope levels", () => {
+    expect(
+      parseKubernetesBundle(
+        JSON.stringify({
+          schema_version: "kubernetes-bundle.v1",
+          cluster: { name: "aks-prod-eu-1" },
+          scope: { level: "workload", namespace: "payments" },
+          documents: [],
+        })
+      )
+    ).toBeNull();
   });
 });

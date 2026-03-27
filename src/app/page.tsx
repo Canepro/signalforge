@@ -114,8 +114,6 @@ function buildCollectionPulse(
     }
   }
 
-  const rawCounts = Array.from(countsByDay.values());
-  const maxCount = rawCounts.length > 0 ? Math.max(...rawCounts) : 0;
   const dayLabelFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -127,30 +125,37 @@ function buildCollectionPulse(
     day.setUTCDate(today.getUTCDate() - offset);
     const key = toUtcDayKey(day);
     const count = countsByDay.get(key) ?? 0;
-    const ratio = maxCount > 0 ? count / maxCount : 0;
-    const level: CollectionPulseDay["level"] =
-      count === 0 ? 0
-      : ratio >= 0.75 ? 4
-      : ratio >= 0.5 ? 3
-      : ratio >= 0.25 ? 2
-      : 1;
 
     days.push({
       date: key,
       label: dayLabelFormatter.format(day),
       count,
-      level,
+      level: 0,
       maxSeverity: severityByDay.get(key) ?? null,
       isToday: offset === 0,
     });
   }
+  const maxVisibleCount = days.reduce((max, day) => Math.max(max, day.count), 0);
+  const normalizedDays = days.map((day) => {
+    const ratio = maxVisibleCount > 0 ? day.count / maxVisibleCount : 0;
+    const level: CollectionPulseDay["level"] =
+      day.count === 0 ? 0
+      : ratio >= 0.75 ? 4
+      : ratio >= 0.5 ? 3
+      : ratio >= 0.25 ? 2
+      : 1;
+    return {
+      ...day,
+      level,
+    };
+  });
 
   const configuredSources = sourceStates.filter((entry) => entry.hasRegistration).length;
   const onlineSources = sourceStates.filter(
     (entry) => entry.hasRegistration && entry.source.health_status === "online"
   ).length;
-  const collectionsLast7d = days.slice(-7).reduce((total, day) => total + day.count, 0);
-  const elevatedDays = days.filter(
+  const collectionsLast7d = normalizedDays.slice(-7).reduce((total, day) => total + day.count, 0);
+  const elevatedDays = normalizedDays.filter(
     (day) => day.maxSeverity === "critical" || day.maxSeverity === "high"
   ).length;
   const lastCollectionRun = runs.reduce<RunSummary | null>((latest, run) => {
@@ -159,7 +164,7 @@ function buildCollectionPulse(
   }, null);
 
   return {
-    days,
+    days: normalizedDays,
     onlineSources,
     configuredSources,
     collectionsLast7d,
@@ -224,7 +229,7 @@ export default async function DashboardPage() {
       .slice(0, 12)
       .map(async (run) => ({
         run,
-        detail: await storage.runs.getPageDetail(run.id),
+        detail: await storage.runs.getApiDetail(run.id),
       }))
   );
   const operationalWatch: DashboardOperationalWatchLane[] = buildDashboardOperationalWatch(

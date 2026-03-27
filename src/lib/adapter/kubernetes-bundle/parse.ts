@@ -174,6 +174,7 @@ export function parseKubernetesBundle(raw: string): KubernetesBundleManifest | n
     const cluster = parsed.cluster as Record<string, unknown> | undefined;
     const scope = parsed.scope as Record<string, unknown> | undefined;
     const documents = Array.isArray(parsed.documents) ? parsed.documents : [];
+    if (scope?.level !== "cluster" && scope?.level !== "namespace") return null;
 
     return {
       schema_version: "kubernetes-bundle.v1",
@@ -182,7 +183,7 @@ export function parseKubernetesBundle(raw: string): KubernetesBundleManifest | n
         provider: typeof cluster?.provider === "string" ? cluster.provider : null,
       },
       scope: {
-        level: scope?.level === "namespace" ? "namespace" : "cluster",
+        level: scope.level,
         namespace: typeof scope?.namespace === "string" ? scope.namespace : null,
       },
       collected_at: typeof parsed.collected_at === "string" ? parsed.collected_at : null,
