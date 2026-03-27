@@ -35,6 +35,13 @@ Today, that means:
 - container host environments: prefer the same host-service model on the runtime host, or a dedicated nearby runner with explicit runtime access
 - Kubernetes: keep push-first as the honest default until Phase 9 scope handling is complete; once job-driven Kubernetes becomes first-class, prefer a dedicated cluster-side runner with explicit RBAC over operator laptops or ambient `kubectl`
 
+Current implementation status in the sibling `signalforge-agent` repo:
+
+- the preferred Linux / WSL host-service path now has a first-class hardened `systemd` unit
+- the service install flow now supports a separate root-controlled token file instead of keeping the bearer token in the installed env file
+- `signalforge-agent preflight` now validates config, token source, and locally runnable collector/runtime capabilities before enabling the unit
+- the installer supports a dry-run render path so operators can inspect the unit, env file, and token target before touching `systemd`
+
 ## Why this is the preferred model
 
 This model is preferred because it:
@@ -94,6 +101,7 @@ For Linux and WSL, prefer `systemd` hardening such as:
 Current best path:
 
 - Linux host job-driven collection is the cleanest fully general deployment path today
+- that path now has a first-class hardened install and preflight flow in `signalforge-agent`
 
 Current limited paths:
 

@@ -1,6 +1,6 @@
 # Phase 9 Design: Job-Scoped Collection Parameters
 
-> Status: active follow-on after Phase 8 analyzer and collection-plane parity work. SignalForge repo contract and operator UI work are partially implemented; sibling repo agent and collector integration remains open.
+> Status: active follow-on after Phase 8 analyzer and collection-plane parity work. SignalForge repo contract and operator UI work are implemented; sibling repo agent and collector integration is materially advanced, including typed scope mapping, collector input wiring, and a hardened host-service deployment baseline in `signalforge-agent`.
 
 ## Why this exists
 
@@ -366,17 +366,17 @@ This checklist is the source of truth for the actual Phase 9 implementation. Do 
 
 ### Repo 2: `signalforge-agent`
 
-- [ ] Parse `collection_scope` from `jobs/next`.
-- [ ] Map `linux_host` scope directly to the Linux collector path with no extra operator input.
-- [ ] Map `container_target` scope to explicit collector inputs instead of relying on pre-set process-local environment.
-- [ ] Map `kubernetes_scope` scope to explicit collector inputs instead of relying on ambient `kubectl` context alone.
+- [x] Parse `collection_scope` from `jobs/next`.
+- [x] Map `linux_host` scope directly to the Linux collector path with no extra operator input.
+- [x] Map `container_target` scope to explicit collector inputs instead of relying on pre-set process-local environment.
+- [x] Map `kubernetes_scope` scope to explicit collector inputs instead of relying on ambient `kubectl` context alone.
 - [ ] Make the claimed scope visible in agent logs so support/debugging is self-explanatory.
-- [ ] Keep capability advertisement at the artifact-family layer unless a narrower scope-capability split is deliberately introduced.
-- [ ] Add tests for each scope kind and for invalid/missing scope handling.
-- [ ] Ship a first-class hardened `systemd` service form for the always-on host deployment path.
-- [ ] Support loading the agent token from a root-controlled file or service credential, not only plain environment export from an operator shell.
-- [ ] Support explicit kubeconfig path and context selection for Kubernetes scope handling.
-- [ ] Document least-privilege deployment modes separately for Linux-only, container-capable, and Kubernetes-capable hosts.
+- [x] Keep capability advertisement at the artifact-family layer unless a narrower scope-capability split is deliberately introduced.
+- [x] Add tests for each scope kind and for invalid/missing scope handling.
+- [x] Ship a first-class hardened `systemd` service form for the always-on host deployment path.
+- [x] Support loading the agent token from a root-controlled file or service credential, not only plain environment export from an operator shell.
+- [x] Support explicit kubeconfig path and context selection for Kubernetes scope handling.
+- [x] Document least-privilege deployment modes separately for Linux-only, container-capable, and Kubernetes-capable hosts.
 
 ### Repo 3: `signalforge-collectors`
 
@@ -394,12 +394,13 @@ This checklist is the source of truth for the actual Phase 9 implementation. Do 
 - [x] Make Phase 8 branch reality explicit in README, docs, and plans.
 - [ ] Add a dedicated operator-facing document for job-scoped collection parameters once the agent and collector mapping is implemented.
 - [x] Add a dedicated operator-facing document for the preferred `signalforge-agent` deployment model and security baseline in `signalforge` so the cross-repo stance does not live only in thread history.
+- [x] Add a first-class `signalforge-agent preflight` command plus a dry-run systemd installer path so operators can validate config, capability readiness, and rendered units before enabling the service.
 - [ ] Add a sibling-repo handoff note linking the exact SignalForge, agent, and collector changes that shipped together.
 
 ### Validation gates
 
 - [ ] `signalforge`: targeted API, repository, parity, and typecheck validation pass.
-- [ ] `signalforge-agent`: family-aware scope mapping tests pass.
+- [x] `signalforge-agent`: family-aware scope mapping tests pass.
 - [ ] `signalforge-collectors`: documented and tested invocation examples for Linux, container, and Kubernetes.
 - [ ] At least one end-to-end operator flow is exercised for:
   - Linux host job
