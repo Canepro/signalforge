@@ -44,10 +44,10 @@
   --color-accent: #525f71;
   --color-accent-hover: #465365;
 
-  /* Fonts — values injected by next/font CSS variables on <html> */
-  --font-headline: var(--font-headline, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
-  --font-sans: var(--font-sans, "Inter", ui-sans-serif, system-ui, sans-serif);
-  --font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  /* Fonts — tokens used by Tailwind utilities and body styles */
+  --font-headline: var(--font-headline-loaded, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  --font-sans: var(--font-sans-loaded, "Inter", ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--font-mono-loaded, "JetBrains Mono", ui-monospace, monospace);
 }
 
 /*
