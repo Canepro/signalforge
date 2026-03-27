@@ -8,13 +8,18 @@ import { TopBar } from "@/components/top-bar";
 import { SeveritySummary } from "@/components/severity-badge";
 import { TopActionsPanel } from "@/components/top-actions-panel";
 import { FindingsTable } from "@/components/findings-table";
+import { FindingsOverview } from "@/components/findings-overview";
+import { RunEvidenceSections } from "@/components/run-evidence-sections";
 import { SuppressedNoisePanel } from "@/components/suppressed-noise-panel";
 import { RunMetadataPanel } from "@/components/run-metadata-panel";
 import { EnvironmentBanner } from "@/components/environment-banner";
 import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
+import type { Severity } from "@/lib/analyzer/schema";
 import type { RunDetail } from "@/types/api";
 import { compareRunAgainstHref, compareRunHref } from "@/lib/compare/nav";
+import { classifyFindingSignal, type FindingSignal } from "@/lib/findings-presentation";
+import { buildRunEvidenceSections } from "@/lib/run-evidence-presentation";
 import {
   getArtifactFamilyPresentation,
   getArtifactTypeLabel,
@@ -29,6 +34,8 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
   const [reanalyzePending, setReanalyzePending] = useState(false);
+  const [activeSignal, setActiveSignal] = useState<FindingSignal | "all">("all");
+  const [activeSeverity, setActiveSeverity] = useState<Severity | "all">("all");
   const artifactFamily = getArtifactFamilyPresentation(run.artifact_type);
   const artifactFamilyLabel =
     artifactFamily?.label ?? getArtifactTypeLabel(run.artifact_type);
@@ -36,6 +43,15 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const findings = report?.findings ?? [];
   const noise = run.noise ?? report?.noise_or_expected ?? [];
   const topActions = report?.top_actions_now ?? [];
+  const evidenceSections = buildRunEvidenceSections(run.artifact_type, findings);
+  const filteredFindings = findings.filter((finding) => {
+    const matchesSignal =
+      activeSignal === "all" || classifyFindingSignal(finding) === activeSignal;
+    const matchesSeverity =
+      activeSeverity === "all" || finding.severity === activeSeverity;
+    return matchesSignal && matchesSeverity;
+  });
+  const filtersActive = activeSignal !== "all" || activeSeverity !== "all";
   const targetLabel =
     artifactFamily?.value === "container-diagnostics"
       ? "Container workload"
@@ -252,8 +268,28 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                 </div>
               )}
 
+              {findings.length > 0 ? (
+                <FindingsOverview
+                  findings={findings}
+                  filteredCount={filteredFindings.length}
+                  activeSignal={activeSignal}
+                  activeSeverity={activeSeverity}
+                  onSignalChange={setActiveSignal}
+                  onSeverityChange={setActiveSeverity}
+                />
+              ) : null}
+
+              <RunEvidenceSections sections={evidenceSections} />
+
               {/* Findings Table */}
-              <FindingsTable findings={findings} />
+              <FindingsTable
+                findings={filteredFindings}
+                emptyMessage={
+                  filtersActive
+                    ? "No findings match the current overview filters."
+                    : "No findings for this run."
+                }
+              />
 
               {/* Bottom grid: Suppressed Noise + Run Metadata */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

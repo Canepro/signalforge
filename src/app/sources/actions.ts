@@ -16,11 +16,12 @@ import {
   type SourceType,
 } from "@/lib/source-catalog";
 import { getStorage } from "@/lib/storage";
+import { parseCollectionScopeFormData } from "./collection-scope-form";
 
 async function assertAdminSession(): Promise<void> {
   const jar = await cookies();
   const v = jar.get(ADMIN_SESSION_COOKIE)?.value;
-  if (!verifyAdminSessionCookie(v)) {
+  if (!(await verifyAdminSessionCookie(v))) {
     redirect("/sources/login");
   }
 }
@@ -74,6 +75,15 @@ export async function createSourceAction(formData: FormData): Promise<void> {
     redirect("/sources/new?error=artifact_type");
   }
 
+  const defaultCollectionScope = parseCollectionScopeFormData(formData, {
+    prefix: "default_collection_scope",
+    artifactType: expected_artifact_type as ArtifactType,
+    errorCode: "invalid_default_collection_scope",
+  });
+  if (!defaultCollectionScope.ok) {
+    redirect("/sources/new?error=invalid_default_collection_scope");
+  }
+
   const storage = await getStorage();
   try {
     const row = await storage.withTransaction((tx) =>
@@ -82,12 +92,17 @@ export async function createSourceAction(formData: FormData): Promise<void> {
         target_identifier,
         source_type: source_type as SourceType,
         expected_artifact_type: expected_artifact_type as ArtifactType,
+        default_collection_scope: defaultCollectionScope.value,
       })
     );
     revalidatePath("/sources");
     redirect(`/sources/${row.id}`);
   } catch (e) {
+    const code = (e as Error & { code?: string }).code;
     const msg = e instanceof Error ? e.message : String(e);
+    if (code === "invalid_default_collection_scope") {
+      redirect("/sources/new?error=invalid_default_collection_scope");
+    }
     if (msg.includes("UNIQUE") || msg.includes("unique")) {
       redirect("/sources/new?error=duplicate");
     }
@@ -108,12 +123,21 @@ export async function createCollectionJobAction(formData: FormData): Promise<voi
   const idemRaw = formData.get("idempotency_key");
   const idempotency_key =
     typeof idemRaw === "string" && idemRaw.trim() ? idemRaw.trim() : null;
+  const collectionScope = parseCollectionScopeFormData(formData, {
+    prefix: "collection_scope",
+    artifactType: source.expected_artifact_type as ArtifactType,
+    errorCode: "invalid_collection_scope",
+  });
+  if (!collectionScope.ok) {
+    redirect(`/sources/${sourceId}?error=invalid_collection_scope`);
+  }
 
   try {
     const { row } = await storage.withTransaction((tx) =>
       tx.jobs.queueForSource(sourceId, {
         request_reason,
         idempotency_key,
+        collection_scope: collectionScope.value,
       })
     );
     revalidatePath(`/sources/${sourceId}`);
@@ -122,6 +146,9 @@ export async function createCollectionJobAction(formData: FormData): Promise<voi
     const code = (e as Error & { code?: string }).code;
     if (code === "source_disabled") {
       redirect(`/sources/${sourceId}?error=disabled`);
+    }
+    if (code === "invalid_collection_scope") {
+      redirect(`/sources/${sourceId}?error=invalid_collection_scope`);
     }
     throw e;
   }
@@ -148,7 +175,16 @@ export async function cancelCollectionJobAction(formData: FormData): Promise<voi
 }
 
 export type DashboardRequestCollectionState =
-  | { ok: false; error: "admin_required" | "missing_source" | "not_found" | "disabled" | "not_ready" }
+  | {
+      ok: false;
+      error:
+        | "admin_required"
+        | "missing_source"
+        | "not_found"
+        | "disabled"
+        | "not_ready"
+        | "invalid_collection_scope";
+    }
   | { ok: true; job_id: string; source_id: string; source_name: string };
 
 export async function requestCollectionFromDashboardAction(
@@ -171,10 +207,19 @@ export async function requestCollectionFromDashboardAction(
   if (!registration) return { ok: false, error: "not_ready" };
 
   const request_reason = String(formData.get("request_reason") ?? "").trim() || null;
+  const collectionScope = parseCollectionScopeFormData(formData, {
+    prefix: "collection_scope",
+    artifactType: source.expected_artifact_type as ArtifactType,
+    errorCode: "invalid_collection_scope",
+  });
+  if (!collectionScope.ok) {
+    return { ok: false, error: "invalid_collection_scope" };
+  }
   try {
     const { row } = await storage.withTransaction((tx) =>
       tx.jobs.queueForSource(sourceId, {
         request_reason,
+        collection_scope: collectionScope.value,
       })
     );
     revalidatePath("/");
@@ -190,6 +235,9 @@ export async function requestCollectionFromDashboardAction(
     const code = (e as Error & { code?: string }).code;
     if (code === "source_disabled") {
       return { ok: false, error: "disabled" };
+    }
+    if (code === "invalid_collection_scope") {
+      return { ok: false, error: "invalid_collection_scope" };
     }
     throw e;
   }
@@ -217,9 +265,26 @@ export async function updateSourceAction(formData: FormData): Promise<void> {
   if (typeof default_collector_version === "string") {
     patch.default_collector_version = default_collector_version.trim() || null;
   }
+  const defaultCollectionScope = parseCollectionScopeFormData(formData, {
+    prefix: "default_collection_scope",
+    artifactType: source.expected_artifact_type as ArtifactType,
+    errorCode: "invalid_default_collection_scope",
+  });
+  if (!defaultCollectionScope.ok) {
+    redirect(`/sources/${sourceId}?settings_error=invalid_default_collection_scope`);
+  }
+  patch.default_collection_scope = defaultCollectionScope.value;
 
   if (Object.keys(patch).length > 0) {
-    await storage.withTransaction((tx) => tx.sources.update(sourceId, patch));
+    try {
+      await storage.withTransaction((tx) => tx.sources.update(sourceId, patch));
+    } catch (e) {
+      const code = (e as Error & { code?: string }).code;
+      if (code === "invalid_default_collection_scope") {
+        redirect(`/sources/${sourceId}?settings_error=invalid_default_collection_scope`);
+      }
+      throw e;
+    }
   }
   revalidatePath(`/sources/${sourceId}`);
   revalidatePath("/sources");

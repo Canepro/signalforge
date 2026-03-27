@@ -4,6 +4,18 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleManifest,
+  type KubernetesHorizontalPodAutoscaler,
+  type KubernetesLimitRange,
+  type KubernetesNodeTop,
+  type KubernetesNodeHealth,
+  type KubernetesPersistentVolume,
+  type KubernetesPersistentVolumeClaim,
+  type KubernetesPodDisruptionBudget,
+  type KubernetesPodTop,
+  type KubernetesResourceQuota,
+  type KubernetesUnhealthyWorkloadLogExcerpt,
+  type KubernetesWarningEvent,
+  type KubernetesWorkloadRolloutStatus,
 } from "./parse";
 
 const MANIFEST_KEY = "__manifest_json";
@@ -86,6 +98,9 @@ type KubernetesProjectedSource = {
 
 type KubernetesVolume = {
   name?: string;
+  persistentVolumeClaim?: {
+    claimName?: string;
+  } | null;
   secret?: {
     secretName?: string;
   } | null;
@@ -134,6 +149,18 @@ type KubernetesWorkloadSpec = {
   name?: string;
   kind?: string;
   pod_spec?: KubernetesPodSpec;
+};
+
+type WarningEventCategory = {
+  key: string;
+  title: string;
+  severity_hint: "high" | "medium";
+  rule_id: string;
+};
+
+type NamespaceResourceDefaults = {
+  hasDefaultRequests: boolean;
+  hasDefaultLimits: boolean;
 };
 
 function manifestFromSections(sections: Record<string, string>): KubernetesBundleManifest | null {
@@ -256,6 +283,12 @@ function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpe
   );
 }
 
+function persistentVolumeClaimNames(workload: KubernetesWorkloadSpec): string[] {
+  return (workload.pod_spec?.volumes ?? [])
+    .map((volume) => volume.persistentVolumeClaim?.claimName?.trim() ?? "")
+    .filter(Boolean);
+}
+
 function hostPathVolumeMountCount(workload: KubernetesWorkloadSpec): number {
   const hostPathVolumeNames = new Set(
     (workload.pod_spec?.volumes ?? [])
@@ -288,6 +321,126 @@ function privilegedInitContainerCount(workload: KubernetesWorkloadSpec): number 
   return (workload.pod_spec?.initContainers ?? []).filter(
     (container) => container.securityContext?.privileged === true
   ).length;
+}
+
+function normalizedValue(value: string | undefined | null): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function warningEventCategory(event: KubernetesWarningEvent): WarningEventCategory | null {
+  const reason = normalizedValue(event.reason);
+  const message = normalizedValue(event.message);
+
+  if (
+    ["failedscheduling", "notscaleup", "notscalesup"].includes(reason) ||
+    message.includes("insufficient") ||
+    message.includes("didn't match pod affinity") ||
+    message.includes("taint")
+  ) {
+    return {
+      key: "scheduling",
+      title: "Kubernetes warning events indicate scheduling failures",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_scheduling",
+    };
+  }
+
+  if (
+    ["errimagepull", "imagepullbackoff", "failedpull", "inspectfailed"].includes(reason) ||
+    message.includes("pull image") ||
+    message.includes("imagepullbackoff")
+  ) {
+    return {
+      key: "image-pull",
+      title: "Kubernetes warning events indicate image pull failures",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_image_pull",
+    };
+  }
+
+  if (
+    ["failedmount", "failedattachvolume", "failedmapvolume"].includes(reason) ||
+    message.includes("mountvolume") ||
+    message.includes("unmounted volumes") ||
+    message.includes("unable to attach or mount volumes")
+  ) {
+    return {
+      key: "mounts",
+      title: "Kubernetes warning events indicate mount or volume failures",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_mounts",
+    };
+  }
+
+  if (
+    ["backoff", "unhealthy", "failed", "failedcreatepodsandbox"].includes(reason) ||
+    message.includes("back-off") ||
+    message.includes("crashloopbackoff") ||
+    message.includes("readiness probe failed") ||
+    message.includes("liveness probe failed")
+  ) {
+    return {
+      key: "runtime",
+      title: "Kubernetes warning events indicate runtime instability",
+      severity_hint: "medium",
+      rule_id: "kubernetes.warning_events_runtime",
+    };
+  }
+
+  if (
+    ["evicted", "oomkilled", "preempted"].includes(reason) ||
+    message.includes("evict") ||
+    message.includes("oom")
+  ) {
+    return {
+      key: "pressure",
+      title: "Kubernetes warning events indicate eviction or OOM pressure",
+      severity_hint: "high",
+      rule_id: "kubernetes.warning_events_pressure",
+    };
+  }
+
+  return null;
+}
+
+function rolloutMismatchSummary(status: KubernetesWorkloadRolloutStatus): {
+  desired: number;
+  ready: number;
+  available: number;
+  updated: number;
+  unavailable: number;
+  controllerLag: boolean;
+  hasReplicaMismatch: boolean;
+} | null {
+  const desired = status.desired_replicas ?? 0;
+  if (desired <= 0) return null;
+  const ready = status.ready_replicas ?? 0;
+  const available = status.available_replicas ?? 0;
+  const updated = status.updated_replicas ?? 0;
+  const unavailable = status.unavailable_replicas ?? Math.max(desired - available, 0);
+  const generation = status.generation ?? null;
+  const observedGeneration = status.observed_generation ?? null;
+  const controllerLag =
+    generation !== null && observedGeneration !== null && observedGeneration < generation;
+  const hasReplicaMismatch = ready < desired || available < desired || updated < desired;
+
+  return {
+    desired,
+    ready,
+    available,
+    updated,
+    unavailable,
+    controllerLag,
+    hasReplicaMismatch,
+  };
+}
+
+function percentLabel(value: number | null | undefined): string {
+  return `${Number(value ?? 0).toFixed(1)}%`;
+}
+
+function isTrueStatus(value: string | null | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -397,6 +550,10 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     const escalationRoleKeys = new Set<string>();
     const nodeProxyRoleKeys = new Set<string>();
     const serviceAccountRoleBindings = new Map<string, Set<string>>();
+    const namespacesWithWorkloads = new Set<string>();
+    const namespaceLimitRanges = new Map<string, NamespaceResourceDefaults>();
+    const pendingPersistentVolumeClaims = new Map<string, KubernetesPersistentVolumeClaim>();
+    const resizePendingPersistentVolumeClaims = new Map<string, KubernetesPersistentVolumeClaim>();
 
     for (const doc of manifest.documents) {
       if (doc.kind !== "rbac-roles") continue;
@@ -595,6 +752,431 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         }
       }
 
+      if (doc.kind === "node-health") {
+        const nodes = parseKubernetesDocumentJson<KubernetesNodeHealth[]>(doc) ?? [];
+        for (const node of nodes) {
+          const nodeName = node.name?.trim() || "unknown-node";
+          const pressureConditions = (node.pressure_conditions ?? []).filter((value) =>
+            value.trim()
+          );
+
+          if (node.ready === false) {
+            findings.push({
+              title: `Kubernetes node is not Ready: ${nodeName}`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_not_ready",
+            });
+          }
+
+          if (pressureConditions.length > 0) {
+            findings.push({
+              title: `Kubernetes node reports pressure conditions: ${nodeName} (${pressureConditions.join(", ")})`,
+              severity_hint: "high",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_pressure",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "warning-events") {
+        const events = parseKubernetesDocumentJson<KubernetesWarningEvent[]>(doc) ?? [];
+        const grouped = new Map<
+          string,
+          {
+            category: WarningEventCategory;
+            totalCount: number;
+            namespaces: Set<string>;
+            affectedObjects: Set<string>;
+            samples: KubernetesWarningEvent[];
+          }
+        >();
+
+        for (const event of events) {
+          const category = warningEventCategory(event);
+          if (!category) continue;
+
+          let bucket = grouped.get(category.key);
+          if (!bucket) {
+            bucket = {
+              category,
+              totalCount: 0,
+              namespaces: new Set<string>(),
+              affectedObjects: new Set<string>(),
+              samples: [],
+            };
+            grouped.set(category.key, bucket);
+          }
+
+          bucket.totalCount += Math.max(1, event.count ?? 1);
+          if (event.namespace?.trim()) bucket.namespaces.add(event.namespace.trim());
+          const objectLabel =
+            [event.involved_kind?.trim(), event.involved_name?.trim()]
+              .filter(Boolean)
+              .join("/")
+              .trim() || "unknown-object";
+          bucket.affectedObjects.add(objectLabel);
+          if (bucket.samples.length < 3) bucket.samples.push(event);
+        }
+
+        for (const bucket of grouped.values()) {
+          findings.push({
+            title: `${bucket.category.title} (${bucket.totalCount} events)`,
+            severity_hint: bucket.category.severity_hint,
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify({
+              warning_event_count: bucket.totalCount,
+              namespaces: Array.from(bucket.namespaces).sort(),
+              affected_objects: Array.from(bucket.affectedObjects).sort(),
+              samples: bucket.samples,
+            }),
+            rule_id: bucket.category.rule_id,
+          });
+        }
+      }
+
+      if (doc.kind === "unhealthy-workload-log-excerpts") {
+        const excerpts =
+          parseKubernetesDocumentJson<KubernetesUnhealthyWorkloadLogExcerpt[]>(doc) ?? [];
+        const grouped = new Map<
+          string,
+          {
+            namespace: string | null;
+            workloadKind: string | null;
+            workloadName: string | null;
+            reasons: Set<string>;
+            pods: Set<string>;
+            samples: KubernetesUnhealthyWorkloadLogExcerpt[];
+            excerptCount: number;
+          }
+        >();
+
+        for (const excerpt of excerpts) {
+          const workloadKey = [
+            excerpt.namespace?.trim() || "",
+            excerpt.workload_kind?.trim() || "",
+            excerpt.workload_name?.trim() || "",
+          ].join(":");
+          const bucket =
+            grouped.get(workloadKey) ??
+            {
+              namespace: excerpt.namespace?.trim() || null,
+              workloadKind: excerpt.workload_kind?.trim() || null,
+              workloadName: excerpt.workload_name?.trim() || null,
+              reasons: new Set<string>(),
+              pods: new Set<string>(),
+              samples: [],
+              excerptCount: 0,
+            };
+
+          if (excerpt.reason?.trim()) bucket.reasons.add(excerpt.reason.trim());
+          if (excerpt.pod_name?.trim()) bucket.pods.add(excerpt.pod_name.trim());
+          if (
+            bucket.samples.length < 2 &&
+            Array.isArray(excerpt.excerpt_lines) &&
+            excerpt.excerpt_lines.some((line) => typeof line === "string" && line.trim())
+          ) {
+            bucket.samples.push(excerpt);
+          }
+          bucket.excerptCount += 1;
+          grouped.set(workloadKey, bucket);
+        }
+
+        for (const bucket of grouped.values()) {
+          const label = workloadLabel(bucket.namespace ?? undefined, bucket.workloadName ?? undefined);
+          findings.push({
+            title: `Kubernetes unhealthy workload logs captured: ${label}`,
+            severity_hint: "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify({
+              namespace: bucket.namespace,
+              workload_kind: bucket.workloadKind,
+              workload_name: bucket.workloadName,
+              excerpt_count: bucket.excerptCount,
+              reasons: Array.from(bucket.reasons).sort(),
+              pods: Array.from(bucket.pods).sort(),
+              samples: bucket.samples,
+            }),
+            rule_id: "kubernetes.unhealthy_workload_logs",
+          });
+        }
+      }
+
+      if (doc.kind === "horizontal-pod-autoscalers") {
+        const hpas =
+          parseKubernetesDocumentJson<KubernetesHorizontalPodAutoscaler[]>(doc) ?? [];
+        for (const hpa of hpas) {
+          const namespace = hpa.namespace?.trim();
+          const name = hpa.name?.trim() || "unknown-hpa";
+          const label = namespace ? `${namespace}/${name}` : name;
+          const currentReplicas = hpa.current_replicas ?? 0;
+          const desiredReplicas = hpa.desired_replicas ?? 0;
+          const maxReplicas = hpa.max_replicas ?? 0;
+          const currentCpu = hpa.current_cpu_utilization_percentage ?? null;
+          const targetCpu = hpa.target_cpu_utilization_percentage ?? null;
+          const conditions = hpa.conditions ?? [];
+          const scalingActiveFalse = conditions.find(
+            (condition) =>
+              condition.type?.trim() === "ScalingActive" && !isTrueStatus(condition.status)
+          );
+          const ableToScaleFalse = conditions.find(
+            (condition) =>
+              condition.type?.trim() === "AbleToScale" && !isTrueStatus(condition.status)
+          );
+
+          if (
+            maxReplicas > 0 &&
+            desiredReplicas >= maxReplicas &&
+            currentReplicas >= maxReplicas
+          ) {
+            findings.push({
+              title: `Kubernetes HPA is saturated at max replicas: ${label}`,
+              severity_hint:
+                currentCpu !== null && targetCpu !== null && currentCpu > targetCpu
+                  ? "high"
+                  : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(hpa),
+              rule_id: "kubernetes.hpa_saturated",
+            });
+          }
+
+          const blockedCondition = scalingActiveFalse ?? ableToScaleFalse;
+          if (blockedCondition) {
+            const targetKind = hpa.scale_target_kind?.trim() || "Workload";
+            const targetName = hpa.scale_target_name?.trim() || "unknown-target";
+            findings.push({
+              title: `Kubernetes HPA cannot compute a healthy scaling recommendation: ${label} (${targetKind} ${targetName})`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(hpa),
+              rule_id: "kubernetes.hpa_scaling_inactive",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "pod-disruption-budgets") {
+        const budgets =
+          parseKubernetesDocumentJson<KubernetesPodDisruptionBudget[]>(doc) ?? [];
+        for (const budget of budgets) {
+          const disruptionsAllowed = budget.disruptions_allowed ?? 0;
+          const expectedPods = budget.expected_pods ?? 0;
+          if (expectedPods <= 0 || disruptionsAllowed > 0) continue;
+
+          const namespace = budget.namespace?.trim();
+          const name = budget.name?.trim() || "unknown-pdb";
+          const label = namespace ? `${namespace}/${name}` : name;
+          findings.push({
+            title: `Kubernetes PodDisruptionBudget blocks voluntary disruption: ${label}`,
+            severity_hint:
+              (budget.current_healthy ?? 0) < (budget.desired_healthy ?? 0) ? "high" : "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify(budget),
+            rule_id: "kubernetes.pdb_blocking",
+          });
+        }
+      }
+
+      if (doc.kind === "resource-quotas") {
+        const quotas = parseKubernetesDocumentJson<KubernetesResourceQuota[]>(doc) ?? [];
+        for (const quota of quotas) {
+          const namespace = quota.namespace?.trim();
+          const name = quota.name?.trim() || "unknown-quota";
+          const label = namespace ? `${namespace}/${name}` : name;
+          for (const resource of quota.resources ?? []) {
+            const usedRatio = resource.used_ratio ?? null;
+            if (usedRatio === null || usedRatio < 0.9) continue;
+            const resourceName = resource.resource?.trim() || "unknown-resource";
+            findings.push({
+              title: `Kubernetes ResourceQuota is near exhaustion: ${label} (${resourceName} at ${percentLabel(usedRatio * 100)})`,
+              severity_hint: usedRatio >= 0.97 ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                ...quota,
+                resource,
+              }),
+              rule_id: "kubernetes.resource_quota_pressure",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "limit-ranges") {
+        const limitRanges = parseKubernetesDocumentJson<KubernetesLimitRange[]>(doc) ?? [];
+        for (const limitRange of limitRanges) {
+          const namespace = limitRange.namespace?.trim();
+          if (!namespace) continue;
+
+          const current = namespaceLimitRanges.get(namespace) ?? {
+            hasDefaultRequests: false,
+            hasDefaultLimits: false,
+          };
+          namespaceLimitRanges.set(namespace, {
+            hasDefaultRequests:
+              current.hasDefaultRequests || limitRange.has_default_requests === true,
+            hasDefaultLimits:
+              current.hasDefaultLimits || limitRange.has_default_limits === true,
+          });
+        }
+      }
+
+      if (doc.kind === "persistent-volume-claims") {
+        const claims =
+          parseKubernetesDocumentJson<KubernetesPersistentVolumeClaim[]>(doc) ?? [];
+        for (const claim of claims) {
+          const namespace = claim.namespace?.trim();
+          const name = claim.name?.trim() || "unknown-claim";
+          const label = namespace ? `${namespace}/${name}` : name;
+          const phase = claim.phase?.trim().toLowerCase() ?? "";
+          const claimKey = namespace ? `${namespace}/${name}` : null;
+          const resizePending = (claim.conditions ?? []).find(
+            (condition) =>
+              condition.type?.trim() === "FileSystemResizePending" &&
+              isTrueStatus(condition.status)
+          );
+
+          if (phase === "pending" || phase === "lost") {
+            findings.push({
+              title:
+                phase === "lost"
+                  ? `Kubernetes PersistentVolumeClaim is lost: ${label}`
+                  : `Kubernetes PersistentVolumeClaim is Pending: ${label}`,
+              severity_hint: phase === "lost" ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(claim),
+              rule_id:
+                phase === "lost"
+                  ? "kubernetes.persistent_volume_claim_lost"
+                  : "kubernetes.persistent_volume_claim_pending",
+            });
+            if (claimKey) pendingPersistentVolumeClaims.set(claimKey, claim);
+          }
+
+          if (resizePending) {
+            findings.push({
+              title: `Kubernetes PersistentVolumeClaim is waiting for filesystem resize: ${label}`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(claim),
+              rule_id: "kubernetes.persistent_volume_claim_resize_pending",
+            });
+            if (claimKey) resizePendingPersistentVolumeClaims.set(claimKey, claim);
+          }
+        }
+      }
+
+      if (doc.kind === "persistent-volumes") {
+        const volumes = parseKubernetesDocumentJson<KubernetesPersistentVolume[]>(doc) ?? [];
+        for (const volume of volumes) {
+          const name = volume.name?.trim() || "unknown-volume";
+          const phase = volume.phase?.trim().toLowerCase() ?? "";
+          if (!["failed", "released"].includes(phase)) continue;
+
+          findings.push({
+            title:
+              phase === "failed"
+                ? `Kubernetes PersistentVolume is failed: ${name}`
+                : `Kubernetes PersistentVolume is released without reuse: ${name}`,
+            severity_hint: phase === "failed" ? "high" : "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify(volume),
+            rule_id:
+              phase === "failed"
+                ? "kubernetes.persistent_volume_failed"
+                : "kubernetes.persistent_volume_released",
+          });
+        }
+      }
+
+      if (doc.kind === "node-top") {
+        const nodes = parseKubernetesDocumentJson<KubernetesNodeTop[]>(doc) ?? [];
+        for (const node of nodes) {
+          const nodeName = node.name?.trim() || "unknown-node";
+          if ((node.memory_percent ?? 0) >= 90) {
+            findings.push({
+              title: `Kubernetes node memory usage is elevated: ${nodeName} (${percentLabel(node.memory_percent)})`,
+              severity_hint: (node.memory_percent ?? 0) >= 95 ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_memory_usage",
+            });
+          }
+
+          if ((node.cpu_percent ?? 0) >= 90) {
+            findings.push({
+              title: `Kubernetes node CPU usage is elevated: ${nodeName} (${percentLabel(node.cpu_percent)})`,
+              severity_hint: (node.cpu_percent ?? 0) >= 95 ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_cpu_usage",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "workload-rollout-status") {
+        const rolloutStatuses =
+          parseKubernetesDocumentJson<KubernetesWorkloadRolloutStatus[]>(doc) ?? [];
+        for (const rollout of rolloutStatuses) {
+          const summary = rolloutMismatchSummary(rollout);
+          if (!summary) continue;
+
+          const label = workloadLabel(rollout.namespace ?? undefined, rollout.name ?? undefined);
+          const kind = rollout.kind?.trim() || "Workload";
+
+          if (summary.controllerLag) {
+            findings.push({
+              title: `Kubernetes rollout controller has not observed the latest spec generation: ${kind} ${label}`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(rollout),
+              rule_id: "kubernetes.rollout_generation_lag",
+            });
+          }
+
+          if (!summary.hasReplicaMismatch) continue;
+
+          findings.push({
+            title: `Kubernetes rollout incomplete: ${kind} ${label} (ready ${summary.ready}/${summary.desired}, updated ${summary.updated}/${summary.desired})`,
+            severity_hint:
+              summary.ready === 0 || summary.unavailable >= Math.ceil(summary.desired / 2)
+                ? "high"
+                : "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify(rollout),
+            rule_id: "kubernetes.rollout_incomplete",
+          });
+        }
+      }
+
+      if (doc.kind === "pod-top") {
+        const pods = parseKubernetesDocumentJson<KubernetesPodTop[]>(doc) ?? [];
+        for (const pod of pods) {
+          if (!pod.name?.trim()) continue;
+          // Keep pod top evidence available for future UI surfacing without turning
+          // a one-shot usage snapshot into a finding unless a clearer threshold exists.
+        }
+      }
+
       if (doc.kind === "workload-specs") {
         const workloads = parseKubernetesDocumentJson<KubernetesWorkloadSpec[]>(doc) ?? [];
         for (const workload of workloads) {
@@ -602,10 +1184,42 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           const podSecurityContext = workload.pod_spec?.securityContext;
           const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
           const workloadNamespace = workload.namespace?.trim();
+          if (workloadNamespace) namespacesWithWorkloads.add(workloadNamespace);
           const workloadInExposedNamespace =
             workloadNamespace !== undefined &&
             workloadNamespace.length > 0 &&
             externalServiceNamespaces.has(workloadNamespace);
+
+          for (const claimName of persistentVolumeClaimNames(workload)) {
+            const claimKey = workloadNamespace ? `${workloadNamespace}/${claimName}` : null;
+            if (claimKey && pendingPersistentVolumeClaims.has(claimKey)) {
+              findings.push({
+                title: `Kubernetes workload depends on a Pending PersistentVolumeClaim: ${label} -> ${claimName}`,
+                severity_hint: "high",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({
+                  workload,
+                  persistent_volume_claim: pendingPersistentVolumeClaims.get(claimKey),
+                }),
+                rule_id: "kubernetes.workload_pending_persistent_volume_claim",
+              });
+            }
+
+            if (claimKey && resizePendingPersistentVolumeClaims.has(claimKey)) {
+              findings.push({
+                title: `Kubernetes workload depends on a PersistentVolumeClaim waiting for filesystem resize: ${label} -> ${claimName}`,
+                severity_hint: "medium",
+                category: "kubernetes",
+                section_source: doc.path,
+                evidence: JSON.stringify({
+                  workload,
+                  persistent_volume_claim: resizePendingPersistentVolumeClaims.get(claimKey),
+                }),
+                rule_id: "kubernetes.workload_persistent_volume_claim_resize_pending",
+              });
+            }
+          }
 
           if (workload.pod_spec?.automountServiceAccountToken !== false) {
             findings.push({
@@ -1044,6 +1658,34 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           }
         }
       }
+    }
+
+    for (const namespace of Array.from(namespacesWithWorkloads).sort()) {
+      const defaults = namespaceLimitRanges.get(namespace);
+      const hasDefaultRequests = defaults?.hasDefaultRequests === true;
+      const hasDefaultLimits = defaults?.hasDefaultLimits === true;
+      if (hasDefaultRequests && hasDefaultLimits) continue;
+
+      const missing = [
+        hasDefaultRequests ? null : "default requests",
+        hasDefaultLimits ? null : "default limits",
+      ]
+        .filter((value): value is string => value !== null)
+        .join(" and ");
+
+      findings.push({
+        title: `Kubernetes namespace lacks complete LimitRange defaults: ${namespace}`,
+        severity_hint: "medium",
+        category: "kubernetes",
+        section_source: "quotas/limit-ranges.json",
+        evidence: JSON.stringify({
+          namespace,
+          has_default_requests: hasDefaultRequests,
+          has_default_limits: hasDefaultLimits,
+          missing,
+        }),
+        rule_id: "kubernetes.namespace_limit_range_defaults_missing",
+      });
     }
 
     for (const namespace of externalServiceNamespaces) {

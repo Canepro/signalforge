@@ -3,6 +3,27 @@ export function parseContainerBoolean(value: string | undefined): boolean {
   return ["true", "yes", "1", "on"].includes(value.trim().toLowerCase());
 }
 
+export function parseContainerInteger(value: string | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "unknown" || normalized === "none" || normalized === "--") {
+    return null;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function parseContainerFloat(value: string | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "unknown" || normalized === "none" || normalized === "--") {
+    return null;
+  }
+  const stripped = normalized.endsWith("%") ? normalized.slice(0, -1).trim() : normalized;
+  const parsed = Number.parseFloat(stripped);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function parseContainerList(value: string | undefined): string[] {
   if (!value) return [];
   return value
@@ -10,6 +31,23 @@ export function parseContainerList(value: string | undefined): string[] {
     .map((item) => item.trim())
     .filter(Boolean)
     .filter((item) => item.toLowerCase() !== "none");
+}
+
+export interface ContainerFailureLogExcerpt {
+  source?: string | null;
+  reason?: string | null;
+  excerpt_lines?: string[] | null;
+  line_count?: number | null;
+  truncated?: boolean | null;
+}
+
+export function parseContainerJson<T>(value: string | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
 }
 
 export function containerValueFor(sections: Record<string, string>, key: string): string {

@@ -9,8 +9,16 @@ import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
 import type { FindingsDriftResult } from "@/lib/compare/findings-diff";
 import type {
   EvidenceDeltaPayload,
+  EvidenceDeltaMetricRow,
   EvidenceDeltaStatus,
 } from "@/lib/compare/evidence-delta";
+import {
+  buildOperationalEvidenceDeltaSections,
+  classifyEvidenceMetricFocus,
+  EVIDENCE_METRIC_FOCUS_DEFINITIONS,
+  type EvidenceMetricFocus,
+} from "@/lib/compare/evidence-delta-presentation";
+import { RunEvidenceSections } from "@/components/run-evidence-sections";
 
 export interface CompareRunHeader {
   id: string;
@@ -107,6 +115,7 @@ export function CompareClient({
 }: CompareClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
+  const [activeMetricFocus, setActiveMetricFocus] = useState<EvidenceMetricFocus>("all");
 
   const title = useMemo(
     () =>
@@ -125,6 +134,17 @@ export function CompareClient({
         : [],
     [evidenceDelta],
   );
+  const operationalDeltaSections = useMemo(
+    () => buildOperationalEvidenceDeltaSections(evidenceDelta),
+    [evidenceDelta]
+  );
+  const filteredEvidenceMetrics = useMemo(() => {
+    if (!evidenceDelta) return [] as EvidenceDeltaMetricRow[];
+    if (activeMetricFocus === "all") return evidenceDelta.metrics;
+    return evidenceDelta.metrics.filter(
+      (row) => classifyEvidenceMetricFocus(row) === activeMetricFocus
+    );
+  }, [activeMetricFocus, evidenceDelta]);
   const currentTargetName = current.target_name ?? "Target not recorded";
   const baselineTargetName = baseline?.target_name ?? "Target not recorded";
 
@@ -308,7 +328,7 @@ export function CompareClient({
                             : "same"}
                         </span>
                       </div>
-                    </div>
+                      </div>
 
                     {!evidenceDelta.changed ? (
                       <div className="px-4 py-6 text-sm text-on-surface-variant">
@@ -317,6 +337,12 @@ export function CompareClient({
                       </div>
                     ) : (
                       <div className="space-y-4 px-4 py-4">
+                        <RunEvidenceSections
+                          sections={operationalDeltaSections}
+                          heading="Operational delta"
+                          description="Stable rollout, pressure, runtime-health, and namespace-guardrail changes pulled out of the evidence delta so you can see operational movement before scanning the raw metric table."
+                        />
+
                         {changedMetadata.length > 0 ? (
                           <div className="space-y-2">
                             <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -340,8 +366,42 @@ export function CompareClient({
 
                         {evidenceDelta.metrics.length > 0 ? (
                           <div className="space-y-2">
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                              Stable metric changes
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                                Stable metric changes
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                                    activeMetricFocus === "all"
+                                      ? "border-primary/30 bg-primary/[0.08] text-primary"
+                                      : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                                  }`}
+                                  onClick={() => setActiveMetricFocus("all")}
+                                >
+                                  All metrics
+                                </button>
+                                {EVIDENCE_METRIC_FOCUS_DEFINITIONS.map((definition) => {
+                                  const count = evidenceDelta.metrics.filter(
+                                    (row) => classifyEvidenceMetricFocus(row) === definition.value
+                                  ).length;
+                                  return (
+                                    <button
+                                      key={definition.value}
+                                      type="button"
+                                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                                        activeMetricFocus === definition.value
+                                          ? "border-primary/30 bg-primary/[0.08] text-primary"
+                                          : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                                      } ${count === 0 ? "opacity-60" : ""}`}
+                                      onClick={() => setActiveMetricFocus(definition.value)}
+                                    >
+                                      {definition.label} {count}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
                             <div className="overflow-x-auto">
                               <table className="w-full text-left text-xs">
@@ -362,7 +422,7 @@ export function CompareClient({
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {evidenceDelta.metrics.map((row) => (
+                                  {filteredEvidenceMetrics.map((row) => (
                                     <tr
                                       key={row.key}
                                       className="border-b border-outline-variant/10 align-top hover:bg-surface-container-low/40"
@@ -381,6 +441,16 @@ export function CompareClient({
                                       </td>
                                     </tr>
                                   ))}
+                                  {filteredEvidenceMetrics.length === 0 ? (
+                                    <tr>
+                                      <td
+                                        colSpan={4}
+                                        className="px-3 py-6 text-center text-on-surface-variant"
+                                      >
+                                        No metric changes match the current filter.
+                                      </td>
+                                    </tr>
+                                  ) : null}
                                 </tbody>
                               </table>
                             </div>

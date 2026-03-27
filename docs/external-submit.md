@@ -41,6 +41,15 @@ If the supplied or inferred `artifact_type` is unsupported, the route returns **
 
 For `kubernetes-bundle`, `content` should be a UTF-8 JSON manifest with `schema_version: "kubernetes-bundle.v1"` and a `documents` array of named text documents. Raw archives are not accepted in this v1 contract.
 
+Current normalized Kubernetes document kinds include:
+
+- service exposure
+- network policies
+- RBAC bindings and roles
+- workload specs and workload status
+- optional warning events
+- optional node health summaries
+
 ## Optional Ingestion Metadata
 
 All metadata fields are optional.

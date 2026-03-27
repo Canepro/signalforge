@@ -2,18 +2,25 @@
 
 import { useRef, useState, useTransition } from "react";
 import { updateSourceAction } from "../../actions";
+import { CollectionScopeFields } from "../../collection-scope-fields";
+import type { CollectionScope } from "@/lib/collection-scope";
+import type { ArtifactType } from "@/lib/source-catalog";
 
 interface SourceSettingsFormProps {
   sourceId: string;
   displayName: string;
+  artifactType: ArtifactType;
   collectorVersion: string | null;
+  defaultCollectionScope: CollectionScope | null;
   enabled: boolean;
 }
 
 export function SourceSettingsForm({
   sourceId,
   displayName,
+  artifactType,
   collectorVersion,
+  defaultCollectionScope,
   enabled,
 }: SourceSettingsFormProps) {
   const [isPending, startTransition] = useTransition();
@@ -59,6 +66,13 @@ export function SourceSettingsForm({
           />
         </label>
       </div>
+      <CollectionScopeFields
+        artifactType={artifactType}
+        prefix="default_collection_scope"
+        initialScope={defaultCollectionScope}
+        emptyLabel="No default scope"
+        caption="Optional. Jobs requested without an explicit override will inherit this scope."
+      />
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-3 cursor-pointer">
           <span className="relative inline-flex items-center">

@@ -5,6 +5,149 @@ export interface KubernetesBundleDocument {
   content: string;
 }
 
+export interface KubernetesNodeHealth {
+  name?: string;
+  ready?: boolean;
+  unschedulable?: boolean;
+  pressure_conditions?: string[];
+}
+
+export interface KubernetesWarningEvent {
+  namespace?: string | null;
+  involved_kind?: string | null;
+  involved_name?: string | null;
+  reason?: string | null;
+  message?: string | null;
+  count?: number | null;
+  last_timestamp?: string | null;
+}
+
+export interface KubernetesUnhealthyWorkloadLogExcerpt {
+  namespace?: string | null;
+  workload_kind?: string | null;
+  workload_name?: string | null;
+  pod_name?: string | null;
+  container_name?: string | null;
+  reason?: string | null;
+  restarts?: number | null;
+  previous?: boolean | null;
+  excerpt_lines?: string[] | null;
+  line_count?: number | null;
+  truncated?: boolean | null;
+}
+
+export interface KubernetesWorkloadRolloutStatus {
+  namespace?: string | null;
+  name?: string | null;
+  kind?: string | null;
+  desired_replicas?: number | null;
+  ready_replicas?: number | null;
+  available_replicas?: number | null;
+  updated_replicas?: number | null;
+  unavailable_replicas?: number | null;
+  generation?: number | null;
+  observed_generation?: number | null;
+}
+
+export interface KubernetesHpaCondition {
+  type?: string | null;
+  status?: string | null;
+  reason?: string | null;
+  message?: string | null;
+}
+
+export interface KubernetesHorizontalPodAutoscaler {
+  namespace?: string | null;
+  name?: string | null;
+  scale_target_kind?: string | null;
+  scale_target_name?: string | null;
+  min_replicas?: number | null;
+  max_replicas?: number | null;
+  current_replicas?: number | null;
+  desired_replicas?: number | null;
+  current_cpu_utilization_percentage?: number | null;
+  target_cpu_utilization_percentage?: number | null;
+  conditions?: KubernetesHpaCondition[] | null;
+}
+
+export interface KubernetesPodDisruptionBudget {
+  namespace?: string | null;
+  name?: string | null;
+  min_available?: string | null;
+  max_unavailable?: string | null;
+  current_healthy?: number | null;
+  desired_healthy?: number | null;
+  disruptions_allowed?: number | null;
+  expected_pods?: number | null;
+}
+
+export interface KubernetesResourceQuotaResource {
+  resource?: string | null;
+  hard?: string | null;
+  used?: string | null;
+  used_ratio?: number | null;
+}
+
+export interface KubernetesResourceQuota {
+  namespace?: string | null;
+  name?: string | null;
+  resources?: KubernetesResourceQuotaResource[] | null;
+}
+
+export interface KubernetesLimitRange {
+  namespace?: string | null;
+  name?: string | null;
+  has_default_requests?: boolean | null;
+  has_default_limits?: boolean | null;
+}
+
+export interface KubernetesPersistentVolumeClaimCondition {
+  type?: string | null;
+  status?: string | null;
+  reason?: string | null;
+  message?: string | null;
+}
+
+export interface KubernetesPersistentVolumeClaim {
+  namespace?: string | null;
+  name?: string | null;
+  phase?: string | null;
+  volume_name?: string | null;
+  storage_class_name?: string | null;
+  access_modes?: string[] | null;
+  requested_storage?: string | null;
+  capacity_storage?: string | null;
+  conditions?: KubernetesPersistentVolumeClaimCondition[] | null;
+}
+
+export interface KubernetesPersistentVolume {
+  name?: string | null;
+  phase?: string | null;
+  storage_class_name?: string | null;
+  reclaim_policy?: string | null;
+  claim_namespace?: string | null;
+  claim_name?: string | null;
+  access_modes?: string[] | null;
+  capacity_storage?: string | null;
+  reason?: string | null;
+  message?: string | null;
+}
+
+export interface KubernetesPodTop {
+  namespace?: string | null;
+  name?: string | null;
+  cpu?: string | null;
+  memory?: string | null;
+}
+
+export interface KubernetesNodeTop {
+  name?: string | null;
+  cpu?: string | null;
+  cpu_percent?: number | null;
+  memory?: string | null;
+  memory_percent?: number | null;
+}
+
 export interface KubernetesBundleManifest {
   schema_version: "kubernetes-bundle.v1";
   cluster: {
@@ -31,6 +174,7 @@ export function parseKubernetesBundle(raw: string): KubernetesBundleManifest | n
     const cluster = parsed.cluster as Record<string, unknown> | undefined;
     const scope = parsed.scope as Record<string, unknown> | undefined;
     const documents = Array.isArray(parsed.documents) ? parsed.documents : [];
+    if (scope?.level !== "cluster" && scope?.level !== "namespace") return null;
 
     return {
       schema_version: "kubernetes-bundle.v1",
@@ -39,7 +183,7 @@ export function parseKubernetesBundle(raw: string): KubernetesBundleManifest | n
         provider: typeof cluster?.provider === "string" ? cluster.provider : null,
       },
       scope: {
-        level: scope?.level === "namespace" ? "namespace" : "cluster",
+        level: scope.level,
         namespace: typeof scope?.namespace === "string" ? scope.namespace : null,
       },
       collected_at: typeof parsed.collected_at === "string" ? parsed.collected_at : null,

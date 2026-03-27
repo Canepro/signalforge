@@ -155,8 +155,9 @@ Recommended near-term choices:
 1. Use the system with more real submissions and collect friction.
 2. Finish the Phase 8 honesty and merge cleanup across README, docs, and plan files so `main` can catch up to branch reality.
 3. Land the Phase 9 job-scoped collection-parameter slice across `signalforge`, `signalforge-agent`, and `signalforge-collectors` instead of leaving non-Linux job-driven collection dependent on host-local environment.
-4. Continue agent hardening: exponential backoff on network errors, Playwright/browser smoke test for Sources UI, hardened `systemd` service form with secure credential loading, and an explicit preferred deployment stance of always-on service near the execution surface rather than operator laptops or ambient shell context.
-5. Add lint to CI.
+4. Continue agent hardening: keep the environment-specific deployment matrix explicit, preserve the new managed-kubeconfig and user-`systemd` validation path, and carry the stricter container-runtime access checks into a production-like host install smoke plus live container-host and cluster-side deployment validation.
+5. Plan and implement the next diagnostics-enrichment tranche so SignalForge expands beyond posture-only evidence for containers and Kubernetes, and update the dashboard and findings experience so that richer evidence is visible and useful instead of hidden. Source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md).
+6. Add lint to CI.
 
 ## Future Phases
 
@@ -236,6 +237,19 @@ Possible scope:
 - controlled “collect fresh evidence” workflows
 - likely push-first or hybrid orchestration
 - explicit security and trust model required first
+
+### Phase 10b: Operational Diagnostics Enrichment and Rich Presentation
+
+Possible scope:
+
+- richer operational diagnostics for Kubernetes, containers, and hosts
+- optional metrics, events, rollout state, node health, and bounded unhealthy-workload log excerpts
+- stronger findings and evidence summaries for instability and pressure, not only posture
+- dashboard and run-detail enrichment so operators can actually see and use the new evidence
+
+Source of truth:
+
+- [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
 
 ### Phase 11+: Broader Artifact Families
 

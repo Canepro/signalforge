@@ -1,6 +1,11 @@
 import type { Severity } from "@/lib/analyzer/schema";
 import { parseEnvironmentHostname, type RunWithArtifactRow } from "@/lib/db/repository";
 import {
+  type ContainerFailureLogExcerpt,
+  containerValueFor,
+  parseContainerBoolean,
+  parseContainerInteger,
+  parseContainerJson,
   parseContainerList,
   parseContainerSections,
 } from "@/lib/adapter/container-diagnostics/parse";
@@ -8,6 +13,16 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleDocument,
+  type KubernetesHorizontalPodAutoscaler,
+  type KubernetesLimitRange,
+  type KubernetesNodeHealth,
+  type KubernetesPersistentVolume,
+  type KubernetesPersistentVolumeClaim,
+  type KubernetesPodDisruptionBudget,
+  type KubernetesResourceQuota,
+  type KubernetesUnhealthyWorkloadLogExcerpt,
+  type KubernetesWarningEvent,
+  type KubernetesWorkloadRolloutStatus,
 } from "@/lib/adapter/kubernetes-bundle/parse";
 
 export type EvidenceDeltaStatus = "changed" | "unchanged" | "added" | "removed";
@@ -47,6 +62,13 @@ type ContainerEvidenceSummary = {
   secret_mount_count: number;
   runs_as_root: boolean;
   read_only_rootfs: boolean;
+  state_status: string | null;
+  health_status: string | null;
+  restart_count: number | null;
+  oom_killed: boolean;
+  failure_log_excerpt_count: number;
+  memory_limit_bytes: number | null;
+  memory_reservation_bytes: number | null;
 };
 
 type KubernetesServiceExposure = {
@@ -117,6 +139,9 @@ type KubernetesProjectedSource = {
 
 type KubernetesVolume = {
   name?: string;
+  persistentVolumeClaim?: {
+    claimName?: string;
+  } | null;
   secret?: {
     secretName?: string;
   } | null;
@@ -166,6 +191,20 @@ type KubernetesWorkloadSpec = {
 
 type KubernetesEvidenceSummary = {
   document_count: number;
+  warning_event_count: number;
+  unhealthy_workload_log_excerpt_count: number;
+  node_not_ready_count: number;
+  node_pressure_count: number;
+  rollout_issue_count: number;
+  unavailable_replica_count: number;
+  hpa_issue_count: number;
+  pdb_blocking_count: number;
+  resource_quota_pressure_count: number;
+  namespace_without_limit_range_default_count: number;
+  pending_persistent_volume_claim_count: number;
+  persistent_volume_claim_resize_pending_count: number;
+  degraded_persistent_volume_count: number;
+  workload_pending_persistent_volume_claim_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
   workload_cluster_admin_binding_count: number;
@@ -197,6 +236,11 @@ type KubernetesEvidenceSummary = {
   host_path_volume_mount_count: number;
   added_capability_count: number;
   privileged_init_container_count: number;
+};
+
+type NamespaceResourceDefaults = {
+  hasDefaultRequests: boolean;
+  hasDefaultLimits: boolean;
 };
 
 function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
@@ -348,12 +392,18 @@ function summarizeContainerEvidence(content: string): ContainerEvidenceSummary {
     writable_mount_count: parseContainerList(sections.writable_mounts).length,
     added_capability_count: parseContainerList(sections.added_capabilities).length,
     secret_mount_count: parseContainerList(sections.secrets).length,
-    runs_as_root: ["true", "yes", "1", "on"].includes(
-      (sections.ran_as_root ?? "").trim().toLowerCase()
-    ),
-    read_only_rootfs: ["true", "yes", "1", "on"].includes(
-      (sections.read_only_rootfs ?? "").trim().toLowerCase()
-    ),
+    runs_as_root: parseContainerBoolean(sections.ran_as_root),
+    read_only_rootfs: parseContainerBoolean(sections.read_only_rootfs),
+    state_status: containerValueFor(sections, "state_status") || null,
+    health_status: containerValueFor(sections, "health_status") || null,
+    restart_count: parseContainerInteger(sections.restart_count),
+    oom_killed: parseContainerBoolean(sections.oom_killed),
+    failure_log_excerpt_count:
+      (
+        parseContainerJson<ContainerFailureLogExcerpt[]>(sections.failure_log_excerpts_json) ?? []
+      ).length,
+    memory_limit_bytes: parseContainerInteger(sections.memory_limit_bytes),
+    memory_reservation_bytes: parseContainerInteger(sections.memory_reservation_bytes),
   };
 }
 
@@ -459,6 +509,12 @@ function projectedServiceAccountTokenVolumeCount(workload: KubernetesWorkloadSpe
   );
 }
 
+function persistentVolumeClaimNames(workload: KubernetesWorkloadSpec): string[] {
+  return (workload.pod_spec?.volumes ?? [])
+    .map((volume) => volume.persistentVolumeClaim?.claimName?.trim() ?? "")
+    .filter(Boolean);
+}
+
 function hostPathVolumeMountCount(workload: KubernetesWorkloadSpec): number {
   const hostPathVolumeNames = new Set(
     (workload.pod_spec?.volumes ?? [])
@@ -491,6 +547,54 @@ function privilegedInitContainerCount(workload: KubernetesWorkloadSpec): number 
   return (workload.pod_spec?.initContainers ?? []).filter(
     (container) => container.securityContext?.privileged === true
   ).length;
+}
+
+function normalizedValue(value: string | undefined | null): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function isTrueStatus(value: string | null | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
+function warningEventWeight(event: KubernetesWarningEvent): number {
+  return Math.max(1, event.count ?? 1);
+}
+
+function isOperationalWarningEvent(event: KubernetesWarningEvent): boolean {
+  const reason = normalizedValue(event.reason);
+  const message = normalizedValue(event.message);
+  return (
+    [
+      "failedscheduling",
+      "notscaleup",
+      "notscalesup",
+      "errimagepull",
+      "imagepullbackoff",
+      "failedpull",
+      "inspectfailed",
+      "failedmount",
+      "failedattachvolume",
+      "failedmapvolume",
+      "backoff",
+      "unhealthy",
+      "failed",
+      "failedcreatepodsandbox",
+      "evicted",
+      "oomkilled",
+      "preempted",
+    ].includes(reason) ||
+    message.includes("insufficient") ||
+    message.includes("taint") ||
+    message.includes("pull image") ||
+    message.includes("mountvolume") ||
+    message.includes("unable to attach or mount volumes") ||
+    message.includes("back-off") ||
+    message.includes("readiness probe failed") ||
+    message.includes("liveness probe failed") ||
+    message.includes("evict") ||
+    message.includes("oom")
+  );
 }
 
 function summarizeWorkloadHardeningGaps(workload: KubernetesWorkloadSpec): number {
@@ -533,6 +637,20 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   if (!manifest) {
     return {
       document_count: 0,
+      warning_event_count: 0,
+      unhealthy_workload_log_excerpt_count: 0,
+      node_not_ready_count: 0,
+      node_pressure_count: 0,
+      rollout_issue_count: 0,
+      unavailable_replica_count: 0,
+      hpa_issue_count: 0,
+      pdb_blocking_count: 0,
+      resource_quota_pressure_count: 0,
+      namespace_without_limit_range_default_count: 0,
+      pending_persistent_volume_claim_count: 0,
+      persistent_volume_claim_resize_pending_count: 0,
+      degraded_persistent_volume_count: 0,
+      workload_pending_persistent_volume_claim_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
       workload_cluster_admin_binding_count: 0,
@@ -567,6 +685,19 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     };
   }
 
+  let warningEventCount = 0;
+  let unhealthyWorkloadLogExcerptCount = 0;
+  let nodeNotReadyCount = 0;
+  let nodePressureCount = 0;
+  let rolloutIssueCount = 0;
+  let unavailableReplicaCount = 0;
+  let hpaIssueCount = 0;
+  let pdbBlockingCount = 0;
+  let resourceQuotaPressureCount = 0;
+  let pendingPersistentVolumeClaimCount = 0;
+  let persistentVolumeClaimResizePendingCount = 0;
+  let degradedPersistentVolumeCount = 0;
+  let workloadPendingPersistentVolumeClaimCount = 0;
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
   let workloadClusterAdminBindingCount = 0;
@@ -599,6 +730,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let privilegedInitContainerCountTotal = 0;
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
+  const namespacesWithWorkloads = new Set<string>();
+  const namespaceLimitRanges = new Map<string, NamespaceResourceDefaults>();
+  const pendingPersistentVolumeClaims = new Set<string>();
   const clusterAdminServiceAccounts = new Set<string>();
   const wildcardRoleKeys = new Set<string>();
   const escalationRoleKeys = new Set<string>();
@@ -606,6 +740,141 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   const serviceAccountRoleBindings = new Map<string, Set<string>>();
 
   for (const doc of manifest.documents) {
+    if (doc.kind === "warning-events") {
+      for (const event of parseKubernetesJson<KubernetesWarningEvent>(doc)) {
+        if (!isOperationalWarningEvent(event)) continue;
+        warningEventCount += warningEventWeight(event);
+      }
+      continue;
+    }
+
+    if (doc.kind === "unhealthy-workload-log-excerpts") {
+      unhealthyWorkloadLogExcerptCount +=
+        parseKubernetesJson<KubernetesUnhealthyWorkloadLogExcerpt>(doc).length;
+      continue;
+    }
+
+    if (doc.kind === "node-health") {
+      for (const node of parseKubernetesJson<KubernetesNodeHealth>(doc)) {
+        if (node.ready === false) nodeNotReadyCount += 1;
+        if ((node.pressure_conditions ?? []).some((value) => value.trim())) {
+          nodePressureCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "workload-rollout-status") {
+      for (const rollout of parseKubernetesJson<KubernetesWorkloadRolloutStatus>(doc)) {
+        const desired = rollout.desired_replicas ?? 0;
+        if (desired <= 0) continue;
+        const ready = rollout.ready_replicas ?? 0;
+        const available = rollout.available_replicas ?? 0;
+        const updated = rollout.updated_replicas ?? 0;
+        const unavailable =
+          rollout.unavailable_replicas ?? Math.max(desired - available, 0);
+        const generation = rollout.generation ?? null;
+        const observedGeneration = rollout.observed_generation ?? null;
+        const controllerLag =
+          generation !== null && observedGeneration !== null && observedGeneration < generation;
+        const hasReplicaMismatch = ready < desired || available < desired || updated < desired;
+        if (controllerLag || hasReplicaMismatch) rolloutIssueCount += 1;
+        unavailableReplicaCount += Math.max(0, unavailable);
+      }
+      continue;
+    }
+
+    if (doc.kind === "horizontal-pod-autoscalers") {
+      for (const hpa of parseKubernetesJson<KubernetesHorizontalPodAutoscaler>(doc)) {
+        const currentReplicas = hpa.current_replicas ?? 0;
+        const desiredReplicas = hpa.desired_replicas ?? 0;
+        const maxReplicas = hpa.max_replicas ?? 0;
+        const scalingBlocked = (hpa.conditions ?? []).some(
+          (condition) =>
+            (condition.type?.trim() === "ScalingActive" ||
+              condition.type?.trim() === "AbleToScale") &&
+            !isTrueStatus(condition.status)
+        );
+        if (
+          scalingBlocked ||
+          (maxReplicas > 0 &&
+            desiredReplicas >= maxReplicas &&
+            currentReplicas >= maxReplicas)
+        ) {
+          hpaIssueCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "pod-disruption-budgets") {
+      for (const budget of parseKubernetesJson<KubernetesPodDisruptionBudget>(doc)) {
+        if ((budget.expected_pods ?? 0) > 0 && (budget.disruptions_allowed ?? 0) <= 0) {
+          pdbBlockingCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "resource-quotas") {
+      for (const quota of parseKubernetesJson<KubernetesResourceQuota>(doc)) {
+        if ((quota.resources ?? []).some((resource) => (resource.used_ratio ?? 0) >= 0.9)) {
+          resourceQuotaPressureCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "limit-ranges") {
+      for (const limitRange of parseKubernetesJson<KubernetesLimitRange>(doc)) {
+        const namespace = limitRange.namespace?.trim();
+        if (!namespace) continue;
+        const current = namespaceLimitRanges.get(namespace) ?? {
+          hasDefaultRequests: false,
+          hasDefaultLimits: false,
+        };
+        namespaceLimitRanges.set(namespace, {
+          hasDefaultRequests:
+            current.hasDefaultRequests || limitRange.has_default_requests === true,
+          hasDefaultLimits:
+            current.hasDefaultLimits || limitRange.has_default_limits === true,
+        });
+      }
+      continue;
+    }
+
+    if (doc.kind === "persistent-volume-claims") {
+      for (const claim of parseKubernetesJson<KubernetesPersistentVolumeClaim>(doc)) {
+        const namespace = claim.namespace?.trim();
+        const name = claim.name?.trim();
+        const phase = claim.phase?.trim().toLowerCase() ?? "";
+        if (namespace && name && (phase === "pending" || phase === "lost")) {
+          pendingPersistentVolumeClaims.add(`${namespace}/${name}`);
+          pendingPersistentVolumeClaimCount += 1;
+        }
+        if (
+          (claim.conditions ?? []).some(
+            (condition) =>
+              condition.type?.trim() === "FileSystemResizePending" &&
+              isTrueStatus(condition.status)
+          )
+        ) {
+          persistentVolumeClaimResizePendingCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "persistent-volumes") {
+      for (const volume of parseKubernetesJson<KubernetesPersistentVolume>(doc)) {
+        const phase = volume.phase?.trim().toLowerCase() ?? "";
+        if (phase === "failed" || phase === "released") {
+          degradedPersistentVolumeCount += 1;
+        }
+      }
+      continue;
+    }
+
     if (doc.kind !== "service-exposure") continue;
     for (const service of parseKubernetesJson<KubernetesServiceExposure>(doc)) {
       const serviceType = service.type?.trim();
@@ -698,15 +967,24 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     if (doc.kind === "workload-specs") {
       for (const workload of parseKubernetesJson<KubernetesWorkloadSpec>(doc)) {
         workloadHardeningGapCount += summarizeWorkloadHardeningGaps(workload);
+        const workloadNamespace = workload.namespace?.trim();
+        if (workloadNamespace) namespacesWithWorkloads.add(workloadNamespace);
         if (workload.pod_spec?.automountServiceAccountToken !== false) {
           serviceAccountTokenAutomountCount += 1;
         }
         if (workload.pod_spec?.hostNetwork) hostNetworkWorkloadCount += 1;
         if (workload.pod_spec?.hostPID) hostPidWorkloadCount += 1;
         if (workload.pod_spec?.hostIPC) hostIpcWorkloadCount += 1;
+        if (
+          workloadNamespace &&
+          persistentVolumeClaimNames(workload).some((claimName) =>
+            pendingPersistentVolumeClaims.has(`${workloadNamespace}/${claimName}`)
+          )
+        ) {
+          workloadPendingPersistentVolumeClaimCount += 1;
+        }
         const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
         const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
-        const workloadNamespace = workload.namespace?.trim();
         const workloadInExposedNamespace =
           workloadNamespace !== undefined &&
           workloadNamespace.length > 0 &&
@@ -791,8 +1069,29 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     }
   }
 
+  let namespaceWithoutLimitRangeDefaultCount = 0;
+  for (const namespace of namespacesWithWorkloads) {
+    const defaults = namespaceLimitRanges.get(namespace);
+    if (defaults?.hasDefaultRequests === true && defaults?.hasDefaultLimits === true) continue;
+    namespaceWithoutLimitRangeDefaultCount += 1;
+  }
+
   return {
     document_count: manifest.documents.length,
+    warning_event_count: warningEventCount,
+    unhealthy_workload_log_excerpt_count: unhealthyWorkloadLogExcerptCount,
+    node_not_ready_count: nodeNotReadyCount,
+    node_pressure_count: nodePressureCount,
+    rollout_issue_count: rolloutIssueCount,
+    unavailable_replica_count: unavailableReplicaCount,
+    hpa_issue_count: hpaIssueCount,
+    pdb_blocking_count: pdbBlockingCount,
+    resource_quota_pressure_count: resourceQuotaPressureCount,
+    namespace_without_limit_range_default_count: namespaceWithoutLimitRangeDefaultCount,
+    pending_persistent_volume_claim_count: pendingPersistentVolumeClaimCount,
+    persistent_volume_claim_resize_pending_count: persistentVolumeClaimResizePendingCount,
+    degraded_persistent_volume_count: degradedPersistentVolumeCount,
+    workload_pending_persistent_volume_claim_count: workloadPendingPersistentVolumeClaimCount,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
     workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
@@ -893,6 +1192,57 @@ function buildFamilyMetrics(
         next.read_only_rootfs,
         "container-diagnostics"
       ),
+      metricRow(
+        "state_status",
+        "Container state",
+        previous.state_status,
+        next.state_status,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "health_status",
+        "Container health",
+        previous.health_status,
+        next.health_status,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "restart_count",
+        "Restart count",
+        previous.restart_count,
+        next.restart_count,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "oom_killed",
+        "OOM killed",
+        previous.oom_killed,
+        next.oom_killed,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "failure_log_excerpt_count",
+        "Failure log excerpts",
+        previous.failure_log_excerpt_count,
+        next.failure_log_excerpt_count,
+        "container-diagnostics"
+      ),
+      metricRow(
+        "memory_limit_bytes",
+        "Memory limit",
+        previous.memory_limit_bytes,
+        next.memory_limit_bytes,
+        "container-diagnostics",
+        "bytes"
+      ),
+      metricRow(
+        "memory_reservation_bytes",
+        "Memory reservation",
+        previous.memory_reservation_bytes,
+        next.memory_reservation_bytes,
+        "container-diagnostics",
+        "bytes"
+      ),
     ];
   }
 
@@ -905,6 +1255,104 @@ function buildFamilyMetrics(
         "Bundle documents",
         previous.document_count,
         next.document_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "warning_event_count",
+        "Operational warning events",
+        previous.warning_event_count,
+        next.warning_event_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "unhealthy_workload_log_excerpt_count",
+        "Unhealthy workload log excerpts",
+        previous.unhealthy_workload_log_excerpt_count,
+        next.unhealthy_workload_log_excerpt_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "node_not_ready_count",
+        "Nodes not Ready",
+        previous.node_not_ready_count,
+        next.node_not_ready_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "node_pressure_count",
+        "Nodes with pressure conditions",
+        previous.node_pressure_count,
+        next.node_pressure_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "rollout_issue_count",
+        "Workloads with rollout issues",
+        previous.rollout_issue_count,
+        next.rollout_issue_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "unavailable_replica_count",
+        "Unavailable workload replicas",
+        previous.unavailable_replica_count,
+        next.unavailable_replica_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "hpa_issue_count",
+        "HPAs with scaling issues",
+        previous.hpa_issue_count,
+        next.hpa_issue_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "pdb_blocking_count",
+        "PodDisruptionBudgets blocking disruption",
+        previous.pdb_blocking_count,
+        next.pdb_blocking_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "resource_quota_pressure_count",
+        "ResourceQuotas near exhaustion",
+        previous.resource_quota_pressure_count,
+        next.resource_quota_pressure_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "namespace_without_limit_range_default_count",
+        "Namespaces missing full LimitRange defaults",
+        previous.namespace_without_limit_range_default_count,
+        next.namespace_without_limit_range_default_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "pending_persistent_volume_claim_count",
+        "Pending PersistentVolumeClaims",
+        previous.pending_persistent_volume_claim_count,
+        next.pending_persistent_volume_claim_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "persistent_volume_claim_resize_pending_count",
+        "PersistentVolumeClaims waiting for filesystem resize",
+        previous.persistent_volume_claim_resize_pending_count,
+        next.persistent_volume_claim_resize_pending_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "degraded_persistent_volume_count",
+        "Degraded PersistentVolumes",
+        previous.degraded_persistent_volume_count,
+        next.degraded_persistent_volume_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "workload_pending_persistent_volume_claim_count",
+        "Workloads blocked by pending PersistentVolumeClaims",
+        previous.workload_pending_persistent_volume_claim_count,
+        next.workload_pending_persistent_volume_claim_count,
         "kubernetes-bundle"
       ),
       metricRow(

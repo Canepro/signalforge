@@ -24,6 +24,21 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "rollout incomplete",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "node memory usage is elevated",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "node CPU usage is elevated",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "without NetworkPolicy isolation",
       "severity": "high",
       "category": "kubernetes"
@@ -190,6 +205,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 36,
-  "max_findings": 36
+  "min_findings": 39,
+  "max_findings": 40
 }

@@ -29,11 +29,22 @@ The preferred deployment model is:
 - deployed near the execution surface
 - managed by the local init or platform, not by an operator shell session
 
-Today, that means:
+The preferred long-running form is environment-specific, not one-size-fits-all:
 
-- Linux and WSL: prefer a hardened `systemd` service on the target host
-- container host environments: prefer the same host-service model on the runtime host, or a dedicated nearby runner with explicit runtime access
-- Kubernetes: keep push-first as the honest default until Phase 9 scope handling is complete; once job-driven Kubernetes becomes first-class, prefer a dedicated cluster-side runner with explicit RBAC over operator laptops or ambient `kubectl`
+- Linux and WSL host audit: prefer a hardened `systemd` service on the target host
+- container diagnostics: prefer a containerized runner on the runtime host when that host already operates Docker or Podman and the socket-trust tradeoff is acceptable
+- Kubernetes bundle collection: prefer a dedicated cluster-side Deployment with explicit kubeconfig or future in-cluster identity over operator laptops or ambient `kubectl`
+
+Current implementation status in the sibling `signalforge-agent` repo:
+
+- the preferred Linux / WSL host-service path now has a first-class hardened `systemd` unit
+- the service install flow now supports a separate root-controlled token file instead of keeping the bearer token in the installed env file
+- `signalforge-agent preflight` now validates config, token source, and locally runnable collector/runtime capabilities before enabling the unit
+- the installer supports a dry-run render path so operators can inspect the unit, env file, and token target before touching `systemd`
+- the service install flow now supports an optional managed kubeconfig path for Kubernetes-capable runners, wired into the installed env file instead of relying on a mutable operator context
+- the agent now supports explicit `SIGNALFORGE_KUBECTL_BIN` and `SIGNALFORGE_KUBECONFIG` overrides so Kubernetes-capable services can pin both the binary and the kubeconfig path
+- this service path has been smoke-tested under a real user `systemd` execution context via `systemd-run --user`, not only through static unit rendering
+- container-capable readiness now requires actual Docker or Podman access during capability derivation and `preflight`, not only a runtime binary on `PATH`
 
 ## Why this is the preferred model
 
@@ -69,6 +80,8 @@ These may be useful for smoke tests or debugging, but they are not the normal pr
 - use a dedicated local service account
 - grant only the file, group, and socket access that host actually needs
 - treat container-runtime access as a higher-trust host profile, not the default
+- for Docker-capable hosts, validate daemon-socket reachability as that service account, not only `docker` binary presence
+- for Podman-capable hosts, validate `podman info` in the intended rootless or privileged mode before advertising `container-diagnostics`
 
 ### Service hardening
 
@@ -91,20 +104,11 @@ For Linux and WSL, prefer `systemd` hardening such as:
 
 ## Honest current status
 
-Current best path:
-
-- Linux host job-driven collection is the cleanest fully general deployment path today
-
-Current limited paths:
-
-- `container-diagnostics` job-driven collection can work from a prepared host agent, but runtime access must be explicit
-- `kubernetes-bundle` job-driven collection can work from a prepared host agent, but it still depends on explicit local cluster access and is not yet the cleanest production story
-
 Current honest recommendation:
 
-- Linux: job-driven via long-running host service
-- container: push-first or carefully prepared host service
-- Kubernetes: push-first first, then dedicated cluster-side runner once Phase 9 is complete
+- Linux: job-driven via long-running host `systemd` service
+- container: job-driven via a long-running containerized runner on the runtime host, with explicit socket access and capability pinning
+- Kubernetes: job-driven via a long-running cluster-side Deployment, with explicit kubeconfig today and scoped in-cluster identity later
 
 ## Phase 9 relationship
 

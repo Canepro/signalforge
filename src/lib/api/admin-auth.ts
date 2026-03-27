@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "crypto";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -30,9 +29,7 @@ export function requireAdminBearer(request: NextRequest): NextResponse | null {
   }
 
   const provided = auth.slice(7).trim();
-  const a = Buffer.from(provided, "utf8");
-  const b = Buffer.from(expected, "utf8");
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+  if (!timingSafeEqualAscii(provided, expected)) {
     return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
   }
 
@@ -43,8 +40,12 @@ const COOKIE_SALT = "signalforge_admin_cookie_v1";
 
 async function subtleCrypto() {
   if (globalThis.crypto?.subtle) return globalThis.crypto.subtle;
-  const { webcrypto } = await import("node:crypto");
-  return webcrypto.subtle as unknown as SubtleCrypto;
+  const loadNodeCrypto = Function("return import('node:crypto')") as () => Promise<{
+    webcrypto?: Crypto;
+  }>;
+  const { webcrypto } = await loadNodeCrypto();
+  if (webcrypto?.subtle) return webcrypto.subtle as unknown as SubtleCrypto;
+  throw new Error("Web Crypto API is unavailable");
 }
 
 /** SHA-256 hex of session cookie (Web Crypto — safe for Edge middleware + Node). */
