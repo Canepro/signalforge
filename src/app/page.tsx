@@ -2,6 +2,8 @@ import { DashboardClient } from "./dashboard-client";
 import { LivePageRefresh } from "@/components/live-page-refresh";
 import type { CollectionPulseData, CollectionPulseDay } from "@/components/collection-pulse";
 import type { DashboardOperationalHighlight } from "@/components/dashboard-operational-highlights";
+import type { DashboardOperationalWatchLane } from "@/lib/dashboard-operational-watch";
+import { buildDashboardOperationalWatch } from "@/lib/dashboard-operational-watch";
 import { buildRunEvidenceSections } from "@/lib/run-evidence-presentation";
 import type { ArtifactType } from "@/lib/source-catalog";
 import type { SourceView } from "@/lib/storage/contract";
@@ -216,12 +218,28 @@ export default async function DashboardPage() {
       return bMs - aMs || a.display_name.localeCompare(b.display_name);
     });
   const collectionPulse = buildCollectionPulse(runs, sourceStates, nowMs);
+  const dashboardSignalRuns = await Promise.all(
+    runs
+      .filter((candidate) => runAttentionScore(candidate) > 0)
+      .slice(0, 12)
+      .map(async (run) => ({
+        run,
+        detail: await storage.runs.getPageDetail(run.id),
+      }))
+  );
+  const operationalWatch: DashboardOperationalWatchLane[] = buildDashboardOperationalWatch(
+    dashboardSignalRuns
+      .filter((entry) => entry.detail?.report?.findings?.length)
+      .map((entry) => ({
+        run: entry.run,
+        target_name: entry.run.target_identifier ?? entry.run.hostname ?? "Target not recorded",
+        findings: entry.detail?.report?.findings ?? [],
+      }))
+  );
   const operationalHighlights: DashboardOperationalHighlight[] = [];
-  for (const run of [...runs]
-    .filter((candidate) => runAttentionScore(candidate) > 0)
-    .sort((a, b) => runAttentionScore(b) - runAttentionScore(a))
+  for (const { run, detail } of [...dashboardSignalRuns]
+    .sort((a, b) => runAttentionScore(b.run) - runAttentionScore(a.run))
     .slice(0, 6)) {
-    const detail = await storage.runs.getPageDetail(run.id);
     const sections = buildRunEvidenceSections(
       detail?.artifact_type ?? run.artifact_type,
       detail?.report?.findings ?? []
@@ -249,6 +267,7 @@ export default async function DashboardPage() {
         suppressedNoise={stats.suppressedNoise}
         severityDistribution={stats.severityDistribution}
         collectionPulse={collectionPulse}
+        operationalWatch={operationalWatch}
         operationalHighlights={operationalHighlights}
       />
     </>

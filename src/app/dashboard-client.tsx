@@ -6,10 +6,12 @@ import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { KpiCard } from "@/components/kpi-card";
 import { CollectionPulse, type CollectionPulseData } from "@/components/collection-pulse";
+import { DashboardOperationalWatch } from "@/components/dashboard-operational-watch";
 import {
   DashboardOperationalHighlights,
   type DashboardOperationalHighlight,
 } from "@/components/dashboard-operational-highlights";
+import type { DashboardOperationalWatchLane } from "@/lib/dashboard-operational-watch";
 import { RunTable } from "@/components/run-table";
 import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
@@ -29,6 +31,7 @@ interface DashboardClientProps {
   suppressedNoise: number;
   severityDistribution: Record<string, number>;
   collectionPulse: CollectionPulseData;
+  operationalWatch: DashboardOperationalWatchLane[];
   operationalHighlights: DashboardOperationalHighlight[];
 }
 
@@ -64,6 +67,7 @@ export function DashboardClient({
   suppressedNoise,
   severityDistribution,
   collectionPulse,
+  operationalWatch,
   operationalHighlights,
 }: DashboardClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -279,6 +283,8 @@ export function DashboardClient({
               accentColor="bg-outline"
             />
           </div>
+
+          <DashboardOperationalWatch lanes={operationalWatch} />
 
           {/* Main Grid: Table + Right Rail */}
           <div className="grid grid-cols-12 gap-6">
