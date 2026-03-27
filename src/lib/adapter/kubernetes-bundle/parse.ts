@@ -35,6 +35,58 @@ export interface KubernetesWorkloadRolloutStatus {
   observed_generation?: number | null;
 }
 
+export interface KubernetesHpaCondition {
+  type?: string | null;
+  status?: string | null;
+  reason?: string | null;
+  message?: string | null;
+}
+
+export interface KubernetesHorizontalPodAutoscaler {
+  namespace?: string | null;
+  name?: string | null;
+  scale_target_kind?: string | null;
+  scale_target_name?: string | null;
+  min_replicas?: number | null;
+  max_replicas?: number | null;
+  current_replicas?: number | null;
+  desired_replicas?: number | null;
+  current_cpu_utilization_percentage?: number | null;
+  target_cpu_utilization_percentage?: number | null;
+  conditions?: KubernetesHpaCondition[] | null;
+}
+
+export interface KubernetesPodDisruptionBudget {
+  namespace?: string | null;
+  name?: string | null;
+  min_available?: string | null;
+  max_unavailable?: string | null;
+  current_healthy?: number | null;
+  desired_healthy?: number | null;
+  disruptions_allowed?: number | null;
+  expected_pods?: number | null;
+}
+
+export interface KubernetesResourceQuotaResource {
+  resource?: string | null;
+  hard?: string | null;
+  used?: string | null;
+  used_ratio?: number | null;
+}
+
+export interface KubernetesResourceQuota {
+  namespace?: string | null;
+  name?: string | null;
+  resources?: KubernetesResourceQuotaResource[] | null;
+}
+
+export interface KubernetesLimitRange {
+  namespace?: string | null;
+  name?: string | null;
+  has_default_requests?: boolean | null;
+  has_default_limits?: boolean | null;
+}
+
 export interface KubernetesPodTop {
   namespace?: string | null;
   name?: string | null;

@@ -107,9 +107,11 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
   const rolloutEntries: RunEvidenceSection["entries"] = [];
   const pressureEntries: RunEvidenceSection["entries"] = [];
   const warningEntries: RunEvidenceSection["entries"] = [];
+  const guardrailEntries: RunEvidenceSection["entries"] = [];
   const rolloutSeen = new Set<string>();
   const pressureSeen = new Set<string>();
   const warningSeen = new Set<string>();
+  const guardrailSeen = new Set<string>();
 
   for (const finding of findings) {
     if (finding.section_source === "workloads/rollout-status.json") {
@@ -144,6 +146,78 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
           });
           rolloutSeen.add(key);
         }
+      }
+      continue;
+    }
+
+    if (finding.section_source === "autoscaling/horizontal-pod-autoscalers.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const hpaLabel =
+        [asString(parsed?.namespace), asString(parsed?.name)].filter(Boolean).join("/") ||
+        "unknown-hpa";
+
+      if (finding.title.startsWith("Kubernetes HPA is saturated at max replicas:")) {
+        const value =
+          `Desired ${asNumber(parsed?.desired_replicas) ?? "?"}/${asNumber(parsed?.max_replicas) ?? "?"}`
+          + (
+            asNumber(parsed?.current_cpu_utilization_percentage) !== null &&
+            asNumber(parsed?.target_cpu_utilization_percentage) !== null
+              ? ` · CPU ${asNumber(parsed?.current_cpu_utilization_percentage)}% vs target ${asNumber(parsed?.target_cpu_utilization_percentage)}%`
+              : ""
+          );
+        const key = `hpa-saturated:${hpaLabel}:${value}`;
+        if (!rolloutSeen.has(key)) {
+          rolloutEntries.push({
+            label: `HPA ${hpaLabel}`,
+            value,
+            emphasis: true,
+          });
+          rolloutSeen.add(key);
+        }
+      } else if (
+        finding.title.startsWith("Kubernetes HPA cannot compute a healthy scaling recommendation:")
+      ) {
+        const blockedCondition = Array.isArray(parsed?.conditions)
+          ? (parsed?.conditions as Array<Record<string, unknown>>).find(
+              (condition) =>
+                (asString(condition.type) === "ScalingActive" ||
+                  asString(condition.type) === "AbleToScale") &&
+                asString(condition.status) !== "True"
+            )
+          : null;
+        const value =
+          asString(blockedCondition?.reason) ??
+          asString(blockedCondition?.message) ??
+          "Scaling recommendation unavailable";
+        const key = `hpa-blocked:${hpaLabel}:${value}`;
+        if (!rolloutSeen.has(key)) {
+          rolloutEntries.push({
+            label: `HPA ${hpaLabel}`,
+            value,
+            emphasis: true,
+          });
+          rolloutSeen.add(key);
+        }
+      }
+      continue;
+    }
+
+    if (finding.section_source === "policy/pod-disruption-budgets.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const label =
+        [asString(parsed?.namespace), asString(parsed?.name)].filter(Boolean).join("/") ||
+        "unknown-pdb";
+      const value =
+        `Disruptions allowed ${asNumber(parsed?.disruptions_allowed) ?? 0}, ` +
+        `healthy ${asNumber(parsed?.current_healthy) ?? "?"}/${asNumber(parsed?.desired_healthy) ?? "?"}`;
+      const key = `pdb:${label}:${value}`;
+      if (!rolloutSeen.has(key)) {
+        rolloutEntries.push({
+          label: `PDB ${label}`,
+          value,
+          emphasis: true,
+        });
+        rolloutSeen.add(key);
       }
       continue;
     }
@@ -195,6 +269,48 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
           });
           pressureSeen.add(key);
         }
+      }
+      continue;
+    }
+
+    if (finding.section_source === "quotas/resource-quotas.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const quotaResource =
+        parsed && typeof parsed.resource === "object" && !Array.isArray(parsed.resource)
+          ? (parsed.resource as Record<string, unknown>)
+          : null;
+      const label =
+        [asString(parsed?.namespace), asString(parsed?.name)].filter(Boolean).join("/") ||
+        "unknown-quota";
+      const ratio = asNumber(quotaResource?.used_ratio);
+      const value =
+        `${asString(quotaResource?.resource) ?? "resource"} at ${
+          ratio !== null ? `${(ratio * 100).toFixed(1)}%` : "high usage"
+        }`;
+      const key = `quota:${label}:${value}`;
+      if (!pressureSeen.has(key)) {
+        pressureEntries.push({
+          label: `Quota ${label}`,
+          value,
+          emphasis: true,
+        });
+        pressureSeen.add(key);
+      }
+      continue;
+    }
+
+    if (finding.section_source === "quotas/limit-ranges.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const label = asString(parsed?.namespace) ?? "unknown-namespace";
+      const value = asString(parsed?.missing) ?? "Missing default requests or limits";
+      const key = `limit-range:${label}:${value}`;
+      if (!guardrailSeen.has(key)) {
+        guardrailEntries.push({
+          label,
+          value,
+          emphasis: true,
+        });
+        guardrailSeen.add(key);
       }
       continue;
     }
@@ -255,6 +371,18 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
           : `Normalized warning-event groups captured across ${warningEntries.length} operational failure modes.`,
       tone: "warning",
       entries: warningEntries,
+    });
+  }
+  if (guardrailEntries.length > 0) {
+    sections.push({
+      id: "kubernetes-guardrails",
+      title: "Namespace Guardrails",
+      summary:
+        guardrailEntries.length === 1
+          ? "Namespace-level defaults or guardrails that are missing for the affected workload space."
+          : `Namespace-level defaults or guardrails missing across ${guardrailEntries.length} workload scopes.`,
+      tone: "neutral",
+      entries: guardrailEntries,
     });
   }
 

@@ -118,17 +118,77 @@ describe("run-evidence-presentation", () => {
           }),
         }
       ),
+      mkFinding(
+        "5",
+        "Kubernetes HPA is saturated at max replicas: payments/payments-api",
+        "high",
+        {
+          section_source: "autoscaling/horizontal-pod-autoscalers.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            name: "payments-api",
+            desired_replicas: 4,
+            max_replicas: 4,
+            current_cpu_utilization_percentage: 96,
+            target_cpu_utilization_percentage: 70,
+          }),
+        }
+      ),
+      mkFinding(
+        "6",
+        "Kubernetes PodDisruptionBudget blocks voluntary disruption: payments/payments-api",
+        "high",
+        {
+          section_source: "policy/pod-disruption-budgets.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            name: "payments-api",
+            disruptions_allowed: 0,
+            current_healthy: 1,
+            desired_healthy: 2,
+          }),
+        }
+      ),
+      mkFinding(
+        "7",
+        "Kubernetes ResourceQuota is near exhaustion: payments/payments-quota (limits.memory at 92.5%)",
+        "medium",
+        {
+          section_source: "quotas/resource-quotas.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            name: "payments-quota",
+            resource: {
+              resource: "limits.memory",
+              used_ratio: 0.925,
+            },
+          }),
+        }
+      ),
+      mkFinding(
+        "8",
+        "Kubernetes namespace lacks complete LimitRange defaults: payments",
+        "medium",
+        {
+          section_source: "quotas/limit-ranges.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            missing: "default requests",
+          }),
+        }
+      ),
     ]);
 
     expect(sections.map((section) => section.id)).toEqual([
       "kubernetes-rollout",
       "kubernetes-pressure",
       "kubernetes-warnings",
+      "kubernetes-guardrails",
     ]);
 
     expect(sections[0]).toMatchObject({
       tone: "critical",
-      entries: [
+      entries: expect.arrayContaining([
         {
           label: "Deployment payments/api",
           value: "Observed generation 7 of 9",
@@ -139,17 +199,32 @@ describe("run-evidence-presentation", () => {
           value: "Ready 1/4, updated 2, unavailable 3",
           emphasis: true,
         },
-      ],
+        {
+          label: "HPA payments/payments-api",
+          value: "Desired 4/4 · CPU 96% vs target 70%",
+          emphasis: true,
+        },
+        {
+          label: "PDB payments/payments-api",
+          value: "Disruptions allowed 0, healthy 1/2",
+          emphasis: true,
+        },
+      ]),
     });
 
     expect(sections[1]).toMatchObject({
-      entries: [
+      entries: expect.arrayContaining([
         {
           label: "aks-system-000001",
           value: "91.0% memory used",
           emphasis: true,
         },
-      ],
+        {
+          label: "Quota payments/payments-quota",
+          value: "limits.memory at 92.5%",
+          emphasis: true,
+        },
+      ]),
     });
 
     expect(sections[2]).toMatchObject({
@@ -157,6 +232,16 @@ describe("run-evidence-presentation", () => {
         {
           label: "Kubernetes warning events indicate scheduling failures",
           value: "2 events across payments · Pod/api-123",
+          emphasis: true,
+        },
+      ],
+    });
+
+    expect(sections[3]).toMatchObject({
+      entries: [
+        {
+          label: "payments",
+          value: "default requests",
           emphasis: true,
         },
       ],

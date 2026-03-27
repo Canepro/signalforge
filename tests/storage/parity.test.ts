@@ -763,6 +763,81 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "autoscaling/horizontal-pod-autoscalers.json",
+                kind: "horizontal-pod-autoscalers",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    scale_target_kind: "Deployment",
+                    scale_target_name: "payments-api",
+                    min_replicas: 2,
+                    max_replicas: 4,
+                    current_replicas: 2,
+                    desired_replicas: 2,
+                    current_cpu_utilization_percentage: 48,
+                    target_cpu_utilization_percentage: 70,
+                    conditions: [
+                      {
+                        type: "ScalingActive",
+                        status: "True",
+                        reason: "ValidMetricFound",
+                        message: "scaling active",
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "policy/pod-disruption-budgets.json",
+                kind: "pod-disruption-budgets",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    min_available: "1",
+                    current_healthy: 2,
+                    desired_healthy: 1,
+                    disruptions_allowed: 1,
+                    expected_pods: 2,
+                  },
+                ]),
+              },
+              {
+                path: "quotas/resource-quotas.json",
+                kind: "resource-quotas",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-quota",
+                    resources: [
+                      {
+                        resource: "limits.memory",
+                        hard: "8Gi",
+                        used: "4Gi",
+                        used_ratio: 0.5,
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "quotas/limit-ranges.json",
+                kind: "limit-ranges",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-defaults",
+                    has_default_requests: true,
+                    has_default_limits: true,
+                  },
+                ]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -1005,6 +1080,81 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "autoscaling/horizontal-pod-autoscalers.json",
+                kind: "horizontal-pod-autoscalers",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    scale_target_kind: "Deployment",
+                    scale_target_name: "payments-api",
+                    min_replicas: 2,
+                    max_replicas: 3,
+                    current_replicas: 3,
+                    desired_replicas: 3,
+                    current_cpu_utilization_percentage: 94,
+                    target_cpu_utilization_percentage: 70,
+                    conditions: [
+                      {
+                        type: "ScalingActive",
+                        status: "False",
+                        reason: "FailedGetResourceMetric",
+                        message: "missing request for cpu",
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "policy/pod-disruption-budgets.json",
+                kind: "pod-disruption-budgets",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-api",
+                    min_available: "2",
+                    current_healthy: 1,
+                    desired_healthy: 2,
+                    disruptions_allowed: 0,
+                    expected_pods: 3,
+                  },
+                ]),
+              },
+              {
+                path: "quotas/resource-quotas.json",
+                kind: "resource-quotas",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-quota",
+                    resources: [
+                      {
+                        resource: "limits.memory",
+                        hard: "8Gi",
+                        used: "7.4Gi",
+                        used_ratio: 0.925,
+                      },
+                    ],
+                  },
+                ]),
+              },
+              {
+                path: "quotas/limit-ranges.json",
+                kind: "limit-ranges",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    name: "payments-defaults",
+                    has_default_requests: false,
+                    has_default_limits: true,
+                  },
+                ]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -1159,6 +1309,34 @@ for (const backend of backends) {
             family: "kubernetes-bundle",
             previous: 0,
             current: 2,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "hpa_issue_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "pdb_blocking_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "resource_quota_pressure_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "namespace_without_limit_range_default_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 1,
             status: "changed",
           }),
           expect.objectContaining({

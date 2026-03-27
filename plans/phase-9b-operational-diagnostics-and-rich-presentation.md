@@ -1,6 +1,6 @@
 # Phase 9b Design: Operational Diagnostics Enrichment and Rich Presentation
 
-> Status: in progress. The first presentation slice is already in this branch: dashboard `Collection Pulse` and run-detail findings overview/filtering. The richer diagnostics collection work remains a follow-on across `signalforge`, `signalforge-agent`, and `signalforge-collectors`.
+> Status: in progress. The first presentation slice is already in this branch: dashboard `Collection Pulse`, run-detail findings overview/filtering, compare operational-delta cards, and recent-operational-signal dashboard summaries. The richer diagnostics collection work is now partially implemented across `signalforge` and `signalforge-collectors`, with agent-side follow-on still required where job-driven scope should request optional diagnostics explicitly.
 
 ## Why this exists
 
@@ -30,14 +30,14 @@ The presentation half has started:
 - run detail now has a findings overview band above the findings table
 - findings can be filtered by operator-facing signal buckets and severity without hiding the underlying evidence trail
 
-The evidence-enrichment half is still pending:
+The evidence-enrichment half is now partially implemented:
 
-- first Kubernetes operational diagnostics are now present on this branch through optional `warning-events` and `node-health` bundle documents
-- controller rollout state is now present on this branch through optional `workload-rollout-status` bundle documents
-- optional `kubectl top` snapshots are now present on this branch through `node-top` and `pod-top` bundle documents, with deterministic node CPU and memory pressure findings
-- richer Kubernetes operational diagnostics
-- richer container runtime-health diagnostics
-- richer Linux pressure diagnostics
+- first Kubernetes operational diagnostics are present on this branch through optional `warning-events` and `node-health` bundle documents
+- controller rollout state is present on this branch through optional `workload-rollout-status` bundle documents
+- optional `kubectl top` snapshots are present on this branch through `node-top` and `pod-top` bundle documents, with deterministic node CPU and memory pressure findings
+- HPA, PodDisruptionBudget, ResourceQuota, and LimitRange state are now present on this branch as optional structured bundle documents with deterministic findings and compare metrics
+- container runtime-health diagnostics are present for state, health, restart count, OOMKilled, memory limits or reservations, and one-shot memory pressure
+- richer Linux pressure diagnostics remain a follow-on
 
 ## Problem statement
 
@@ -158,6 +158,13 @@ Add optional bundle documents for:
 - ResourceQuota and LimitRange
 - PVC and PV state
 - ingress or gateway exposure surfaces
+
+Current progress in this checkout:
+
+- HPA state, PDB state, ResourceQuota state, and LimitRange defaults are now collected in `signalforge-collectors`
+- SignalForge now turns those documents into deterministic findings for HPA saturation, broken scaling recommendations, blocking PDBs, quota pressure, and namespaces missing full LimitRange defaults
+- compare now includes stable metrics for HPA issue count, PDB blocking count, quota pressure count, and namespaces missing full LimitRange defaults
+- run detail, dashboard highlights, and compare operational-delta cards now surface those signals instead of leaving them buried in the findings table
 
 Optional bounded runtime evidence:
 

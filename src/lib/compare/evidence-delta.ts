@@ -11,7 +11,11 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleDocument,
+  type KubernetesHorizontalPodAutoscaler,
+  type KubernetesLimitRange,
   type KubernetesNodeHealth,
+  type KubernetesPodDisruptionBudget,
+  type KubernetesResourceQuota,
   type KubernetesWarningEvent,
   type KubernetesWorkloadRolloutStatus,
 } from "@/lib/adapter/kubernetes-bundle/parse";
@@ -183,6 +187,10 @@ type KubernetesEvidenceSummary = {
   node_pressure_count: number;
   rollout_issue_count: number;
   unavailable_replica_count: number;
+  hpa_issue_count: number;
+  pdb_blocking_count: number;
+  resource_quota_pressure_count: number;
+  namespace_without_limit_range_default_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
   workload_cluster_admin_binding_count: number;
@@ -214,6 +222,11 @@ type KubernetesEvidenceSummary = {
   host_path_volume_mount_count: number;
   added_capability_count: number;
   privileged_init_container_count: number;
+};
+
+type NamespaceResourceDefaults = {
+  hasDefaultRequests: boolean;
+  hasDefaultLimits: boolean;
 };
 
 function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
@@ -516,6 +529,10 @@ function normalizedValue(value: string | undefined | null): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
+function isTrueStatus(value: string | null | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
 function warningEventWeight(event: KubernetesWarningEvent): number {
   return Math.max(1, event.count ?? 1);
 }
@@ -601,6 +618,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       node_pressure_count: 0,
       rollout_issue_count: 0,
       unavailable_replica_count: 0,
+      hpa_issue_count: 0,
+      pdb_blocking_count: 0,
+      resource_quota_pressure_count: 0,
+      namespace_without_limit_range_default_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
       workload_cluster_admin_binding_count: 0,
@@ -640,6 +661,9 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let nodePressureCount = 0;
   let rolloutIssueCount = 0;
   let unavailableReplicaCount = 0;
+  let hpaIssueCount = 0;
+  let pdbBlockingCount = 0;
+  let resourceQuotaPressureCount = 0;
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
   let workloadClusterAdminBindingCount = 0;
@@ -672,6 +696,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let privilegedInitContainerCountTotal = 0;
   const externalServiceNamespaces = new Set<string>();
   const namespacesWithNetworkPolicy = new Set<string>();
+  const namespacesWithWorkloads = new Set<string>();
+  const namespaceLimitRanges = new Map<string, NamespaceResourceDefaults>();
   const clusterAdminServiceAccounts = new Set<string>();
   const wildcardRoleKeys = new Set<string>();
   const escalationRoleKeys = new Set<string>();
@@ -713,6 +739,65 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         const hasReplicaMismatch = ready < desired || available < desired || updated < desired;
         if (controllerLag || hasReplicaMismatch) rolloutIssueCount += 1;
         unavailableReplicaCount += Math.max(0, unavailable);
+      }
+      continue;
+    }
+
+    if (doc.kind === "horizontal-pod-autoscalers") {
+      for (const hpa of parseKubernetesJson<KubernetesHorizontalPodAutoscaler>(doc)) {
+        const currentReplicas = hpa.current_replicas ?? 0;
+        const desiredReplicas = hpa.desired_replicas ?? 0;
+        const maxReplicas = hpa.max_replicas ?? 0;
+        const scalingBlocked = (hpa.conditions ?? []).some(
+          (condition) =>
+            (condition.type?.trim() === "ScalingActive" ||
+              condition.type?.trim() === "AbleToScale") &&
+            !isTrueStatus(condition.status)
+        );
+        if (
+          scalingBlocked ||
+          (maxReplicas > 0 &&
+            desiredReplicas >= maxReplicas &&
+            currentReplicas >= maxReplicas)
+        ) {
+          hpaIssueCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "pod-disruption-budgets") {
+      for (const budget of parseKubernetesJson<KubernetesPodDisruptionBudget>(doc)) {
+        if ((budget.expected_pods ?? 0) > 0 && (budget.disruptions_allowed ?? 0) <= 0) {
+          pdbBlockingCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "resource-quotas") {
+      for (const quota of parseKubernetesJson<KubernetesResourceQuota>(doc)) {
+        if ((quota.resources ?? []).some((resource) => (resource.used_ratio ?? 0) >= 0.9)) {
+          resourceQuotaPressureCount += 1;
+        }
+      }
+      continue;
+    }
+
+    if (doc.kind === "limit-ranges") {
+      for (const limitRange of parseKubernetesJson<KubernetesLimitRange>(doc)) {
+        const namespace = limitRange.namespace?.trim();
+        if (!namespace) continue;
+        const current = namespaceLimitRanges.get(namespace) ?? {
+          hasDefaultRequests: false,
+          hasDefaultLimits: false,
+        };
+        namespaceLimitRanges.set(namespace, {
+          hasDefaultRequests:
+            current.hasDefaultRequests || limitRange.has_default_requests === true,
+          hasDefaultLimits:
+            current.hasDefaultLimits || limitRange.has_default_limits === true,
+        });
       }
       continue;
     }
@@ -809,6 +894,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     if (doc.kind === "workload-specs") {
       for (const workload of parseKubernetesJson<KubernetesWorkloadSpec>(doc)) {
         workloadHardeningGapCount += summarizeWorkloadHardeningGaps(workload);
+        const workloadNamespace = workload.namespace?.trim();
+        if (workloadNamespace) namespacesWithWorkloads.add(workloadNamespace);
         if (workload.pod_spec?.automountServiceAccountToken !== false) {
           serviceAccountTokenAutomountCount += 1;
         }
@@ -817,7 +904,6 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (workload.pod_spec?.hostIPC) hostIpcWorkloadCount += 1;
         const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
         const workloadServiceAccountKey = serviceAccountKey(workload.namespace, serviceAccountName);
-        const workloadNamespace = workload.namespace?.trim();
         const workloadInExposedNamespace =
           workloadNamespace !== undefined &&
           workloadNamespace.length > 0 &&
@@ -902,6 +988,13 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     }
   }
 
+  let namespaceWithoutLimitRangeDefaultCount = 0;
+  for (const namespace of namespacesWithWorkloads) {
+    const defaults = namespaceLimitRanges.get(namespace);
+    if (defaults?.hasDefaultRequests === true && defaults?.hasDefaultLimits === true) continue;
+    namespaceWithoutLimitRangeDefaultCount += 1;
+  }
+
   return {
     document_count: manifest.documents.length,
     warning_event_count: warningEventCount,
@@ -909,6 +1002,10 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     node_pressure_count: nodePressureCount,
     rollout_issue_count: rolloutIssueCount,
     unavailable_replica_count: unavailableReplicaCount,
+    hpa_issue_count: hpaIssueCount,
+    pdb_blocking_count: pdbBlockingCount,
+    resource_quota_pressure_count: resourceQuotaPressureCount,
+    namespace_without_limit_range_default_count: namespaceWithoutLimitRangeDefaultCount,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
     workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
@@ -1100,6 +1197,34 @@ function buildFamilyMetrics(
         "Unavailable workload replicas",
         previous.unavailable_replica_count,
         next.unavailable_replica_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "hpa_issue_count",
+        "HPAs with scaling issues",
+        previous.hpa_issue_count,
+        next.hpa_issue_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "pdb_blocking_count",
+        "PodDisruptionBudgets blocking disruption",
+        previous.pdb_blocking_count,
+        next.pdb_blocking_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "resource_quota_pressure_count",
+        "ResourceQuotas near exhaustion",
+        previous.resource_quota_pressure_count,
+        next.resource_quota_pressure_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "namespace_without_limit_range_default_count",
+        "Namespaces missing full LimitRange defaults",
+        previous.namespace_without_limit_range_default_count,
+        next.namespace_without_limit_range_default_count,
         "kubernetes-bundle"
       ),
       metricRow(

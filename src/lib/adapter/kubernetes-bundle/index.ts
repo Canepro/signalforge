@@ -4,9 +4,13 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleManifest,
+  type KubernetesHorizontalPodAutoscaler,
+  type KubernetesLimitRange,
   type KubernetesNodeTop,
   type KubernetesNodeHealth,
+  type KubernetesPodDisruptionBudget,
   type KubernetesPodTop,
+  type KubernetesResourceQuota,
   type KubernetesWarningEvent,
   type KubernetesWorkloadRolloutStatus,
 } from "./parse";
@@ -146,6 +150,11 @@ type WarningEventCategory = {
   title: string;
   severity_hint: "high" | "medium";
   rule_id: string;
+};
+
+type NamespaceResourceDefaults = {
+  hasDefaultRequests: boolean;
+  hasDefaultLimits: boolean;
 };
 
 function manifestFromSections(sections: Record<string, string>): KubernetesBundleManifest | null {
@@ -418,6 +427,10 @@ function percentLabel(value: number | null | undefined): string {
   return `${Number(value ?? 0).toFixed(1)}%`;
 }
 
+function isTrueStatus(value: string | null | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
 export class KubernetesBundleAdapter implements ArtifactAdapter {
   readonly type = "kubernetes-bundle";
 
@@ -525,6 +538,8 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
     const escalationRoleKeys = new Set<string>();
     const nodeProxyRoleKeys = new Set<string>();
     const serviceAccountRoleBindings = new Map<string, Set<string>>();
+    const namespacesWithWorkloads = new Set<string>();
+    const namespaceLimitRanges = new Map<string, NamespaceResourceDefaults>();
 
     for (const doc of manifest.documents) {
       if (doc.kind !== "rbac-roles") continue;
@@ -812,6 +827,129 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         }
       }
 
+      if (doc.kind === "horizontal-pod-autoscalers") {
+        const hpas =
+          parseKubernetesDocumentJson<KubernetesHorizontalPodAutoscaler[]>(doc) ?? [];
+        for (const hpa of hpas) {
+          const namespace = hpa.namespace?.trim();
+          const name = hpa.name?.trim() || "unknown-hpa";
+          const label = namespace ? `${namespace}/${name}` : name;
+          const currentReplicas = hpa.current_replicas ?? 0;
+          const desiredReplicas = hpa.desired_replicas ?? 0;
+          const maxReplicas = hpa.max_replicas ?? 0;
+          const currentCpu = hpa.current_cpu_utilization_percentage ?? null;
+          const targetCpu = hpa.target_cpu_utilization_percentage ?? null;
+          const conditions = hpa.conditions ?? [];
+          const scalingActiveFalse = conditions.find(
+            (condition) =>
+              condition.type?.trim() === "ScalingActive" && !isTrueStatus(condition.status)
+          );
+          const ableToScaleFalse = conditions.find(
+            (condition) =>
+              condition.type?.trim() === "AbleToScale" && !isTrueStatus(condition.status)
+          );
+
+          if (
+            maxReplicas > 0 &&
+            desiredReplicas >= maxReplicas &&
+            currentReplicas >= maxReplicas
+          ) {
+            findings.push({
+              title: `Kubernetes HPA is saturated at max replicas: ${label}`,
+              severity_hint:
+                currentCpu !== null && targetCpu !== null && currentCpu > targetCpu
+                  ? "high"
+                  : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(hpa),
+              rule_id: "kubernetes.hpa_saturated",
+            });
+          }
+
+          const blockedCondition = scalingActiveFalse ?? ableToScaleFalse;
+          if (blockedCondition) {
+            const targetKind = hpa.scale_target_kind?.trim() || "Workload";
+            const targetName = hpa.scale_target_name?.trim() || "unknown-target";
+            findings.push({
+              title: `Kubernetes HPA cannot compute a healthy scaling recommendation: ${label} (${targetKind} ${targetName})`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(hpa),
+              rule_id: "kubernetes.hpa_scaling_inactive",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "pod-disruption-budgets") {
+        const budgets =
+          parseKubernetesDocumentJson<KubernetesPodDisruptionBudget[]>(doc) ?? [];
+        for (const budget of budgets) {
+          const disruptionsAllowed = budget.disruptions_allowed ?? 0;
+          const expectedPods = budget.expected_pods ?? 0;
+          if (expectedPods <= 0 || disruptionsAllowed > 0) continue;
+
+          const namespace = budget.namespace?.trim();
+          const name = budget.name?.trim() || "unknown-pdb";
+          const label = namespace ? `${namespace}/${name}` : name;
+          findings.push({
+            title: `Kubernetes PodDisruptionBudget blocks voluntary disruption: ${label}`,
+            severity_hint:
+              (budget.current_healthy ?? 0) < (budget.desired_healthy ?? 0) ? "high" : "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify(budget),
+            rule_id: "kubernetes.pdb_blocking",
+          });
+        }
+      }
+
+      if (doc.kind === "resource-quotas") {
+        const quotas = parseKubernetesDocumentJson<KubernetesResourceQuota[]>(doc) ?? [];
+        for (const quota of quotas) {
+          const namespace = quota.namespace?.trim();
+          const name = quota.name?.trim() || "unknown-quota";
+          const label = namespace ? `${namespace}/${name}` : name;
+          for (const resource of quota.resources ?? []) {
+            const usedRatio = resource.used_ratio ?? null;
+            if (usedRatio === null || usedRatio < 0.9) continue;
+            const resourceName = resource.resource?.trim() || "unknown-resource";
+            findings.push({
+              title: `Kubernetes ResourceQuota is near exhaustion: ${label} (${resourceName} at ${percentLabel(usedRatio * 100)})`,
+              severity_hint: usedRatio >= 0.97 ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify({
+                ...quota,
+                resource,
+              }),
+              rule_id: "kubernetes.resource_quota_pressure",
+            });
+          }
+        }
+      }
+
+      if (doc.kind === "limit-ranges") {
+        const limitRanges = parseKubernetesDocumentJson<KubernetesLimitRange[]>(doc) ?? [];
+        for (const limitRange of limitRanges) {
+          const namespace = limitRange.namespace?.trim();
+          if (!namespace) continue;
+
+          const current = namespaceLimitRanges.get(namespace) ?? {
+            hasDefaultRequests: false,
+            hasDefaultLimits: false,
+          };
+          namespaceLimitRanges.set(namespace, {
+            hasDefaultRequests:
+              current.hasDefaultRequests || limitRange.has_default_requests === true,
+            hasDefaultLimits:
+              current.hasDefaultLimits || limitRange.has_default_limits === true,
+          });
+        }
+      }
+
       if (doc.kind === "node-top") {
         const nodes = parseKubernetesDocumentJson<KubernetesNodeTop[]>(doc) ?? [];
         for (const node of nodes) {
@@ -893,6 +1031,7 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           const podSecurityContext = workload.pod_spec?.securityContext;
           const serviceAccountName = workload.pod_spec?.serviceAccountName?.trim() || "default";
           const workloadNamespace = workload.namespace?.trim();
+          if (workloadNamespace) namespacesWithWorkloads.add(workloadNamespace);
           const workloadInExposedNamespace =
             workloadNamespace !== undefined &&
             workloadNamespace.length > 0 &&
@@ -1335,6 +1474,34 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           }
         }
       }
+    }
+
+    for (const namespace of Array.from(namespacesWithWorkloads).sort()) {
+      const defaults = namespaceLimitRanges.get(namespace);
+      const hasDefaultRequests = defaults?.hasDefaultRequests === true;
+      const hasDefaultLimits = defaults?.hasDefaultLimits === true;
+      if (hasDefaultRequests && hasDefaultLimits) continue;
+
+      const missing = [
+        hasDefaultRequests ? null : "default requests",
+        hasDefaultLimits ? null : "default limits",
+      ]
+        .filter((value): value is string => value !== null)
+        .join(" and ");
+
+      findings.push({
+        title: `Kubernetes namespace lacks complete LimitRange defaults: ${namespace}`,
+        severity_hint: "medium",
+        category: "kubernetes",
+        section_source: "quotas/limit-ranges.json",
+        evidence: JSON.stringify({
+          namespace,
+          has_default_requests: hasDefaultRequests,
+          has_default_limits: hasDefaultLimits,
+          missing,
+        }),
+        rule_id: "kubernetes.namespace_limit_range_defaults_missing",
+      });
     }
 
     for (const namespace of externalServiceNamespaces) {

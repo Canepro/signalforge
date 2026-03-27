@@ -137,6 +137,81 @@ const RAW = JSON.stringify(
         ]),
       },
       {
+        path: "autoscaling/horizontal-pod-autoscalers.json",
+        kind: "horizontal-pod-autoscalers",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-api",
+            scale_target_kind: "Deployment",
+            scale_target_name: "payments-api",
+            min_replicas: 2,
+            max_replicas: 4,
+            current_replicas: 4,
+            desired_replicas: 4,
+            current_cpu_utilization_percentage: 96,
+            target_cpu_utilization_percentage: 70,
+            conditions: [
+              {
+                type: "ScalingActive",
+                status: "False",
+                reason: "FailedGetResourceMetric",
+                message: "missing request for cpu",
+              },
+            ],
+          },
+        ]),
+      },
+      {
+        path: "policy/pod-disruption-budgets.json",
+        kind: "pod-disruption-budgets",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-api",
+            min_available: "2",
+            current_healthy: 1,
+            desired_healthy: 2,
+            disruptions_allowed: 0,
+            expected_pods: 3,
+          },
+        ]),
+      },
+      {
+        path: "quotas/resource-quotas.json",
+        kind: "resource-quotas",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-quota",
+            resources: [
+              {
+                resource: "limits.memory",
+                hard: "8Gi",
+                used: "7.4Gi",
+                used_ratio: 0.925,
+              },
+            ],
+          },
+        ]),
+      },
+      {
+        path: "quotas/limit-ranges.json",
+        kind: "limit-ranges",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-defaults",
+            has_default_requests: false,
+            has_default_limits: true,
+          },
+        ]),
+      },
+      {
         path: "workloads/specs.json",
         kind: "workload-specs",
         media_type: "application/json",
@@ -316,6 +391,25 @@ describe("KubernetesBundleAdapter", () => {
     expect(
       findings.some((finding) =>
         finding.title.includes("warning events indicate image pull failures")
+      )
+    ).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("HPA is saturated at max replicas"))).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("HPA cannot compute a healthy scaling recommendation")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("PodDisruptionBudget blocks voluntary disruption")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("ResourceQuota is near exhaustion"))
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("namespace lacks complete LimitRange defaults")
       )
     ).toBe(true);
     expect(

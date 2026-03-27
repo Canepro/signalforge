@@ -39,6 +39,15 @@ const samplePayload: EvidenceDeltaPayload = {
       unit: null,
     },
     {
+      key: "resource_quota_pressure_count",
+      label: "ResourceQuotas near exhaustion",
+      family: "kubernetes-bundle",
+      status: "changed",
+      previous: 0,
+      current: 2,
+      unit: null,
+    },
+    {
       key: "restart_count",
       label: "Restart count",
       family: "container-diagnostics",
@@ -56,6 +65,15 @@ const samplePayload: EvidenceDeltaPayload = {
       current: 2,
       unit: null,
     },
+    {
+      key: "namespace_without_limit_range_default_count",
+      label: "Namespaces missing full LimitRange defaults",
+      family: "kubernetes-bundle",
+      status: "changed",
+      previous: 1,
+      current: 0,
+      unit: null,
+    },
   ],
 };
 
@@ -63,8 +81,10 @@ describe("evidence-delta-presentation", () => {
   it("classifies operational metric focus buckets", () => {
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[0]!)).toBe("rollout");
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[1]!)).toBe("pressure");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[2]!)).toBe("runtime");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[3]!)).toBe("posture");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[2]!)).toBe("pressure");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[3]!)).toBe("runtime");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[4]!)).toBe("posture");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[5]!)).toBe("posture");
   });
 
   it("builds operational delta sections for compare surfaces", () => {
@@ -85,9 +105,25 @@ describe("evidence-delta-presentation", () => {
       label: "Nodes with pressure conditions",
       value: "0 -> 1",
     });
+    expect(sections[1]?.entries[1]).toMatchObject({
+      label: "ResourceQuotas near exhaustion",
+      value: "0 -> 2",
+    });
     expect(sections[2]?.entries[0]).toMatchObject({
       label: "Restart count",
       value: "1 -> 6",
     });
+    expect(sections[3]?.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "External services",
+          value: "1 -> 2",
+        }),
+        expect.objectContaining({
+          label: "Namespaces missing full LimitRange defaults",
+          value: "1 -> 0",
+        }),
+      ])
+    );
   });
 });

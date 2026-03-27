@@ -17,7 +17,7 @@ const toneClasses: Record<RunEvidenceSection["tone"], string> = {
 export function RunEvidenceSections({
   sections,
   heading = "Operational evidence",
-  description = "Structured evidence extracted from the run so instability, rollout trouble, and runtime pressure are visible before you scan the full findings table.",
+  description = "Structured evidence extracted from the run so instability, rollout trouble, runtime pressure, and missing guardrails are visible before you scan the full findings table.",
 }: RunEvidenceSectionsProps) {
   if (sections.length === 0) return null;
 

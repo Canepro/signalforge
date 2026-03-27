@@ -340,7 +340,7 @@ export function CompareClient({
                         <RunEvidenceSections
                           sections={operationalDeltaSections}
                           heading="Operational delta"
-                          description="Stable rollout, pressure, and runtime-health changes pulled out of the evidence delta so you can see operational movement before scanning the raw metric table."
+                          description="Stable rollout, pressure, runtime-health, and namespace-guardrail changes pulled out of the evidence delta so you can see operational movement before scanning the raw metric table."
                         />
 
                         {changedMetadata.length > 0 ? (

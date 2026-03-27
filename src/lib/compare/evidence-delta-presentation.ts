@@ -43,8 +43,26 @@ export function classifyEvidenceMetricFocus(row: EvidenceDeltaMetricRow): Eviden
   }
 
   if (row.family === "kubernetes-bundle") {
-    if (["rollout_issue_count", "unavailable_replica_count"].includes(row.key)) return "rollout";
-    if (["warning_event_count", "node_not_ready_count", "node_pressure_count"].includes(row.key)) return "pressure";
+    if (
+      [
+        "rollout_issue_count",
+        "unavailable_replica_count",
+        "hpa_issue_count",
+        "pdb_blocking_count",
+      ].includes(row.key)
+    ) {
+      return "rollout";
+    }
+    if (
+      [
+        "warning_event_count",
+        "node_not_ready_count",
+        "node_pressure_count",
+        "resource_quota_pressure_count",
+      ].includes(row.key)
+    ) {
+      return "pressure";
+    }
     return "posture";
   }
 

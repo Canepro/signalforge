@@ -26,7 +26,7 @@ export function DashboardOperationalHighlights({
             Recent operational signals
           </h4>
           <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
-            High-signal rollout, pressure, and runtime-health cues from the most important recent runs.
+            High-signal rollout, pressure, runtime-health, and namespace-guardrail cues from the most important recent runs.
           </p>
         </div>
       </div>
