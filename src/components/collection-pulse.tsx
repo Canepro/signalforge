@@ -57,7 +57,7 @@ function SummaryMetric({
 
 export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
   const hasActivity = pulse.days.some((day) => day.count > 0);
-  const visibleDays = pulse.days.slice(-35);
+  const visibleDays = pulse.days.slice(-91);
 
   return (
     <div className="space-y-3">
@@ -67,26 +67,26 @@ export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
             Collection Pulse
           </h4>
           <p className="sf-kicker shrink-0">
-            Last {visibleDays.length}d
+            {visibleDays.length > 60 ? `${Math.round(visibleDays.length / 30)}mo` : `${visibleDays.length}d`} activity
           </p>
         </div>
 
         <div className="mt-3">
           {hasActivity ? (
             <>
-              <div className="grid auto-cols-[14px] grid-flow-col grid-rows-7 gap-[3px]">
+              <div className="grid auto-cols-[12px] grid-flow-col grid-rows-7 gap-[2px]">
                 {visibleDays.map((day) => (
                   <div
                     key={day.date}
                     title={dayTitle(day)}
-                    className={`relative h-3.5 w-3.5 rounded-[3px] transition-[box-shadow,filter] duration-150 hover:brightness-90 ${
+                    className={`relative h-3 w-3 rounded-[2px] transition-[box-shadow,filter] duration-150 hover:brightness-90 ${
                       levelClasses[day.level]
                     } ${day.isToday ? "ring-2 ring-inset ring-primary/60" : ""}`}
                     aria-label={dayTitle(day)}
                   >
                     {day.maxSeverity ? (
                       <span
-                        className={`absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full ${
+                        className={`absolute bottom-0 right-0 h-1 w-1 rounded-full ${
                           severityDotClasses[day.maxSeverity]
                         }`}
                       />

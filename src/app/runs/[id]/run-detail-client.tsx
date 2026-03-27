@@ -289,11 +289,8 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                 }
               />
 
-              {/* Bottom grid: Suppressed Noise + Run Metadata */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <SuppressedNoisePanel items={noise} />
-                <RunMetadataPanel run={run} />
-              </div>
+              <RunMetadataPanel run={run} />
+              <SuppressedNoisePanel items={noise} />
 
               {/* Environment */}
               {run.environment && <EnvironmentBanner env={run.environment} />}
