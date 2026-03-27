@@ -4,6 +4,8 @@ import type { RunEvidenceSection } from "@/lib/run-evidence-presentation";
 
 interface RunEvidenceSectionsProps {
   sections: RunEvidenceSection[];
+  heading?: string;
+  description?: string;
 }
 
 const toneClasses: Record<RunEvidenceSection["tone"], string> = {
@@ -12,7 +14,11 @@ const toneClasses: Record<RunEvidenceSection["tone"], string> = {
   neutral: "border-outline-variant/15 bg-surface-container-low",
 };
 
-export function RunEvidenceSections({ sections }: RunEvidenceSectionsProps) {
+export function RunEvidenceSections({
+  sections,
+  heading = "Operational evidence",
+  description = "Structured evidence extracted from the run so instability, rollout trouble, and runtime pressure are visible before you scan the full findings table.",
+}: RunEvidenceSectionsProps) {
   if (sections.length === 0) return null;
 
   return (
@@ -21,10 +27,10 @@ export function RunEvidenceSections({ sections }: RunEvidenceSectionsProps) {
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              Operational evidence
+              {heading}
             </div>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              Structured evidence extracted from the run so instability, rollout trouble, and runtime pressure are visible before you scan the full findings table.
+              {description}
             </p>
           </div>
         </div>

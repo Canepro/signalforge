@@ -6,6 +6,10 @@ import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { KpiCard } from "@/components/kpi-card";
 import { CollectionPulse, type CollectionPulseData } from "@/components/collection-pulse";
+import {
+  DashboardOperationalHighlights,
+  type DashboardOperationalHighlight,
+} from "@/components/dashboard-operational-highlights";
 import { RunTable } from "@/components/run-table";
 import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
@@ -25,6 +29,7 @@ interface DashboardClientProps {
   suppressedNoise: number;
   severityDistribution: Record<string, number>;
   collectionPulse: CollectionPulseData;
+  operationalHighlights: DashboardOperationalHighlight[];
 }
 
 const sevColors: Record<string, string> = {
@@ -59,6 +64,7 @@ export function DashboardClient({
   suppressedNoise,
   severityDistribution,
   collectionPulse,
+  operationalHighlights,
 }: DashboardClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
@@ -284,6 +290,7 @@ export function DashboardClient({
             {/* Right Rail */}
             <div className="col-span-12 space-y-4 xl:col-span-4">
               <CollectionPulse pulse={collectionPulse} />
+              <DashboardOperationalHighlights highlights={operationalHighlights} />
 
               <div className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-3">

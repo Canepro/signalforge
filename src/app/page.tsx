@@ -1,6 +1,8 @@
 import { DashboardClient } from "./dashboard-client";
 import { LivePageRefresh } from "@/components/live-page-refresh";
 import type { CollectionPulseData, CollectionPulseDay } from "@/components/collection-pulse";
+import type { DashboardOperationalHighlight } from "@/components/dashboard-operational-highlights";
+import { buildRunEvidenceSections } from "@/lib/run-evidence-presentation";
 import type { ArtifactType } from "@/lib/source-catalog";
 import type { SourceView } from "@/lib/storage/contract";
 import type { RunSummary } from "@/types/api";
@@ -164,6 +166,15 @@ function buildCollectionPulse(
   };
 }
 
+function runAttentionScore(run: RunSummary) {
+  return (
+    (run.severity_counts.critical ?? 0) * 1000 +
+    (run.severity_counts.high ?? 0) * 100 +
+    (run.severity_counts.medium ?? 0) * 10 +
+    (run.severity_counts.low ?? 0)
+  );
+}
+
 export default async function DashboardPage() {
   const storage = await getStorage();
   const nowMs = Date.now();
@@ -205,6 +216,26 @@ export default async function DashboardPage() {
       return bMs - aMs || a.display_name.localeCompare(b.display_name);
     });
   const collectionPulse = buildCollectionPulse(runs, sourceStates, nowMs);
+  const operationalHighlights: DashboardOperationalHighlight[] = [];
+  for (const run of [...runs]
+    .filter((candidate) => runAttentionScore(candidate) > 0)
+    .sort((a, b) => runAttentionScore(b) - runAttentionScore(a))
+    .slice(0, 6)) {
+    const detail = await storage.runs.getPageDetail(run.id);
+    const sections = buildRunEvidenceSections(
+      detail?.artifact_type ?? run.artifact_type,
+      detail?.report?.findings ?? []
+    ).slice(0, 2);
+    if (sections.length === 0) continue;
+    operationalHighlights.push({
+      run_id: run.id,
+      filename: run.filename,
+      target_name: run.target_identifier ?? run.hostname ?? "Target not recorded",
+      created_at_label: run.created_at_label ?? run.created_at,
+      sections,
+    });
+    if (operationalHighlights.length >= 3) break;
+  }
 
   return (
     <>
@@ -218,6 +249,7 @@ export default async function DashboardPage() {
         suppressedNoise={stats.suppressedNoise}
         severityDistribution={stats.severityDistribution}
         collectionPulse={collectionPulse}
+        operationalHighlights={operationalHighlights}
       />
     </>
   );
