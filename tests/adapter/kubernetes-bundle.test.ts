@@ -110,6 +110,33 @@ const RAW = JSON.stringify(
         ]),
       },
       {
+        path: "metrics/pod-top.json",
+        kind: "pod-top",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-api-abc123",
+            cpu: "412m",
+            memory: "486Mi",
+          },
+        ]),
+      },
+      {
+        path: "metrics/node-top.json",
+        kind: "node-top",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            name: "aks-nodepool1-12345678-vmss000001",
+            cpu: "1850m",
+            cpu_percent: 92,
+            memory: "14900Mi",
+            memory_percent: 91,
+          },
+        ]),
+      },
+      {
         path: "workloads/specs.json",
         kind: "workload-specs",
         media_type: "application/json",
@@ -291,6 +318,12 @@ describe("KubernetesBundleAdapter", () => {
         finding.title.includes("warning events indicate image pull failures")
       )
     ).toBe(true);
+    expect(
+      findings.some((finding) => finding.title.includes("node memory usage is elevated"))
+    ).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("node CPU usage is elevated"))).toBe(
+      true
+    );
     expect(
       findings.some((finding) => finding.title.includes("without NetworkPolicy isolation"))
     ).toBe(true);

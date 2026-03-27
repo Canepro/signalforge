@@ -35,6 +35,21 @@ export interface KubernetesWorkloadRolloutStatus {
   observed_generation?: number | null;
 }
 
+export interface KubernetesPodTop {
+  namespace?: string | null;
+  name?: string | null;
+  cpu?: string | null;
+  memory?: string | null;
+}
+
+export interface KubernetesNodeTop {
+  name?: string | null;
+  cpu?: string | null;
+  cpu_percent?: number | null;
+  memory?: string | null;
+  memory_percent?: number | null;
+}
+
 export interface KubernetesBundleManifest {
   schema_version: "kubernetes-bundle.v1";
   cluster: {

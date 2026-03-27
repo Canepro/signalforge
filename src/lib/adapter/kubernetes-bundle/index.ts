@@ -4,7 +4,9 @@ import {
   parseKubernetesBundle,
   parseKubernetesDocumentJson,
   type KubernetesBundleManifest,
+  type KubernetesNodeTop,
   type KubernetesNodeHealth,
+  type KubernetesPodTop,
   type KubernetesWarningEvent,
   type KubernetesWorkloadRolloutStatus,
 } from "./parse";
@@ -412,6 +414,10 @@ function rolloutMismatchSummary(status: KubernetesWorkloadRolloutStatus): {
   };
 }
 
+function percentLabel(value: number | null | undefined): string {
+  return `${Number(value ?? 0).toFixed(1)}%`;
+}
+
 export class KubernetesBundleAdapter implements ArtifactAdapter {
   readonly type = "kubernetes-bundle";
 
@@ -806,6 +812,34 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
         }
       }
 
+      if (doc.kind === "node-top") {
+        const nodes = parseKubernetesDocumentJson<KubernetesNodeTop[]>(doc) ?? [];
+        for (const node of nodes) {
+          const nodeName = node.name?.trim() || "unknown-node";
+          if ((node.memory_percent ?? 0) >= 90) {
+            findings.push({
+              title: `Kubernetes node memory usage is elevated: ${nodeName} (${percentLabel(node.memory_percent)})`,
+              severity_hint: (node.memory_percent ?? 0) >= 95 ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_memory_usage",
+            });
+          }
+
+          if ((node.cpu_percent ?? 0) >= 90) {
+            findings.push({
+              title: `Kubernetes node CPU usage is elevated: ${nodeName} (${percentLabel(node.cpu_percent)})`,
+              severity_hint: (node.cpu_percent ?? 0) >= 95 ? "high" : "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(node),
+              rule_id: "kubernetes.node_cpu_usage",
+            });
+          }
+        }
+      }
+
       if (doc.kind === "workload-rollout-status") {
         const rolloutStatuses =
           parseKubernetesDocumentJson<KubernetesWorkloadRolloutStatus[]>(doc) ?? [];
@@ -840,6 +874,15 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
             evidence: JSON.stringify(rollout),
             rule_id: "kubernetes.rollout_incomplete",
           });
+        }
+      }
+
+      if (doc.kind === "pod-top") {
+        const pods = parseKubernetesDocumentJson<KubernetesPodTop[]>(doc) ?? [];
+        for (const pod of pods) {
+          if (!pod.name?.trim()) continue;
+          // Keep pod top evidence available for future UI surfacing without turning
+          // a one-shot usage snapshot into a finding unless a clearer threshold exists.
         }
       }
 

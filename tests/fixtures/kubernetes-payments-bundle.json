@@ -34,6 +34,18 @@
       "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api\",\"kind\":\"Deployment\",\"desired_replicas\":3,\"ready_replicas\":1,\"available_replicas\":1,\"updated_replicas\":2,\"unavailable_replicas\":2,\"generation\":4,\"observed_generation\":4}]"
     },
     {
+      "path": "metrics/pod-top.json",
+      "kind": "pod-top",
+      "media_type": "application/json",
+      "content": "[{\"namespace\":\"payments\",\"name\":\"payments-api-abc123\",\"cpu\":\"412m\",\"memory\":\"486Mi\"}]"
+    },
+    {
+      "path": "metrics/node-top.json",
+      "kind": "node-top",
+      "media_type": "application/json",
+      "content": "[{\"name\":\"aks-nodepool1-12345678-vmss000001\",\"cpu\":\"1850m\",\"cpu_percent\":92,\"memory\":\"14900Mi\",\"memory_percent\":91}]"
+    },
+    {
       "path": "workloads/specs.json",
       "kind": "workload-specs",
       "media_type": "application/json",

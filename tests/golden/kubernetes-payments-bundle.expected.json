@@ -29,6 +29,16 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "node memory usage is elevated",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
+      "title_contains": "node CPU usage is elevated",
+      "severity": "medium",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "without NetworkPolicy isolation",
       "severity": "high",
       "category": "kubernetes"
@@ -195,6 +205,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 37,
-  "max_findings": 37
+  "min_findings": 39,
+  "max_findings": 39
 }
