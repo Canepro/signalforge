@@ -1,10 +1,12 @@
 import type { ArtifactAdapter } from "../types";
 import type { EnvironmentContext, NoiseItem, PreFinding } from "../../analyzer/schema";
 import {
+  type ContainerFailureLogExcerpt,
   containerValueFor,
   parseContainerBoolean,
   parseContainerFloat,
   parseContainerInteger,
+  parseContainerJson,
   parseContainerList,
   parseContainerSections,
 } from "./parse";
@@ -55,6 +57,8 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
     const restartCount = parseContainerInteger(sections.restart_count);
     const memoryLimitBytes = parseContainerInteger(sections.memory_limit_bytes);
     const memoryPercent = parseContainerFloat(sections.memory_percent);
+    const failureLogExcerpts =
+      parseContainerJson<ContainerFailureLogExcerpt[]>(sections.failure_log_excerpts_json) ?? [];
 
     if (stateStatus && stateStatus !== "running") {
       findings.push({
@@ -120,6 +124,26 @@ export class ContainerDiagnosticsAdapter implements ArtifactAdapter {
         section_source: "memory_percent",
         evidence: sections.memory_percent,
         rule_id: "container.memory_pressure",
+      });
+    }
+
+    if (
+      failureLogExcerpts.some(
+        (excerpt) =>
+          Array.isArray(excerpt.excerpt_lines) &&
+          excerpt.excerpt_lines.some((line) => typeof line === "string" && line.trim())
+      )
+    ) {
+      findings.push({
+        title: "Container unhealthy log excerpts captured",
+        severity_hint: "medium",
+        category: "container",
+        section_source: "failure_log_excerpts_json",
+        evidence: JSON.stringify({
+          excerpt_count: failureLogExcerpts.length,
+          samples: failureLogExcerpts.slice(0, 2),
+        }),
+        rule_id: "container.failure_log_excerpts",
       });
     }
 

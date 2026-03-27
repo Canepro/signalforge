@@ -28,6 +28,7 @@ memory_reservation_bytes: 268435456
 cpu_percent: 94.10
 memory_percent: 96.30
 pid_count: 31
+failure_log_excerpts_json: [{"source":"current","reason":"restarting","excerpt_lines":["2026-03-26T10:06:00Z retrying database connection","2026-03-26T10:06:01Z health probe still failing"],"line_count":2,"truncated":false},{"source":"previous","reason":"restarting","excerpt_lines":["2026-03-26T10:05:10Z panic: database connection refused","2026-03-26T10:05:11Z retry budget exhausted after 5 attempts"],"line_count":2,"truncated":false}]
 `;
 
 describe("ContainerDiagnosticsAdapter", () => {
@@ -62,6 +63,9 @@ describe("ContainerDiagnosticsAdapter", () => {
     expect(findings.some((finding) => finding.title.includes("runs as root"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("not pinned"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("host PID"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("unhealthy log excerpts captured"))).toBe(
+      true
+    );
     expect(findings.some((finding) => finding.title.includes("Linux capabilities"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("privilege escalation"))).toBe(
       true

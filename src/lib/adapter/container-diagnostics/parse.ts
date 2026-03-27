@@ -33,6 +33,23 @@ export function parseContainerList(value: string | undefined): string[] {
     .filter((item) => item.toLowerCase() !== "none");
 }
 
+export interface ContainerFailureLogExcerpt {
+  source?: string | null;
+  reason?: string | null;
+  excerpt_lines?: string[] | null;
+  line_count?: number | null;
+  truncated?: boolean | null;
+}
+
+export function parseContainerJson<T>(value: string | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function containerValueFor(sections: Record<string, string>, key: string): string {
   return sections[key]?.trim() ?? "";
 }

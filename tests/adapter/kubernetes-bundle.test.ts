@@ -267,6 +267,29 @@ const RAW = JSON.stringify(
         ]),
       },
       {
+        path: "logs/unhealthy-workload-excerpts.json",
+        kind: "unhealthy-workload-log-excerpts",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            workload_kind: "Deployment",
+            workload_name: "payments-api",
+            pod_name: "payments-api-abc123",
+            container_name: "api",
+            reason: "CrashLoopBackOff",
+            restarts: 12,
+            previous: true,
+            excerpt_lines: [
+              "2026-03-26T10:05:10Z panic: database connection refused",
+              "2026-03-26T10:05:11Z retry budget exhausted after 5 attempts",
+            ],
+            line_count: 2,
+            truncated: false,
+          },
+        ]),
+      },
+      {
         path: "workloads/specs.json",
         kind: "workload-specs",
         media_type: "application/json",
@@ -510,6 +533,11 @@ describe("KubernetesBundleAdapter", () => {
     expect(
       findings.some((finding) =>
         finding.title.includes("workload depends on a PersistentVolumeClaim waiting for filesystem resize")
+      )
+    ).toBe(true);
+    expect(
+      findings.some((finding) =>
+        finding.title.includes("unhealthy workload logs captured")
       )
     ).toBe(true);
     expect(

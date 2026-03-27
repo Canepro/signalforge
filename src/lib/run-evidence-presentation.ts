@@ -48,6 +48,8 @@ function buildContainerEvidence(findings: Finding[]): RunEvidenceSection[] {
   let oomKilled = false;
   let memoryPressure: string | null = null;
   let memoryLimit = false;
+  const failureExcerptEntries: RunEvidenceSection["entries"] = [];
+  const failureExcerptSeen = new Set<string>();
 
   for (const finding of findings) {
     if (finding.title.startsWith("Container runtime state is ")) {
@@ -63,6 +65,24 @@ function buildContainerEvidence(findings: Finding[]): RunEvidenceSection[] {
       memoryPressure = match?.[1] ?? finding.evidence.trim() ?? null;
     } else if (finding.title === "Container has no memory limit configured") {
       memoryLimit = true;
+    } else if (finding.section_source === "failure_log_excerpts_json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const samples = Array.isArray(parsed?.samples)
+        ? (parsed.samples as Array<Record<string, unknown>>)
+        : [];
+      for (const sample of samples.slice(0, 2)) {
+        const source = asString(sample.source) ?? "current";
+        const reason = asString(sample.reason) ?? "failure";
+        const excerptLines = asStringArray(sample.excerpt_lines).slice(0, 6);
+        const key = `${source}:${reason}:${excerptLines.join("|")}`;
+        if (failureExcerptSeen.has(key)) continue;
+        failureExcerptEntries.push({
+          label: `${reason} · ${source} logs`,
+          value: excerptLines.length > 0 ? excerptLines.join("\n") : "No excerpt lines captured",
+          emphasis: true,
+        });
+        failureExcerptSeen.add(key);
+      }
     }
   }
 
@@ -72,12 +92,13 @@ function buildContainerEvidence(findings: Finding[]): RunEvidenceSection[] {
     !restartCount &&
     !oomKilled &&
     !memoryPressure &&
-    !memoryLimit
+    !memoryLimit &&
+    failureExcerptEntries.length === 0
   ) {
     return [];
   }
 
-  return [
+  const sections: RunEvidenceSection[] = [
     {
       id: "container-runtime-health",
       title: "Runtime Health",
@@ -101,16 +122,33 @@ function buildContainerEvidence(findings: Finding[]): RunEvidenceSection[] {
       ],
     },
   ];
+
+  if (failureExcerptEntries.length > 0) {
+    sections.push({
+      id: "container-failure-excerpts",
+      title: "Failure Excerpts",
+      summary:
+        failureExcerptEntries.length === 1
+          ? "Bounded log lines captured from the unhealthy container so operators can see the immediate failure mode without leaving the run."
+          : `Bounded log lines captured across ${failureExcerptEntries.length} unhealthy-container excerpts for immediate triage.`,
+      tone: "warning",
+      entries: failureExcerptEntries,
+    });
+  }
+
+  return sections;
 }
 
 function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
   const rolloutEntries: RunEvidenceSection["entries"] = [];
   const pressureEntries: RunEvidenceSection["entries"] = [];
   const warningEntries: RunEvidenceSection["entries"] = [];
+  const logEntries: RunEvidenceSection["entries"] = [];
   const guardrailEntries: RunEvidenceSection["entries"] = [];
   const rolloutSeen = new Set<string>();
   const pressureSeen = new Set<string>();
   const warningSeen = new Set<string>();
+  const logSeen = new Set<string>();
   const guardrailSeen = new Set<string>();
 
   for (const finding of findings) {
@@ -437,6 +475,40 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
         });
         warningSeen.add(key);
       }
+      continue;
+    }
+
+    if (finding.section_source === "logs/unhealthy-workload-excerpts.json") {
+      const parsed = parseFindingEvidenceJson(finding);
+      const label =
+        [asString(parsed?.namespace), asString(parsed?.workload_name)].filter(Boolean).join("/") ||
+        "unknown-workload";
+      const workloadKind = asString(parsed?.workload_kind) ?? "Workload";
+      const reasons = asStringArray(parsed?.reasons);
+      const samples = Array.isArray(parsed?.samples)
+        ? (parsed?.samples as Array<Record<string, unknown>>)
+        : [];
+      const firstSample = samples[0] ?? null;
+      const podName = asString(firstSample?.pod_name) ?? "unknown-pod";
+      const containerName = asString(firstSample?.container_name) ?? "unknown-container";
+      const previous = firstSample?.previous === true;
+      const excerptLines = asStringArray(firstSample?.excerpt_lines).slice(0, 6);
+      const reasonLabel = reasons[0] ?? asString(firstSample?.reason) ?? "failure";
+      const valueParts = [
+        `${reasonLabel} · ${previous ? "previous" : "current"} logs from ${podName}/${containerName}`,
+      ];
+      if (excerptLines.length > 0) valueParts.push(...excerptLines);
+      if (samples.length > 1) valueParts.push(`... ${samples.length - 1} more excerpt(s) captured`);
+      const value = valueParts.join("\n");
+      const key = `${workloadKind}:${label}:${value}`;
+      if (!logSeen.has(key)) {
+        logEntries.push({
+          label: `${workloadKind} ${label}`,
+          value,
+          emphasis: true,
+        });
+        logSeen.add(key);
+      }
     }
   }
 
@@ -475,6 +547,18 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
           : `Normalized warning-event groups captured across ${warningEntries.length} operational failure modes.`,
       tone: "warning",
       entries: warningEntries,
+    });
+  }
+  if (logEntries.length > 0) {
+    sections.push({
+      id: "kubernetes-failure-excerpts",
+      title: "Failure Excerpts",
+      summary:
+        logEntries.length === 1
+          ? "Bounded log lines captured from the unhealthy workload so operators can see the immediate failure mode without leaving the run."
+          : `Bounded log lines captured across ${logEntries.length} unhealthy workloads so operators can see the immediate failure modes without leaving the run.`,
+      tone: "warning",
+      entries: logEntries,
     });
   }
   if (guardrailEntries.length > 0) {

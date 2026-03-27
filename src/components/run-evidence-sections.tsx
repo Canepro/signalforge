@@ -63,7 +63,7 @@ export function RunEvidenceSections({
                     {entry.label}
                   </div>
                   <div
-                    className={`mt-1 text-[12px] leading-relaxed ${
+                    className={`mt-1 whitespace-pre-wrap text-[12px] leading-relaxed ${
                       entry.emphasis ? "font-semibold text-on-surface" : "text-on-surface-variant"
                     }`}
                   >

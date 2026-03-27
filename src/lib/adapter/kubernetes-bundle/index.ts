@@ -13,6 +13,7 @@ import {
   type KubernetesPodDisruptionBudget,
   type KubernetesPodTop,
   type KubernetesResourceQuota,
+  type KubernetesUnhealthyWorkloadLogExcerpt,
   type KubernetesWarningEvent,
   type KubernetesWorkloadRolloutStatus,
 } from "./parse";
@@ -836,6 +837,74 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
               samples: bucket.samples,
             }),
             rule_id: bucket.category.rule_id,
+          });
+        }
+      }
+
+      if (doc.kind === "unhealthy-workload-log-excerpts") {
+        const excerpts =
+          parseKubernetesDocumentJson<KubernetesUnhealthyWorkloadLogExcerpt[]>(doc) ?? [];
+        const grouped = new Map<
+          string,
+          {
+            namespace: string | null;
+            workloadKind: string | null;
+            workloadName: string | null;
+            reasons: Set<string>;
+            pods: Set<string>;
+            samples: KubernetesUnhealthyWorkloadLogExcerpt[];
+            excerptCount: number;
+          }
+        >();
+
+        for (const excerpt of excerpts) {
+          const workloadKey = [
+            excerpt.namespace?.trim() || "",
+            excerpt.workload_kind?.trim() || "",
+            excerpt.workload_name?.trim() || "",
+          ].join(":");
+          const bucket =
+            grouped.get(workloadKey) ??
+            {
+              namespace: excerpt.namespace?.trim() || null,
+              workloadKind: excerpt.workload_kind?.trim() || null,
+              workloadName: excerpt.workload_name?.trim() || null,
+              reasons: new Set<string>(),
+              pods: new Set<string>(),
+              samples: [],
+              excerptCount: 0,
+            };
+
+          if (excerpt.reason?.trim()) bucket.reasons.add(excerpt.reason.trim());
+          if (excerpt.pod_name?.trim()) bucket.pods.add(excerpt.pod_name.trim());
+          if (
+            bucket.samples.length < 2 &&
+            Array.isArray(excerpt.excerpt_lines) &&
+            excerpt.excerpt_lines.some((line) => typeof line === "string" && line.trim())
+          ) {
+            bucket.samples.push(excerpt);
+          }
+          bucket.excerptCount += 1;
+          grouped.set(workloadKey, bucket);
+        }
+
+        for (const bucket of grouped.values()) {
+          const label = workloadLabel(bucket.namespace ?? undefined, bucket.workloadName ?? undefined);
+          findings.push({
+            title: `Kubernetes unhealthy workload logs captured: ${label}`,
+            severity_hint: "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify({
+              namespace: bucket.namespace,
+              workload_kind: bucket.workloadKind,
+              workload_name: bucket.workloadName,
+              excerpt_count: bucket.excerptCount,
+              reasons: Array.from(bucket.reasons).sort(),
+              pods: Array.from(bucket.pods).sort(),
+              samples: bucket.samples,
+            }),
+            rule_id: "kubernetes.unhealthy_workload_logs",
           });
         }
       }

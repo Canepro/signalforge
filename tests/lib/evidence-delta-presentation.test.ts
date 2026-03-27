@@ -57,12 +57,30 @@ const samplePayload: EvidenceDeltaPayload = {
       unit: null,
     },
     {
+      key: "unhealthy_workload_log_excerpt_count",
+      label: "Unhealthy workload log excerpts",
+      family: "kubernetes-bundle",
+      status: "changed",
+      previous: 0,
+      current: 2,
+      unit: null,
+    },
+    {
       key: "restart_count",
       label: "Restart count",
       family: "container-diagnostics",
       status: "changed",
       previous: 1,
       current: 6,
+      unit: null,
+    },
+    {
+      key: "failure_log_excerpt_count",
+      label: "Failure log excerpts",
+      family: "container-diagnostics",
+      status: "changed",
+      previous: 0,
+      current: 2,
       unit: null,
     },
     {
@@ -92,9 +110,11 @@ describe("evidence-delta-presentation", () => {
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[1]!)).toBe("pressure");
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[2]!)).toBe("pressure");
     expect(classifyEvidenceMetricFocus(samplePayload.metrics[3]!)).toBe("pressure");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[4]!)).toBe("runtime");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[5]!)).toBe("posture");
-    expect(classifyEvidenceMetricFocus(samplePayload.metrics[6]!)).toBe("posture");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[4]!)).toBe("pressure");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[5]!)).toBe("runtime");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[6]!)).toBe("runtime");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[7]!)).toBe("posture");
+    expect(classifyEvidenceMetricFocus(samplePayload.metrics[8]!)).toBe("posture");
   });
 
   it("builds operational delta sections for compare surfaces", () => {
@@ -123,9 +143,17 @@ describe("evidence-delta-presentation", () => {
       label: "Pending PersistentVolumeClaims",
       value: "0 -> 1",
     });
+    expect(sections[1]?.entries[3]).toMatchObject({
+      label: "Unhealthy workload log excerpts",
+      value: "0 -> 2",
+    });
     expect(sections[2]?.entries[0]).toMatchObject({
       label: "Restart count",
       value: "1 -> 6",
+    });
+    expect(sections[2]?.entries[1]).toMatchObject({
+      label: "Failure log excerpts",
+      value: "0 -> 2",
     });
     expect(sections[3]?.entries).toEqual(
       expect.arrayContaining([

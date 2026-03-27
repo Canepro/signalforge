@@ -35,8 +35,8 @@ The evidence-enrichment half is now partially implemented:
 - first Kubernetes operational diagnostics are present on this branch through optional `warning-events` and `node-health` bundle documents
 - controller rollout state is present on this branch through optional `workload-rollout-status` bundle documents
 - optional `kubectl top` snapshots are present on this branch through `node-top` and `pod-top` bundle documents, with deterministic node CPU and memory pressure findings
-- HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV state are now present on this branch as optional structured bundle documents with deterministic findings and compare metrics
-- container runtime-health diagnostics are present for state, health, restart count, OOMKilled, memory limits or reservations, and one-shot memory pressure
+- HPA, PodDisruptionBudget, ResourceQuota, LimitRange, PVC/PV state, and bounded unhealthy-workload log excerpts are now present on this branch as optional structured bundle documents with deterministic findings and compare metrics
+- container runtime-health diagnostics are present for state, health, restart count, OOMKilled, bounded unhealthy log excerpts, memory limits or reservations, and one-shot memory pressure
 - richer Linux pressure diagnostics remain a follow-on
 
 ## Problem statement
@@ -157,13 +157,14 @@ Add optional bundle documents for:
 - PDB state
 - ResourceQuota and LimitRange
 - PVC and PV state
+- bounded unhealthy-workload log excerpts from failing or restarting pods
 - ingress or gateway exposure surfaces
 
 Current progress in this checkout:
 
-- HPA state, PDB state, ResourceQuota state, LimitRange defaults, and PVC/PV state are now collected in `signalforge-collectors`
-- SignalForge now turns those documents into deterministic findings for HPA saturation, broken scaling recommendations, blocking PDBs, quota pressure, namespaces missing full LimitRange defaults, pending PVCs, PVC resize waits, degraded PVs, and workloads blocked on storage claims
-- compare now includes stable metrics for HPA issue count, PDB blocking count, quota pressure count, namespaces missing full LimitRange defaults, pending PVC count, PVC resize wait count, degraded PV count, and workloads blocked on pending claims
+- HPA state, PDB state, ResourceQuota state, LimitRange defaults, PVC/PV state, and bounded unhealthy-workload log excerpts are now collected in `signalforge-collectors`
+- SignalForge now turns those documents into deterministic findings for HPA saturation, broken scaling recommendations, blocking PDBs, quota pressure, namespaces missing full LimitRange defaults, pending PVCs, PVC resize waits, degraded PVs, workloads blocked on storage claims, and grouped unhealthy-workload log capture
+- compare now includes stable metrics for HPA issue count, PDB blocking count, quota pressure count, namespaces missing full LimitRange defaults, pending PVC count, PVC resize wait count, degraded PV count, workloads blocked on pending claims, and unhealthy-workload log excerpt count
 - run detail, dashboard highlights, and compare operational-delta cards now surface those signals instead of leaving them buried in the findings table
 
 Optional bounded runtime evidence:
@@ -178,13 +179,13 @@ Current progress in this checkout:
 
 - runtime state and health status are now collected and analyzed
 - restart count, OOMKilled, and memory limits/reservations are now collected and analyzed
+- bounded current or previous unhealthy-container log excerpts are now collected and surfaced in run detail
 - one-shot CPU and memory percentages are now collected; memory pressure can now raise deterministic findings
-- compare now includes stable container runtime-health deltas for state, health, restart count, OOMKilled, and memory limits/reservations
+- compare now includes stable container runtime-health deltas for state, health, restart count, OOMKilled, unhealthy log excerpt count, and memory limits/reservations
 
 Remaining follow-on:
 
 - broaden runtime-health beyond the first deterministic slice where evidence quality stays credible
-- decide whether bounded recent unhealthy-container logs belong in the same artifact family or a later optional document
 - decide whether CPU pressure should stay informational-only or gain deterministic findings once a less noisy signal is available
 
 ### 3. Linux pressure diagnostics

@@ -43,9 +43,32 @@ describe("run-evidence-presentation", () => {
         section_source: "memory_percent",
         evidence: "96.1",
       }),
+      mkFinding("6", "Container unhealthy log excerpts captured", "medium", {
+        section_source: "failure_log_excerpts_json",
+        evidence: JSON.stringify({
+          excerpt_count: 2,
+          samples: [
+            {
+              source: "current",
+              reason: "restarting",
+              excerpt_lines: [
+                "2026-03-26T10:06:00Z retrying database connection",
+                "2026-03-26T10:06:01Z health probe still failing",
+              ],
+            },
+            {
+              source: "previous",
+              reason: "restarting",
+              excerpt_lines: [
+                "2026-03-26T10:05:10Z panic: database connection refused",
+              ],
+            },
+          ],
+        }),
+      }),
     ]);
 
-    expect(sections).toHaveLength(1);
+    expect(sections).toHaveLength(2);
     expect(sections[0]).toMatchObject({
       id: "container-runtime-health",
       tone: "critical",
@@ -55,6 +78,23 @@ describe("run-evidence-presentation", () => {
         { label: "Restarts", value: "6", emphasis: true },
         { label: "OOM killed", value: "Yes", emphasis: true },
         { label: "Memory guardrail", value: "96.1%", emphasis: true },
+      ],
+    });
+    expect(sections[1]).toMatchObject({
+      id: "container-failure-excerpts",
+      entries: [
+        {
+          label: "restarting · current logs",
+          value:
+            "2026-03-26T10:06:00Z retrying database connection\n"
+            + "2026-03-26T10:06:01Z health probe still failing",
+          emphasis: true,
+        },
+        {
+          label: "restarting · previous logs",
+          value: "2026-03-26T10:05:10Z panic: database connection refused",
+          emphasis: true,
+        },
       ],
     });
   });
@@ -234,12 +274,39 @@ describe("run-evidence-presentation", () => {
           }),
         }
       ),
+      mkFinding(
+        "13",
+        "Kubernetes unhealthy workload logs captured: payments/api",
+        "medium",
+        {
+          section_source: "logs/unhealthy-workload-excerpts.json",
+          evidence: JSON.stringify({
+            namespace: "payments",
+            workload_kind: "Deployment",
+            workload_name: "api",
+            reasons: ["CrashLoopBackOff"],
+            samples: [
+              {
+                pod_name: "payments-api-abc123",
+                container_name: "api",
+                previous: true,
+                reason: "CrashLoopBackOff",
+                excerpt_lines: [
+                  "2026-03-26T10:05:10Z panic: database connection refused",
+                  "2026-03-26T10:05:11Z retry budget exhausted after 5 attempts",
+                ],
+              },
+            ],
+          }),
+        }
+      ),
     ]);
 
     expect(sections.map((section) => section.id)).toEqual([
       "kubernetes-rollout",
       "kubernetes-pressure",
       "kubernetes-warnings",
+      "kubernetes-failure-excerpts",
       "kubernetes-guardrails",
     ]);
 
@@ -315,6 +382,19 @@ describe("run-evidence-presentation", () => {
     });
 
     expect(sections[3]).toMatchObject({
+      entries: [
+        {
+          label: "Deployment payments/api",
+          value:
+            "CrashLoopBackOff · previous logs from payments-api-abc123/api\n"
+            + "2026-03-26T10:05:10Z panic: database connection refused\n"
+            + "2026-03-26T10:05:11Z retry budget exhausted after 5 attempts",
+          emphasis: true,
+        },
+      ],
+    });
+
+    expect(sections[4]).toMatchObject({
       entries: [
         {
           label: "payments",

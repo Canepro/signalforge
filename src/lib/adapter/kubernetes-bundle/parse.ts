@@ -22,6 +22,20 @@ export interface KubernetesWarningEvent {
   last_timestamp?: string | null;
 }
 
+export interface KubernetesUnhealthyWorkloadLogExcerpt {
+  namespace?: string | null;
+  workload_kind?: string | null;
+  workload_name?: string | null;
+  pod_name?: string | null;
+  container_name?: string | null;
+  reason?: string | null;
+  restarts?: number | null;
+  previous?: boolean | null;
+  excerpt_lines?: string[] | null;
+  line_count?: number | null;
+  truncated?: boolean | null;
+}
+
 export interface KubernetesWorkloadRolloutStatus {
   namespace?: string | null;
   name?: string | null;

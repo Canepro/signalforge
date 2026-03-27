@@ -299,6 +299,7 @@ function containerArtifact(fields: Record<string, string>): string {
     "cpu_percent",
     "memory_percent",
     "pid_count",
+    "failure_log_excerpts_json",
   ];
   return [
     "=== container-diagnostics ===",
@@ -504,6 +505,7 @@ for (const backend of backends) {
             ran_as_root: "false",
             memory_limit_bytes: "536870912",
             memory_reservation_bytes: "134217728",
+            failure_log_excerpts_json: "[]",
           }),
           ingestion: {
             target_identifier: "container:payments",
@@ -539,6 +541,8 @@ for (const backend of backends) {
             ran_as_root: "true",
             memory_limit_bytes: "1073741824",
             memory_reservation_bytes: "268435456",
+            failure_log_excerpts_json:
+              '[{"source":"current","reason":"restarting","excerpt_lines":["2026-03-26T10:06:00Z retrying database connection"],"line_count":1,"truncated":false},{"source":"previous","reason":"restarting","excerpt_lines":["2026-03-26T10:05:10Z panic: database connection refused"],"line_count":1,"truncated":false}]',
           }),
           ingestion: {
             target_identifier: "container:payments",
@@ -635,6 +639,13 @@ for (const backend of backends) {
             family: "container-diagnostics",
             previous: false,
             current: true,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "failure_log_excerpt_count",
+            family: "container-diagnostics",
+            previous: 0,
+            current: 2,
             status: "changed",
           }),
           expect.objectContaining({
@@ -873,6 +884,12 @@ for (const backend of backends) {
                     message: null,
                   },
                 ]),
+              },
+              {
+                path: "logs/unhealthy-workload-excerpts.json",
+                kind: "unhealthy-workload-log-excerpts",
+                media_type: "application/json",
+                content: JSON.stringify([]),
               },
               {
                 path: "workloads/specs.json",
@@ -1257,6 +1274,44 @@ for (const backend of backends) {
                 ]),
               },
               {
+                path: "logs/unhealthy-workload-excerpts.json",
+                kind: "unhealthy-workload-log-excerpts",
+                media_type: "application/json",
+                content: JSON.stringify([
+                  {
+                    namespace: "payments",
+                    workload_kind: "Deployment",
+                    workload_name: "payments-api",
+                    pod_name: "payments-api-abc123",
+                    container_name: "api",
+                    reason: "CrashLoopBackOff",
+                    restarts: 6,
+                    previous: true,
+                    excerpt_lines: [
+                      "2026-03-26T10:05:10Z panic: database connection refused",
+                      "2026-03-26T10:05:11Z retry budget exhausted after 5 attempts",
+                    ],
+                    line_count: 2,
+                    truncated: false,
+                  },
+                  {
+                    namespace: "payments",
+                    workload_kind: "Deployment",
+                    workload_name: "payments-worker",
+                    pod_name: "payments-worker-abc123",
+                    container_name: "worker",
+                    reason: "Error",
+                    restarts: 3,
+                    previous: false,
+                    excerpt_lines: [
+                      "2026-03-26T10:09:10Z migration failed: deadlock detected",
+                    ],
+                    line_count: 1,
+                    truncated: false,
+                  },
+                ]),
+              },
+              {
                 path: "workloads/specs.json",
                 kind: "workload-specs",
                 media_type: "application/json",
@@ -1455,6 +1510,13 @@ for (const backend of backends) {
             family: "kubernetes-bundle",
             previous: 0,
             current: 1,
+            status: "changed",
+          }),
+          expect.objectContaining({
+            key: "unhealthy_workload_log_excerpt_count",
+            family: "kubernetes-bundle",
+            previous: 0,
+            current: 2,
             status: "changed",
           }),
           expect.objectContaining({

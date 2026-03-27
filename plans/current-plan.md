@@ -53,7 +53,7 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
 
 - `container-diagnostics` is a shipped artifact family in this checkout with credible first-slice findings around exposure, privilege, mounts, secrets, identity, and runtime hardening.
 - `kubernetes-bundle` is a shipped artifact family in this checkout using the text-carried `kubernetes-bundle.v1` JSON manifest shape, not raw archive ingestion.
-- the Kubernetes bundle now accepts optional operational diagnostics documents for warning events, node health, rollout state, `kubectl top`, HPA state, PodDisruptionBudget state, ResourceQuota state, LimitRange defaults, and PVC/PV state in addition to the original posture-focused docs
+- the Kubernetes bundle now accepts optional operational diagnostics documents for warning events, bounded unhealthy-workload log excerpts, node health, rollout state, `kubectl top`, HPA state, PodDisruptionBudget state, ResourceQuota state, LimitRange defaults, and PVC/PV state in addition to the original posture-focused docs
 - Kubernetes analysis on this branch currently covers public Service exposure, namespace isolation gaps, RBAC over-breadth, workload-to-identity joins, exposed-workload-to-identity joins, token/Secret usage, workload hardening, host-escape style settings, probes, and resource governance.
 - The strongest remaining Phase 8 architectural risk is unchanged: the current execution model is still effectively one registration per source, which may be too narrow for future Kubernetes or mixed-scope execution forms.
 
@@ -85,8 +85,8 @@ Current branch note: `main` still reflects the pre-Phase-8 hardening handoff at 
   - the remaining Phase 9 work is cross-repo: `signalforge-agent` and `signalforge-collectors` still need to consume the same typed scope contract end to end
 - The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
   - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
-  - the current branch already includes the first end-to-end Kubernetes operational tranche beyond events and node pressure: HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV signals now feed deterministic findings, compare metrics, and run-detail or dashboard evidence cards
-  - richer container runtime-health diagnostics such as state, health, restart, OOM, memory limits/reservations, and one-shot CPU/memory stats
+  - the current branch already includes the first end-to-end Kubernetes operational tranche beyond events and node pressure: bounded unhealthy-workload log excerpts, HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV signals now feed deterministic findings, compare metrics, and run-detail or dashboard evidence cards
+  - richer container runtime-health diagnostics such as state, health, restart, OOM, bounded unhealthy log excerpts, memory limits/reservations, and one-shot CPU/memory stats
   - findings and dashboard presentation that surfaces this evidence instead of burying it
   - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
 - Preferred deployment stance for `signalforge-agent`: long-running hardened service near the execution surface. Today that means a host `systemd` service is the first-class path. Container and Kubernetes-native packaging remain follow-on work after the scoped job contract and trust boundaries are explicit.

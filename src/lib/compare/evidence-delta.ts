@@ -1,9 +1,11 @@
 import type { Severity } from "@/lib/analyzer/schema";
 import { parseEnvironmentHostname, type RunWithArtifactRow } from "@/lib/db/repository";
 import {
+  type ContainerFailureLogExcerpt,
   containerValueFor,
   parseContainerBoolean,
   parseContainerInteger,
+  parseContainerJson,
   parseContainerList,
   parseContainerSections,
 } from "@/lib/adapter/container-diagnostics/parse";
@@ -18,6 +20,7 @@ import {
   type KubernetesPersistentVolumeClaim,
   type KubernetesPodDisruptionBudget,
   type KubernetesResourceQuota,
+  type KubernetesUnhealthyWorkloadLogExcerpt,
   type KubernetesWarningEvent,
   type KubernetesWorkloadRolloutStatus,
 } from "@/lib/adapter/kubernetes-bundle/parse";
@@ -63,6 +66,7 @@ type ContainerEvidenceSummary = {
   health_status: string | null;
   restart_count: number | null;
   oom_killed: boolean;
+  failure_log_excerpt_count: number;
   memory_limit_bytes: number | null;
   memory_reservation_bytes: number | null;
 };
@@ -188,6 +192,7 @@ type KubernetesWorkloadSpec = {
 type KubernetesEvidenceSummary = {
   document_count: number;
   warning_event_count: number;
+  unhealthy_workload_log_excerpt_count: number;
   node_not_ready_count: number;
   node_pressure_count: number;
   rollout_issue_count: number;
@@ -393,6 +398,10 @@ function summarizeContainerEvidence(content: string): ContainerEvidenceSummary {
     health_status: containerValueFor(sections, "health_status") || null,
     restart_count: parseContainerInteger(sections.restart_count),
     oom_killed: parseContainerBoolean(sections.oom_killed),
+    failure_log_excerpt_count:
+      (
+        parseContainerJson<ContainerFailureLogExcerpt[]>(sections.failure_log_excerpts_json) ?? []
+      ).length,
     memory_limit_bytes: parseContainerInteger(sections.memory_limit_bytes),
     memory_reservation_bytes: parseContainerInteger(sections.memory_reservation_bytes),
   };
@@ -629,6 +638,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     return {
       document_count: 0,
       warning_event_count: 0,
+      unhealthy_workload_log_excerpt_count: 0,
       node_not_ready_count: 0,
       node_pressure_count: 0,
       rollout_issue_count: 0,
@@ -676,6 +686,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   }
 
   let warningEventCount = 0;
+  let unhealthyWorkloadLogExcerptCount = 0;
   let nodeNotReadyCount = 0;
   let nodePressureCount = 0;
   let rolloutIssueCount = 0;
@@ -734,6 +745,12 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if (!isOperationalWarningEvent(event)) continue;
         warningEventCount += warningEventWeight(event);
       }
+      continue;
+    }
+
+    if (doc.kind === "unhealthy-workload-log-excerpts") {
+      unhealthyWorkloadLogExcerptCount +=
+        parseKubernetesJson<KubernetesUnhealthyWorkloadLogExcerpt>(doc).length;
       continue;
     }
 
@@ -1062,6 +1079,7 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   return {
     document_count: manifest.documents.length,
     warning_event_count: warningEventCount,
+    unhealthy_workload_log_excerpt_count: unhealthyWorkloadLogExcerptCount,
     node_not_ready_count: nodeNotReadyCount,
     node_pressure_count: nodePressureCount,
     rollout_issue_count: rolloutIssueCount,
@@ -1203,6 +1221,13 @@ function buildFamilyMetrics(
         "container-diagnostics"
       ),
       metricRow(
+        "failure_log_excerpt_count",
+        "Failure log excerpts",
+        previous.failure_log_excerpt_count,
+        next.failure_log_excerpt_count,
+        "container-diagnostics"
+      ),
+      metricRow(
         "memory_limit_bytes",
         "Memory limit",
         previous.memory_limit_bytes,
@@ -1237,6 +1262,13 @@ function buildFamilyMetrics(
         "Operational warning events",
         previous.warning_event_count,
         next.warning_event_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "unhealthy_workload_log_excerpt_count",
+        "Unhealthy workload log excerpts",
+        previous.unhealthy_workload_log_excerpt_count,
+        next.unhealthy_workload_log_excerpt_count,
         "kubernetes-bundle"
       ),
       metricRow(

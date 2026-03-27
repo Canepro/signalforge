@@ -36,7 +36,17 @@ function formatMetricValue(value: EvidenceDeltaMetricRow["previous"], unit: stri
 
 export function classifyEvidenceMetricFocus(row: EvidenceDeltaMetricRow): EvidenceMetricFocus {
   if (row.family === "container-diagnostics") {
-    if (["state_status", "health_status", "restart_count", "oom_killed", "memory_limit_bytes", "memory_reservation_bytes"].includes(row.key)) {
+    if (
+      [
+        "state_status",
+        "health_status",
+        "restart_count",
+        "oom_killed",
+        "failure_log_excerpt_count",
+        "memory_limit_bytes",
+        "memory_reservation_bytes",
+      ].includes(row.key)
+    ) {
       return "runtime";
     }
     return "posture";
@@ -56,6 +66,7 @@ export function classifyEvidenceMetricFocus(row: EvidenceDeltaMetricRow): Eviden
     if (
       [
         "warning_event_count",
+        "unhealthy_workload_log_excerpt_count",
         "node_not_ready_count",
         "node_pressure_count",
         "resource_quota_pressure_count",
