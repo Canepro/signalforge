@@ -9,6 +9,7 @@ import { SeveritySummary } from "@/components/severity-badge";
 import { TopActionsPanel } from "@/components/top-actions-panel";
 import { FindingsTable } from "@/components/findings-table";
 import { FindingsOverview } from "@/components/findings-overview";
+import { RunEvidenceSections } from "@/components/run-evidence-sections";
 import { SuppressedNoisePanel } from "@/components/suppressed-noise-panel";
 import { RunMetadataPanel } from "@/components/run-metadata-panel";
 import { EnvironmentBanner } from "@/components/environment-banner";
@@ -18,6 +19,7 @@ import type { Severity } from "@/lib/analyzer/schema";
 import type { RunDetail } from "@/types/api";
 import { compareRunAgainstHref, compareRunHref } from "@/lib/compare/nav";
 import { classifyFindingSignal, type FindingSignal } from "@/lib/findings-presentation";
+import { buildRunEvidenceSections } from "@/lib/run-evidence-presentation";
 import {
   getArtifactFamilyPresentation,
   getArtifactTypeLabel,
@@ -41,6 +43,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const findings = report?.findings ?? [];
   const noise = run.noise ?? report?.noise_or_expected ?? [];
   const topActions = report?.top_actions_now ?? [];
+  const evidenceSections = buildRunEvidenceSections(run.artifact_type, findings);
   const filteredFindings = findings.filter((finding) => {
     const matchesSignal =
       activeSignal === "all" || classifyFindingSignal(finding) === activeSignal;
@@ -275,6 +278,8 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                   onSeverityChange={setActiveSeverity}
                 />
               ) : null}
+
+              <RunEvidenceSections sections={evidenceSections} />
 
               {/* Findings Table */}
               <FindingsTable

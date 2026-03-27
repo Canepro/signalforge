@@ -20,6 +20,8 @@ That is acceptable for the first security and posture slices, but it is not enou
 
 This plan exists so the next evidence additions and the UI work to surface them are tracked together.
 
+Agent deployment guidance remains pinned separately in [`../docs/agent-deployment.md`](../docs/agent-deployment.md). Do not let richer job-driven diagnostics drift away from that service-first, least-privilege deployment model.
+
 ## Already implemented on this branch
 
 The presentation half has started:
@@ -251,6 +253,7 @@ This plan touches all three repos:
 - pass through the richer collection scope where needed
 - support optional collection flags without forcing every environment to have every capability
 - keep failures explicit when optional diagnostics are unavailable
+- keep the deployment and trust-boundary stance aligned with [`../docs/agent-deployment.md`](../docs/agent-deployment.md)
 
 ### `signalforge`
 
