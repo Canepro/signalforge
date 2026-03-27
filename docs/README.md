@@ -17,6 +17,13 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 2. [`external-submit.md`](./external-submit.md)
 3. [`schemas/README.md`](./schemas/README.md)
 
+### I operate Sources, agents, or collection jobs
+
+1. [`operators/README.md`](./operators/README.md)
+2. [`operators/sources-and-agents.md`](./operators/sources-and-agents.md)
+3. [`operators/collection-paths.md`](./operators/collection-paths.md)
+4. [`agent-deployment.md`](./agent-deployment.md)
+
 ### I am an agent working in the repo
 
 1. [`../AGENTS.md`](../AGENTS.md)
@@ -29,6 +36,10 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | Document | Use it for |
 |---|---|
 | [`getting-started.md`](./getting-started.md) | Beginner-friendly setup and first successful run |
+| [`operators/README.md`](./operators/README.md) | Operator docs entrypoint for Sources, agents, collection jobs, and current execution guidance |
+| [`operators/sources-and-agents.md`](./operators/sources-and-agents.md) | Sources UI, enrollment, collection-job lifecycle, and the control-plane / execution-plane split |
+| [`operators/collection-paths.md`](./operators/collection-paths.md) | Honest push-first vs job-driven collection guidance by environment |
+| [`operators/job-scoped-collection.md`](./operators/job-scoped-collection.md) | Typed collection-scope model, source defaults, job overrides, and remaining cross-repo limits |
 | [`agent-deployment.md`](./agent-deployment.md) | Preferred `signalforge-agent` deployment model, trust boundaries, and security baseline |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
@@ -71,7 +82,7 @@ For the preferred job-driven deployment model and security stance, see [`agent-d
 - fleet management
 - remediation in the current product scope
 - raw archive ingestion for Kubernetes support bundles
-- a fully general non-Linux job-driven collection model without explicit job-scoped parameters
+- fully general non-Linux job-driven collection on arbitrary hosts without explicit runtime, kubeconfig, or RBAC preparation
 
 Those remain current limitations or future design topics in the repo plans. Remediation is deferred, not permanently ruled out, and would require a separate higher-trust model if introduced later.
 

@@ -64,9 +64,9 @@ const ARTIFACT_FAMILY_PRESENTATIONS: ArtifactFamilyPresentation[] = [
       "Use a stable workload identifier, not an ephemeral container id, when you want compare to track the same service over time.",
     targetIdentifierExample: "container-workload:host-a:podman:payments-api",
     recommendedCollection:
-      "Push from a prepared runtime-adjacent helper, or use a host agent pinned to one container target.",
+      "Push from a runtime-adjacent helper, or use a host agent on the runtime host with an explicit container target scope.",
     jobDrivenStatus:
-      "Host-agent path exists, but target selection still lives in host-local collector environment.",
+      "Job-driven collection is supported with explicit container scope when the execution host has the intended runtime access.",
   },
   {
     value: "kubernetes-bundle",
@@ -77,9 +77,9 @@ const ARTIFACT_FAMILY_PRESENTATIONS: ArtifactFamilyPresentation[] = [
       "Use a cluster or cluster-plus-namespace identifier so compare stays stable as workload objects churn.",
     targetIdentifierExample: "cluster:prod-eu-1:namespace:payments",
     recommendedCollection:
-      "Push from a workstation, CI runner, or helper with kubectl access, or use a prepared host agent with the intended context.",
+      "Push from a workstation, CI runner, or cluster-adjacent helper with the intended kubeconfig and RBAC.",
     jobDrivenStatus:
-      "Host-agent path exists, but scope and kubectl context are still process-local rather than job-scoped.",
+      "Job-driven collection is supported with explicit Kubernetes scope when the execution environment has the intended kubeconfig and RBAC.",
   },
 ] as const;
 
