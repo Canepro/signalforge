@@ -1,8 +1,20 @@
 import initSqlJs, { type Database } from "sql.js";
-import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "fs";
 import { join } from "path";
 
 export type { Database } from "sql.js";
+
+const SQLITE_SCHEMA_VERSION = 1;
+const SQLITE_LOCK_STALE_MS = 30_000;
+const SQLITE_STALE_DB_CLOSE_DELAY_MS = 30_000;
 
 let _db: Database | null = null;
 let _dbPath: string | null = null;
@@ -22,6 +34,18 @@ function resolveDbPath(): string {
 function getDbMtimeMs(dbPath: string): number | null {
   if (!existsSync(dbPath)) return null;
   return statSync(dbPath).mtimeMs;
+}
+
+function scheduleDbClose(db: Database | null): void {
+  if (!db) return;
+  const timer = setTimeout(() => {
+    try {
+      db.close();
+    } catch {
+      /* best-effort cleanup for replaced sql.js handles */
+    }
+  }, SQLITE_STALE_DB_CLOSE_DELAY_MS);
+  timer.unref?.();
 }
 
 async function loadDbFromPath(dbPath: string): Promise<Database> {
@@ -60,14 +84,22 @@ export async function getDb(): Promise<Database> {
       return _db;
     }
   }
+  const previousDb = _db;
   _db = await loadDbFromPath(dbPath);
+  if (previousDb && previousDb !== _db) {
+    scheduleDbClose(previousDb);
+  }
   return _db;
 }
 
 export async function reloadDbFromDisk(): Promise<Database> {
   if (_dbOverride) return _dbOverride;
   const dbPath = resolveDbPath();
+  const previousDb = _db;
   _db = await loadDbFromPath(dbPath);
+  if (previousDb && previousDb !== _db) {
+    scheduleDbClose(previousDb);
+  }
   return _db;
 }
 
@@ -81,10 +113,13 @@ export async function withDbFileLock<T>(fn: () => Promise<T>): Promise<T> {
   const dbPath = resolveDbPath();
   const lockPath = `${dbPath}.lock`;
   const deadline = Date.now() + 10_000;
+  const lockPayload = JSON.stringify({ pid: process.pid, created_at: Date.now() });
 
   while (true) {
+    let fd: number | null = null;
     try {
-      const fd = openSync(lockPath, "wx");
+      fd = openSync(lockPath, "wx");
+      writeFileSync(fd, lockPayload);
       try {
         return await fn();
       } finally {
@@ -92,6 +127,30 @@ export async function withDbFileLock<T>(fn: () => Promise<T>): Promise<T> {
         unlinkSync(lockPath);
       }
     } catch (error) {
+      if (fd !== null) {
+        try {
+          closeSync(fd);
+        } catch {
+          /* ignore close failures during cleanup */
+        }
+      }
+
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST") {
+        throw error;
+      }
+
+      if (isStaleLock(lockPath)) {
+        try {
+          unlinkSync(lockPath);
+          continue;
+        } catch (unlinkError) {
+          if ((unlinkError as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw unlinkError;
+          }
+        }
+      }
+
       if (Date.now() >= deadline) {
         throw new Error(`Timed out waiting for SQLite lock at ${lockPath}`, {
           cause: error,
@@ -127,6 +186,40 @@ export async function getTestDb(): Promise<Database> {
   return db;
 }
 
+function getUserVersion(db: Database): number {
+  const result = db.exec("PRAGMA user_version");
+  const value = result[0]?.values?.[0]?.[0];
+  return typeof value === "number" ? value : Number(value ?? 0);
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+}
+
+function isStaleLock(lockPath: string): boolean {
+  try {
+    const raw = readFileSync(lockPath, "utf-8").trim();
+    if (!raw) return true;
+    const parsed = JSON.parse(raw) as { pid?: number; created_at?: number };
+    const createdAt = typeof parsed.created_at === "number" ? parsed.created_at : 0;
+    const pid = typeof parsed.pid === "number" ? parsed.pid : 0;
+    if (createdAt > 0 && Date.now() - createdAt > SQLITE_LOCK_STALE_MS) {
+      return true;
+    }
+    if (pid > 0 && !processExists(pid)) {
+      return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 function tableColumnNames(db: Database, table: string): string[] {
   const result = db.exec(`PRAGMA table_info(${table})`);
   if (!result.length || !result[0].values.length) return [];
@@ -137,6 +230,10 @@ function tableColumnNames(db: Database, table: string): string[] {
 }
 
 function migrate(db: Database): void {
+  if (getUserVersion(db) >= SQLITE_SCHEMA_VERSION) {
+    return;
+  }
+
   db.run(`CREATE TABLE IF NOT EXISTS artifacts (
       id TEXT PRIMARY KEY,
       created_at TEXT NOT NULL,
@@ -293,4 +390,6 @@ function migrate(db: Database): void {
   if (!agentRegCols.includes("last_instance_id")) {
     db.run(`ALTER TABLE agent_registrations ADD COLUMN last_instance_id TEXT`);
   }
+
+  db.run(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION}`);
 }

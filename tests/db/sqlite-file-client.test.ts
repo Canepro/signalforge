@@ -3,6 +3,7 @@ import { execFileSync } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { pathToFileURL } from "url";
 
 describe("sqlite file client", () => {
   let tempDir: string;
@@ -18,9 +19,10 @@ describe("sqlite file client", () => {
   });
 
   it("reloads the latest on-disk database when another writer updates the file", () => {
+    const clientModuleUrl = pathToFileURL(join(process.cwd(), "src/lib/db/client.ts")).href;
     const script = `
-      import { readFileSync, writeFileSync } from "fs";
-      import { getDb, initSqlJsForApp, saveDb } from "${process.cwd()}/src/lib/db/client.ts";
+      import { readFileSync, statSync, utimesSync, writeFileSync } from "fs";
+      import { getDb, initSqlJsForApp, saveDb } from "${clientModuleUrl}";
 
       const first = await getDb();
       first.run("CREATE TABLE marker (value TEXT NOT NULL)");
@@ -32,6 +34,12 @@ describe("sqlite file client", () => {
       external.run("INSERT INTO marker(value) VALUES ('second')");
       writeFileSync(process.env.DATABASE_PATH, Buffer.from(external.export()));
       external.close();
+      const stats = statSync(process.env.DATABASE_PATH);
+      utimesSync(
+        process.env.DATABASE_PATH,
+        new Date(),
+        new Date(Math.max(Date.now(), stats.mtimeMs + 2000))
+      );
 
       const reloaded = await getDb();
       const rows = reloaded.exec("SELECT value FROM marker ORDER BY value");
