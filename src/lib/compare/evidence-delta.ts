@@ -13,6 +13,7 @@ import {
   type KubernetesBundleDocument,
   type KubernetesNodeHealth,
   type KubernetesWarningEvent,
+  type KubernetesWorkloadRolloutStatus,
 } from "@/lib/adapter/kubernetes-bundle/parse";
 
 export type EvidenceDeltaStatus = "changed" | "unchanged" | "added" | "removed";
@@ -180,6 +181,8 @@ type KubernetesEvidenceSummary = {
   warning_event_count: number;
   node_not_ready_count: number;
   node_pressure_count: number;
+  rollout_issue_count: number;
+  unavailable_replica_count: number;
   external_service_count: number;
   cluster_admin_binding_count: number;
   workload_cluster_admin_binding_count: number;
@@ -596,6 +599,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
       warning_event_count: 0,
       node_not_ready_count: 0,
       node_pressure_count: 0,
+      rollout_issue_count: 0,
+      unavailable_replica_count: 0,
       external_service_count: 0,
       cluster_admin_binding_count: 0,
       workload_cluster_admin_binding_count: 0,
@@ -633,6 +638,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
   let warningEventCount = 0;
   let nodeNotReadyCount = 0;
   let nodePressureCount = 0;
+  let rolloutIssueCount = 0;
+  let unavailableReplicaCount = 0;
   let externalServiceCount = 0;
   let clusterAdminBindingCount = 0;
   let workloadClusterAdminBindingCount = 0;
@@ -686,6 +693,26 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
         if ((node.pressure_conditions ?? []).some((value) => value.trim())) {
           nodePressureCount += 1;
         }
+      }
+      continue;
+    }
+
+    if (doc.kind === "workload-rollout-status") {
+      for (const rollout of parseKubernetesJson<KubernetesWorkloadRolloutStatus>(doc)) {
+        const desired = rollout.desired_replicas ?? 0;
+        if (desired <= 0) continue;
+        const ready = rollout.ready_replicas ?? 0;
+        const available = rollout.available_replicas ?? 0;
+        const updated = rollout.updated_replicas ?? 0;
+        const unavailable =
+          rollout.unavailable_replicas ?? Math.max(desired - available, 0);
+        const generation = rollout.generation ?? null;
+        const observedGeneration = rollout.observed_generation ?? null;
+        const controllerLag =
+          generation !== null && observedGeneration !== null && observedGeneration < generation;
+        const hasReplicaMismatch = ready < desired || available < desired || updated < desired;
+        if (controllerLag || hasReplicaMismatch) rolloutIssueCount += 1;
+        unavailableReplicaCount += Math.max(0, unavailable);
       }
       continue;
     }
@@ -880,6 +907,8 @@ function summarizeKubernetesEvidence(content: string): KubernetesEvidenceSummary
     warning_event_count: warningEventCount,
     node_not_ready_count: nodeNotReadyCount,
     node_pressure_count: nodePressureCount,
+    rollout_issue_count: rolloutIssueCount,
+    unavailable_replica_count: unavailableReplicaCount,
     external_service_count: externalServiceCount,
     cluster_admin_binding_count: clusterAdminBindingCount,
     workload_cluster_admin_binding_count: workloadClusterAdminBindingCount,
@@ -1057,6 +1086,20 @@ function buildFamilyMetrics(
         "Nodes with pressure conditions",
         previous.node_pressure_count,
         next.node_pressure_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "rollout_issue_count",
+        "Workloads with rollout issues",
+        previous.rollout_issue_count,
+        next.rollout_issue_count,
+        "kubernetes-bundle"
+      ),
+      metricRow(
+        "unavailable_replica_count",
+        "Unavailable workload replicas",
+        previous.unavailable_replica_count,
+        next.unavailable_replica_count,
         "kubernetes-bundle"
       ),
       metricRow(

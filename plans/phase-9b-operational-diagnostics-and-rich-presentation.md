@@ -31,6 +31,7 @@ The presentation half has started:
 The evidence-enrichment half is still pending:
 
 - first Kubernetes operational diagnostics are now present on this branch through optional `warning-events` and `node-health` bundle documents
+- controller rollout state is now present on this branch through optional `workload-rollout-status` bundle documents
 - richer Kubernetes operational diagnostics
 - richer container runtime-health diagnostics
 - richer Linux pressure diagnostics

@@ -24,6 +24,11 @@
       "category": "kubernetes"
     },
     {
+      "title_contains": "rollout incomplete",
+      "severity": "high",
+      "category": "kubernetes"
+    },
+    {
       "title_contains": "without NetworkPolicy isolation",
       "severity": "high",
       "category": "kubernetes"
@@ -190,6 +195,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 36,
-  "max_findings": 36
+  "min_findings": 37,
+  "max_findings": 37
 }

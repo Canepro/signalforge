@@ -610,6 +610,25 @@ describe("API GET /api/runs/[id]/compare", () => {
             content: JSON.stringify([]),
           },
           {
+            path: "workloads/rollout-status.json",
+            kind: "workload-rollout-status",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "payments-api",
+                kind: "Deployment",
+                desired_replicas: 2,
+                ready_replicas: 2,
+                available_replicas: 2,
+                updated_replicas: 2,
+                unavailable_replicas: 0,
+                generation: 4,
+                observed_generation: 4,
+              },
+            ]),
+          },
+          {
             path: "workloads/specs.json",
             kind: "workload-specs",
             media_type: "application/json",
@@ -822,6 +841,25 @@ describe("API GET /api/runs/[id]/compare", () => {
             ]),
           },
           {
+            path: "workloads/rollout-status.json",
+            kind: "workload-rollout-status",
+            media_type: "application/json",
+            content: JSON.stringify([
+              {
+                namespace: "payments",
+                name: "payments-api",
+                kind: "Deployment",
+                desired_replicas: 3,
+                ready_replicas: 1,
+                available_replicas: 1,
+                updated_replicas: 2,
+                unavailable_replicas: 2,
+                generation: 5,
+                observed_generation: 4,
+              },
+            ]),
+          },
+          {
             path: "workloads/specs.json",
             kind: "workload-specs",
             media_type: "application/json",
@@ -968,6 +1006,20 @@ describe("API GET /api/runs/[id]/compare", () => {
           family: "kubernetes-bundle",
           previous: 0,
           current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "rollout_issue_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "unavailable_replica_count",
+          family: "kubernetes-bundle",
+          previous: 0,
+          current: 2,
           status: "changed",
         }),
         expect.objectContaining({

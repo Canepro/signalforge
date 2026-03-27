@@ -22,6 +22,19 @@ export interface KubernetesWarningEvent {
   last_timestamp?: string | null;
 }
 
+export interface KubernetesWorkloadRolloutStatus {
+  namespace?: string | null;
+  name?: string | null;
+  kind?: string | null;
+  desired_replicas?: number | null;
+  ready_replicas?: number | null;
+  available_replicas?: number | null;
+  updated_replicas?: number | null;
+  unavailable_replicas?: number | null;
+  generation?: number | null;
+  observed_generation?: number | null;
+}
+
 export interface KubernetesBundleManifest {
   schema_version: "kubernetes-bundle.v1";
   cluster: {

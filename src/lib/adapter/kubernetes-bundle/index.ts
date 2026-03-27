@@ -6,6 +6,7 @@ import {
   type KubernetesBundleManifest,
   type KubernetesNodeHealth,
   type KubernetesWarningEvent,
+  type KubernetesWorkloadRolloutStatus,
 } from "./parse";
 
 const MANIFEST_KEY = "__manifest_json";
@@ -377,6 +378,38 @@ function warningEventCategory(event: KubernetesWarningEvent): WarningEventCatego
   }
 
   return null;
+}
+
+function rolloutMismatchSummary(status: KubernetesWorkloadRolloutStatus): {
+  desired: number;
+  ready: number;
+  available: number;
+  updated: number;
+  unavailable: number;
+  controllerLag: boolean;
+  hasReplicaMismatch: boolean;
+} | null {
+  const desired = status.desired_replicas ?? 0;
+  if (desired <= 0) return null;
+  const ready = status.ready_replicas ?? 0;
+  const available = status.available_replicas ?? 0;
+  const updated = status.updated_replicas ?? 0;
+  const unavailable = status.unavailable_replicas ?? Math.max(desired - available, 0);
+  const generation = status.generation ?? null;
+  const observedGeneration = status.observed_generation ?? null;
+  const controllerLag =
+    generation !== null && observedGeneration !== null && observedGeneration < generation;
+  const hasReplicaMismatch = ready < desired || available < desired || updated < desired;
+
+  return {
+    desired,
+    ready,
+    available,
+    updated,
+    unavailable,
+    controllerLag,
+    hasReplicaMismatch,
+  };
 }
 
 export class KubernetesBundleAdapter implements ArtifactAdapter {
@@ -769,6 +802,43 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
               samples: bucket.samples,
             }),
             rule_id: bucket.category.rule_id,
+          });
+        }
+      }
+
+      if (doc.kind === "workload-rollout-status") {
+        const rolloutStatuses =
+          parseKubernetesDocumentJson<KubernetesWorkloadRolloutStatus[]>(doc) ?? [];
+        for (const rollout of rolloutStatuses) {
+          const summary = rolloutMismatchSummary(rollout);
+          if (!summary) continue;
+
+          const label = workloadLabel(rollout.namespace ?? undefined, rollout.name ?? undefined);
+          const kind = rollout.kind?.trim() || "Workload";
+
+          if (summary.controllerLag) {
+            findings.push({
+              title: `Kubernetes rollout controller has not observed the latest spec generation: ${kind} ${label}`,
+              severity_hint: "medium",
+              category: "kubernetes",
+              section_source: doc.path,
+              evidence: JSON.stringify(rollout),
+              rule_id: "kubernetes.rollout_generation_lag",
+            });
+          }
+
+          if (!summary.hasReplicaMismatch) continue;
+
+          findings.push({
+            title: `Kubernetes rollout incomplete: ${kind} ${label} (ready ${summary.ready}/${summary.desired}, updated ${summary.updated}/${summary.desired})`,
+            severity_hint:
+              summary.ready === 0 || summary.unavailable >= Math.ceil(summary.desired / 2)
+                ? "high"
+                : "medium",
+            category: "kubernetes",
+            section_source: doc.path,
+            evidence: JSON.stringify(rollout),
+            rule_id: "kubernetes.rollout_incomplete",
           });
         }
       }

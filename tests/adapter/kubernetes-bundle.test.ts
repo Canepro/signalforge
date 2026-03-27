@@ -53,6 +53,25 @@ const RAW = JSON.stringify(
         ]),
       },
       {
+        path: "workloads/rollout-status.json",
+        kind: "workload-rollout-status",
+        media_type: "application/json",
+        content: JSON.stringify([
+          {
+            namespace: "payments",
+            name: "payments-api",
+            kind: "Deployment",
+            desired_replicas: 3,
+            ready_replicas: 1,
+            available_replicas: 1,
+            updated_replicas: 2,
+            unavailable_replicas: 2,
+            generation: 4,
+            observed_generation: 4,
+          },
+        ]),
+      },
+      {
         path: "cluster/node-health.json",
         kind: "node-health",
         media_type: "application/json",
@@ -257,6 +276,7 @@ describe("KubernetesBundleAdapter", () => {
       true
     );
     expect(findings.some((finding) => finding.title.includes("CrashLoopBackOff"))).toBe(true);
+    expect(findings.some((finding) => finding.title.includes("rollout incomplete"))).toBe(true);
     expect(findings.some((finding) => finding.title.includes("node is not Ready"))).toBe(true);
     expect(
       findings.some((finding) => finding.title.includes("node reports pressure conditions"))
