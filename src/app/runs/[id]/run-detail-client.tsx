@@ -67,7 +67,23 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
     : (artifactFamily?.description ?? null);
 
   function handleExport() {
-    window.open(`/api/runs/${run.id}/report`, "_blank");
+    const url = `/api/runs/${run.id}/report`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${run.filename.replace(/\.[^.]+$/, "")}-report.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function handleCopyFindings() {
+    const lines = findings.map(
+      (f) => `[${f.severity.toUpperCase()}] ${f.title}${f.evidence ? ` — ${f.evidence}` : ""}`
+    );
+    const text = lines.join("\n");
+    void navigator.clipboard.writeText(text).catch(() => {
+      window.prompt("Copy findings:", text);
+    });
   }
 
   async function handleReanalyze() {
@@ -127,6 +143,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
             actions={topActions}
             onReanalyze={handleReanalyze}
             onExport={handleExport}
+            onCopyFindings={findings.length > 0 ? handleCopyFindings : undefined}
             compareHref={compareRunHref(run.id)}
             compareToParentHref={
               run.parent_run

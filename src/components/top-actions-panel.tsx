@@ -1,14 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { useRef, useState, useEffect } from "react";
 
 interface TopActionsPanelProps {
   actions: string[];
   onReanalyze?: () => void | Promise<void>;
   onExport?: () => void;
-  /** Implicit baseline compare (`/runs/[id]/compare`). */
+  onCopyFindings?: () => void;
   compareHref?: string;
-  /** Optional: explicit baseline (e.g. `?against=` reanalyze parent). Shown as a small “vs parent” link. */
   compareToParentHref?: string;
-  /** When true, Reanalyze is in-flight (button disabled + busy state). */
   reanalyzePending?: boolean;
 }
 
@@ -16,6 +17,7 @@ export function TopActionsPanel({
   actions,
   onReanalyze,
   onExport,
+  onCopyFindings,
   compareHref,
   compareToParentHref,
   reanalyzePending,
@@ -138,28 +140,7 @@ export function TopActionsPanel({
               </>
             ) : null}
             {onExport ? (
-              <button
-                type="button"
-                onClick={onExport}
-                className="sf-btn-ghost"
-                title="Export report JSON"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                Export JSON
-              </button>
+              <ExportDropdown onExport={onExport} onCopyFindings={onCopyFindings} />
             ) : null}
           </div>
         </div>
@@ -184,5 +165,90 @@ export function TopActionsPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ExportDropdown({
+  onExport,
+  onCopyFindings,
+}: {
+  onExport: () => void;
+  onCopyFindings?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="sf-btn-ghost"
+        aria-expanded={open}
+        aria-haspopup="true"
+      >
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+          />
+        </svg>
+        Export
+        <svg className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-outline-variant/20 bg-surface-container-lowest py-1 shadow-lg">
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm text-on-surface transition-colors hover:bg-surface-container-low"
+            onClick={() => { onExport(); setOpen(false); }}
+          >
+            <svg className="h-4 w-4 text-on-surface-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download JSON
+          </button>
+          {onCopyFindings ? (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm text-on-surface transition-colors hover:bg-surface-container-low"
+              onClick={() => { onCopyFindings(); setOpen(false); }}
+            >
+              <svg className="h-4 w-4 text-on-surface-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              Copy findings
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }

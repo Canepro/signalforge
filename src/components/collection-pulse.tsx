@@ -139,8 +139,8 @@ export function CollectionPulse({ pulse }: { pulse: CollectionPulseData }) {
           value={String(pulse.collectionsLast7d)}
         />
         <SummaryMetric
-          label="Elevated"
-          value={`${pulse.elevatedDays}d`}
+          label="High/crit days"
+          value={String(pulse.elevatedDays)}
         />
         <SummaryMetric
           label="Last run"
