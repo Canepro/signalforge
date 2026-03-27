@@ -1,6 +1,6 @@
 # Phase 9 Design: Job-Scoped Collection Parameters
 
-> Status: active follow-on after Phase 8 analyzer and collection-plane parity work. SignalForge repo contract and operator UI work are implemented; sibling repo agent and collector integration is materially advanced, including typed scope mapping, collector input wiring, and a hardened host-service deployment baseline in `signalforge-agent`.
+> Status: active follow-on after Phase 8 analyzer and collection-plane parity work. SignalForge repo contract and operator UI work are implemented; sibling repo agent and collector integration is materially advanced, including typed scope mapping, collector input wiring, and a hardened host-service deployment baseline in `signalforge-agent`, with managed kubeconfig support and a real user-`systemd` smoke for the preferred service path.
 
 ## Why this exists
 

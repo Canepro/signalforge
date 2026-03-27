@@ -155,7 +155,7 @@ Recommended near-term choices:
 1. Use the system with more real submissions and collect friction.
 2. Finish the Phase 8 honesty and merge cleanup across README, docs, and plan files so `main` can catch up to branch reality.
 3. Land the Phase 9 job-scoped collection-parameter slice across `signalforge`, `signalforge-agent`, and `signalforge-collectors` instead of leaving non-Linux job-driven collection dependent on host-local environment.
-4. Continue agent hardening: Playwright/browser smoke test for Sources UI, install ergonomics for container-capable and Kubernetes-capable runners, and an explicit preferred deployment stance of always-on service near the execution surface rather than operator laptops or ambient shell context.
+4. Continue agent hardening: keep the always-on service stance explicit, preserve the new managed-kubeconfig and user-`systemd` validation path, and tighten container-capable host profile checks and future cluster-side packaging ergonomics.
 5. Plan and implement the next diagnostics-enrichment tranche so SignalForge expands beyond posture-only evidence for containers and Kubernetes, and update the dashboard and findings experience so that richer evidence is visible and useful instead of hidden. Source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md).
 6. Add lint to CI.
 

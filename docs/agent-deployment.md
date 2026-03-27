@@ -41,6 +41,9 @@ Current implementation status in the sibling `signalforge-agent` repo:
 - the service install flow now supports a separate root-controlled token file instead of keeping the bearer token in the installed env file
 - `signalforge-agent preflight` now validates config, token source, and locally runnable collector/runtime capabilities before enabling the unit
 - the installer supports a dry-run render path so operators can inspect the unit, env file, and token target before touching `systemd`
+- the service install flow now supports an optional managed kubeconfig path for Kubernetes-capable runners, wired into the installed env file instead of relying on a mutable operator context
+- the agent now supports explicit `SIGNALFORGE_KUBECTL_BIN` and `SIGNALFORGE_KUBECONFIG` overrides so Kubernetes-capable services can pin both the binary and the kubeconfig path
+- this service path has been smoke-tested under a real user `systemd` execution context via `systemd-run --user`, not only through static unit rendering
 
 ## Why this is the preferred model
 
@@ -106,7 +109,7 @@ Current best path:
 Current limited paths:
 
 - `container-diagnostics` job-driven collection can work from a prepared host agent, but runtime access must be explicit
-- `kubernetes-bundle` job-driven collection can work from a prepared host agent, but it still depends on explicit local cluster access and is not yet the cleanest production story
+- `kubernetes-bundle` job-driven collection can work from a prepared host agent with explicit kubeconfig and context handling, but it is still not as operationally clean as the future dedicated cluster-side runner story
 
 Current honest recommendation:
 
