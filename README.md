@@ -324,6 +324,7 @@ Postgres schema changes must follow the checked-in migration policy: [`docs/post
 - HTTP routes and response shapes: [`docs/api-contract.md`](docs/api-contract.md)
 - ACA app contract: [`docs/aca-app-deployment.md`](docs/aca-app-deployment.md)
 - ACA env contract: [`docs/aca-env-contract.md`](docs/aca-env-contract.md)
+- ACA staging runbook: [`docs/aca-staging-runbook.md`](docs/aca-staging-runbook.md)
 - Postgres migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md)
 - Postgres validation runbook: [`docs/postgres-validation.md`](docs/postgres-validation.md)
 - external collector and CI submission: [`docs/external-submit.md`](docs/external-submit.md)

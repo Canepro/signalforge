@@ -46,6 +46,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
+| [`aca-staging-runbook.md`](./aca-staging-runbook.md) | Slice 3 staging deployment runbook using the checked-in ACA template and parameter contract |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
 | [`postgres-validation.md`](./postgres-validation.md) | Reproducible live validation notes for the Postgres backend |
 | [`schemas/README.md`](./schemas/README.md) | Lightweight JSON Schemas for the published API contract |
