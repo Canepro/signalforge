@@ -1,4 +1,4 @@
-# Container Deployment Contract
+# App Container Runtime
 
 This document is the Slice 1 runtime contract for running SignalForge as a production container before any Azure-specific deployment work.
 
