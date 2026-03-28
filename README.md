@@ -81,6 +81,7 @@ If you are integrating with SignalForge:
 
 - [`docs/api-contract.md`](docs/api-contract.md)
 - [`docs/external-submit.md`](docs/external-submit.md)
+- [`docs/history.md`](docs/history.md)
 - [`docs/schemas/README.md`](docs/schemas/README.md)
 
 If you are operating Sources, agents, or collection jobs:
@@ -192,6 +193,7 @@ Historical background only:
 
 - [`plans/mvp.md`](plans/mvp.md)
 - [`plans/phase-2-ui.md`](plans/phase-2-ui.md)
+- [`docs/history.md`](docs/history.md)
 
 ## Current Scope
 

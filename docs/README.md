@@ -43,6 +43,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`agent-deployment.md`](./agent-deployment.md) | Preferred `signalforge-agent` deployment model, trust boundaries, and security baseline |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
+| [`history.md`](./history.md) | Decision-relevant repo and operator history that should not live only in chat threads |
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
