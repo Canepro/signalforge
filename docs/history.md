@@ -80,6 +80,28 @@ Do not invent earlier milestones just to make the timeline look complete.
 
 ## Log
 
+## Before 2026-03-20: MVP product boundary and UI direction
+
+Backfilled from historical planning docs:
+
+- [`plans/mvp.md`](../plans/mvp.md)
+- [`plans/phase-2-ui.md`](../plans/phase-2-ui.md)
+
+What was already decided before the first implementation commits in this repo:
+
+- SignalForge would be its own product repo, separate from `signalforge-collectors`
+- the product would be an evidence-to-findings diagnostics platform, not a collector, chatbot, remediation engine, or generic admin shell
+- the architecture would be deterministic-first, with one LLM explanation pass layered on top rather than model-led findings generation
+- collection, reanalysis, and compare would stay separate concepts instead of collapsing into a vague "refresh" workflow
+- the product would start with Linux or WSL audit logs while preserving an adapter model for later container and Kubernetes support
+- the UI direction was locked early as operator-first, table-first, and light-theme, with evidence, findings, actions, and metadata foregrounded over AI-dashboard styling
+
+Why it matters:
+
+- these decisions explain a large amount of current shape that can otherwise look accidental
+- later phases extended the product, but they mostly followed this early boundary rather than replacing it
+- this is the earliest durable product intent preserved in the repo today
+
 ## 2026-03-20: project foundation and rename
 
 Backfilled from early `main` commit history:
