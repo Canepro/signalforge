@@ -14,6 +14,9 @@ Before starting:
 4. the Neon staging or safe validation database URL is ready
 5. the checked-in Postgres migrations have been applied to that database
 
+Do not point staging at a shared app database such as the existing production-style `neondb`.
+Use a dedicated staging database for the ACA app, for example `signalforge_staging`, so validation does not mix runs, sources, or collection jobs with another environment.
+
 ## Files to use
 
 - template: [`../infra/aca/main.bicep`](../infra/aca/main.bicep)
@@ -85,6 +88,21 @@ az deployment group what-if \
   --parameters @infra/aca/staging.parameters.json
 ```
 
+If you are driving the Windows Azure CLI from WSL on this machine, point the Azure temp directories at a Windows-accessible path first and pass the parameters file as a Windows path:
+
+```bash
+export TMP=/mnt/c/Users/i/AppData/Local/Temp/codex-aca
+export TEMP=/mnt/c/Users/i/AppData/Local/Temp/codex-aca
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR=/mnt/c/Users/i/AppData/Local/Temp/codex-aca
+
+mkdir -p "$TMP"
+
+az deployment group what-if \
+  --resource-group <resource-group> \
+  --template-file infra/aca/main.bicep \
+  --parameters @"$(wslpath -w infra/aca/staging.parameters.json)"
+```
+
 ## Deploy staging
 
 When ready to create or update the staging app:
@@ -103,11 +121,14 @@ Run these checks against the staging ACA hostname:
 1. `GET /api/health` returns `200`
 2. dashboard loads
 3. `GET /api/runs` responds
-4. create or view a Source in `/sources`
-5. enroll an agent
-6. queue one host job
-7. queue one Kubernetes job
-8. verify artifact upload succeeds and a run is created
+4. on a fresh staging database, `GET /api/runs` is empty before validation uploads
+5. create or view a Source in `/sources` or `POST /api/sources`
+6. enroll an agent
+7. queue one host job
+8. queue one Kubernetes job
+9. verify both jobs can be claimed, started, and completed through `POST /api/collection-jobs/{id}/artifact`
+10. verify the host job reaches `submitted` with `result_analysis_status=complete`
+11. verify the Kubernetes job reaches `submitted` with `result_analysis_status=complete`
 
 ## Rollback stance
 
@@ -115,7 +136,7 @@ If the staging deploy is bad:
 
 1. keep production unchanged
 2. revert to the previous ACA revision
-3. do not rotate away from Neon during rollback
+3. rotate the ACA `database-url` secret back to the last known-good staging database if the issue was isolated to staging DB selection
 4. fix the template, parameters, or image and redeploy
 
 ## Notes
