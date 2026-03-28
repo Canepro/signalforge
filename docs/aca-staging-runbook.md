@@ -44,11 +44,13 @@ Required values to replace:
 
 - `containerAppsEnvironmentId`
 - `image`
+- `registryIdentityResourceId` if using the shared ACR pull identity
 - `databaseUrl`
 - `signalforgeAdminToken`
 
 Optional values to replace:
 
+- `registryServer`
 - `llmProvider`
 - `openAiApiKey`
 - `openAiModel`
@@ -65,6 +67,14 @@ Compile the Bicep file before touching Azure:
 ```bash
 az bicep build --file infra/aca/main.bicep
 ```
+
+For the current Azure subscription inspected from this machine, the reusable ACR pull identity already exists at:
+
+`/subscriptions/d3b51a0d-cdf1-445e-bac3-28e65892afbc/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-canepro-ph-acrpull`
+
+and has `AcrPull` on:
+
+`/subscriptions/d3b51a0d-cdf1-445e-bac3-28e65892afbc/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.ContainerRegistry/registries/caneprophacr01`
 
 If you want a non-destructive Azure-side validation later, use `what-if` before any create or update:
 

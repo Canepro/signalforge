@@ -12,6 +12,12 @@ param containerAppsEnvironmentId string
 @description('Container image reference for the SignalForge app.')
 param image string
 
+@description('Optional ACR server for the image registry.')
+param registryServer string = ''
+
+@description('Optional resource ID of a user-assigned identity with AcrPull on the registry.')
+param registryIdentityResourceId string = ''
+
 @description('CPU cores allocated to the app container.')
 @allowed([
   '0.5'
@@ -233,6 +239,16 @@ var appTemplate = empty(revisionSuffix)
 resource signalforgeApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
+  identity: empty(registryIdentityResourceId)
+    ? {
+        type: 'SystemAssigned'
+      }
+    : {
+        type: 'SystemAssigned, UserAssigned'
+        userAssignedIdentities: {
+          '${registryIdentityResourceId}': {}
+        }
+      }
   tags: tags
   properties: {
     environmentId: containerAppsEnvironmentId
@@ -245,6 +261,14 @@ resource signalforgeApp 'Microsoft.App/containerApps@2024-03-01' = {
         allowInsecure: false
       }
       secrets: containerSecrets
+      registries: !empty(registryServer) && !empty(registryIdentityResourceId)
+        ? [
+            {
+              server: registryServer
+              identity: registryIdentityResourceId
+            }
+          ]
+        : []
     }
     template: appTemplate
   }

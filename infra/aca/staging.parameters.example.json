@@ -14,6 +14,12 @@
     "image": {
       "value": "ghcr.io/canepro/signalforge:staging"
     },
+    "registryServer": {
+      "value": "caneprophacr01.azurecr.io"
+    },
+    "registryIdentityResourceId": {
+      "value": "/subscriptions/<subscription-id>/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-canepro-ph-acrpull"
+    },
     "cpu": {
       "value": "0.5"
     },
