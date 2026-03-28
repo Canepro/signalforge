@@ -1,15 +1,84 @@
 # SignalForge History
 
-This document records small but important repo and operator history that should not live only in chat threads, terminal scrollback, or personal memory.
+This document is the running project log for SignalForge.
 
-Use it for:
+It exists to keep important history in the repo instead of leaving it scattered across:
 
-- migration triggers
-- validated rollout checkpoints
-- production or staging decisions that materially affect future work
-- cross-repo findings that explain why a plan exists
+- chat threads
+- terminal scrollback
+- PR comments
+- personal memory
 
-Do not use it as a full changelog. Keep entries short, factual, and decision-oriented.
+Use it as the durable narrative of the app's life cycle. It should capture meaningful points from early development through current operation, and it can later feed a cleaner changelog or release notes process.
+
+## What Belongs Here
+
+Record entries that would materially help a future maintainer understand:
+
+- why a plan or migration started
+- what changed in the product or operating model
+- what was validated in a real environment
+- what failed in a way that shaped future work
+- what cross-repo decision or discovery changed the roadmap
+
+Examples:
+
+- product-shape changes
+- storage and deployment shifts
+- operator workflow additions
+- real incident or migration triggers
+- major validation checkpoints
+
+## What Does Not Belong Here
+
+This is not meant to be:
+
+- a commit-by-commit changelog
+- a duplicate of `plans/current-plan.md`
+- a scratchpad for temporary debugging notes
+- a dump of every small code change
+
+## Entry Style
+
+Keep entries:
+
+- factual
+- dated
+- short enough to scan
+- detailed enough to preserve the decision context
+
+Prefer:
+
+- one dated heading per meaningful checkpoint
+- short subsections when one day includes multiple related facts
+- explicit separation between confirmed facts and reconstruction when needed
+
+## Relationship To Future Changelogs
+
+Think of this file as the raw repo history log.
+
+Later, changelogs can be distilled from it into a cleaner audience-specific format such as:
+
+- release notes
+- milestone summaries
+- public changelogs
+- operator-facing upgrade notes
+
+## Backfill Stance
+
+This file was introduced after important parts of the project already existed.
+
+That means earlier history should be backfilled carefully from:
+
+- `plans/`
+- `README.md`
+- shipped docs
+- commit history
+- validated cross-repo evidence
+
+Do not invent earlier milestones just to make the timeline look complete.
+
+## Log
 
 ## 2026-03-28: ACA migration evidence and staging validation
 

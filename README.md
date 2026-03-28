@@ -81,7 +81,7 @@ If you are integrating with SignalForge:
 
 - [`docs/api-contract.md`](docs/api-contract.md)
 - [`docs/external-submit.md`](docs/external-submit.md)
-- [`docs/history.md`](docs/history.md)
+- [`docs/history.md`](docs/history.md) for the running repo history log
 - [`docs/schemas/README.md`](docs/schemas/README.md)
 
 If you are operating Sources, agents, or collection jobs:
