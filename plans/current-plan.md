@@ -5,7 +5,7 @@ This file tracks **implemented** work and **recommended next steps**.
 For the canonical long-lived roadmap, see [`roadmap.md`](./roadmap.md).
 For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked historical at the top).
 
-This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, and the merged Phase 9c frontend redesign.
+This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, the merged Phase 9c frontend redesign, and the newly documented ACA migration requirement for production artifact ingestion.
 
 ## Implemented phases
 
@@ -47,6 +47,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is now available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations. The live Vercel deployment uses Neon Postgres.
 - **Deployment workflow:** Vercel preview deployments are available for branches and PRs, so live review does not need to wait for a push or merge to remote `main`.
+- **Production hosting gap:** Vercel remains the current production host, but real host and cluster artifacts can exceed its request-body limits. Migration planning to Azure Container Apps is now tracked explicitly before broader operator rollout.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
 - **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, Vercel.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
@@ -68,6 +69,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 
 ## Recommended next work (high level)
 
+- Production hosting migration now needs to move ahead of broader operator rollout. Real `linux-audit-log` artifacts have already exceeded the Vercel upload boundary, and larger Kubernetes artifacts can do the same. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
