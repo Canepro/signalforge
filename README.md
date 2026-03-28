@@ -265,6 +265,8 @@ If `LLM_PROVIDER=azure` and required variables for the chosen style are missing,
 | `DATABASE_PATH` | If `DATABASE_DRIVER=sqlite` | `./signalforge.db` | SQLite file path for local/self-hosted persistence |
 | `DATABASE_URL` | If `DATABASE_DRIVER=postgres` | — | Postgres connection string for durable remote persistence |
 | `SIGNALFORGE_ADMIN_TOKEN` | **Yes** for Phase 6 operator APIs + `/sources` UI | — | Bootstrap secret: `Authorization: Bearer …` on `/api/sources`, `/api/collection-jobs/*`, `/api/agent/registrations`. If unset, those routes return **503**. The dashboard **Sources** area (`/sources`) signs in via `/sources/login` (httpOnly cookie); the token is not embedded in the client bundle. |
+| `PORT` | No | `3000` | Container/server listen port |
+| `HOSTNAME` | No | runtime default | Host bind value for container/server entrypoints |
 
 Copy `.env.example` to `.env.local` for Next, or export vars in your shell for direct analyzer and helper usage.
 
@@ -300,6 +302,8 @@ That helper will use `--url` if provided, otherwise `DATABASE_URL_TEST` / `DATAB
 
 SQLite remains the easiest local quickstart path. Postgres is the recommended production backend. The live Vercel deployment uses Neon Postgres.
 
+For the Phase 10 containerization slice, keep production containers on `DATABASE_DRIVER=postgres` with Neon or another managed Postgres target. Do not switch the first ACA cut to SQLite. Container build and runtime details: [`docs/app-container-runtime.md`](docs/app-container-runtime.md).
+
 ## CI
 
 GitHub Actions runs on every push to `main` and on pull requests:
@@ -329,11 +333,11 @@ Postgres schema changes must follow the checked-in migration policy: [`docs/post
 
 ### sql.js / deployment
 
-The DB client uses `initSqlJs({ locateFile: ... })` so the WASM is loaded from `node_modules/sql.js/dist/` relative to `process.cwd()`.
+The DB client uses `initSqlJs({ locateFile: ... })` so the WASM can be resolved from the normal `node_modules/sql.js/dist/` path or from traced standalone output.
 
 For serverless or edge-style deployments, ensure the `.wasm` asset is included in the output or copied to a path that `locateFile` can resolve.
 
-Plain Node remains the best-supported path today.
+For the current ACA migration slice, the committed production container uses a Bun build stage and a Node runtime stage with Next standalone output.
 
 ### Fixture logs
 
