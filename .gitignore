@@ -9,3 +9,4 @@ bun.lock
 *.db-wal
 *.db-shm
 .vercel
+infra/aca/main.json
