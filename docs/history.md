@@ -280,3 +280,24 @@ Verification examples after repair:
 
 - Kubernetes run `0cc7a104-b3cc-42d7-83aa-35eb420a5829` now has `collected_at = 2026-03-29T00:18:15.000Z`
 - host run `0ca5cbe6-01f2-471f-8a9e-a5613baa7fb9` now has `collected_at = 2026-03-29T00:11:55.000Z`
+
+### End-of-day checkpoint
+
+State at stop:
+
+- the live ACA staging app remains the active non-production control-plane target
+- `MogahPC` host `systemd` agent is now pointed at ACA staging and has completed a real host job end to end
+- Podman-backed `container-diagnostics` and OKE-backed `kubernetes-bundle` were both validated successfully against ACA staging
+- historical agent-submitted staging runs now carry best-effort `collected_at` values where trustworthy evidence existed
+
+What is done:
+
+- host, container, and Kubernetes artifact families have all been exercised against ACA staging with successful analysis completion
+- the original Vercel `413` migration trigger is now documented in repo history with enough evidence to justify the ACA move
+- collector output and host-agent execution were improved in the external `signalforge-collectors` repo during the same work window
+
+What is not done yet:
+
+- the container and Kubernetes agent paths were validated as one-shot runs, not yet as always-on long-lived deployments
+- one historical direct-upload-style row still has no trustworthy collection timestamp evidence and remains intentionally unset
+- the next real migration step is still to make the non-host agent forms durable, starting with the local Podman-backed container agent because it is the closest to the already-proven host `systemd` model
