@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run tests/analyzer",
     "analyze": "bun src/lib/analyzer/cli.ts",
-    "db:migrate:postgres": "bun scripts/db-migrate-postgres.ts"
+    "db:migrate:postgres": "bun scripts/db-migrate-postgres.ts",
+    "db:backfill:collected-at": "bun scripts/backfill-collected-at.ts"
   },
   "dependencies": {
     "next": "^15.3.2",

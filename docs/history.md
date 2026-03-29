@@ -249,3 +249,34 @@ What is confirmed:
 Implication:
 
 - the remaining blocker on this machine is now in the collector or agent execution path, not ACA ingress
+
+### Historical collected_at repair for agent-submitted runs
+
+On 2026-03-29, a real data-quality gap was closed for historical ACA staging runs.
+
+What was happening:
+
+- new agent uploads were fixed to infer `collected_at`
+- older runs already in the database still had `collected_at = null`
+- that made the run detail UI fall back to recorded time, which was operationally weaker than keeping a best-effort collection timestamp in the database
+
+What changed:
+
+- added a one-time backfill command: `bun run db:backfill:collected-at`
+- backfill priority is:
+  - embedded artifact timestamp where available, such as Kubernetes bundle `collected_at`
+  - collector filename timestamp such as `server_audit_YYYYMMDD_HHMMSS.log`
+  - `run.created_at` only for agent-produced rows with no better hint
+- legacy direct uploads with no trustworthy signal are intentionally left unset
+
+Live staging result:
+
+- ran the backfill against the dedicated staging database `signalforge_staging`
+- scanned `11` runs with `collected_at = null`
+- repaired `10`
+- skipped `1` direct-upload-style row with no trustworthy timestamp evidence
+
+Verification examples after repair:
+
+- Kubernetes run `0cc7a104-b3cc-42d7-83aa-35eb420a5829` now has `collected_at = 2026-03-29T00:18:15.000Z`
+- host run `0ca5cbe6-01f2-471f-8a9e-a5613baa7fb9` now has `collected_at = 2026-03-29T00:11:55.000Z`

@@ -294,6 +294,13 @@ Before starting the app on Postgres, apply the checked-in SQL migrations:
 bun run db:migrate:postgres
 ```
 
+If you need to repair older agent-created runs that were stored before `collected_at`
+was inferred on upload, run the one-time backfill:
+
+```bash
+bun run db:backfill:collected-at
+```
+
 For local Postgres parity validation, prefer:
 
 ```bash

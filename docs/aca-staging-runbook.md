@@ -143,3 +143,4 @@ If the staging deploy is bad:
 
 - The current `GET /api/health` endpoint is config-focused. It is suitable for ACA probes and initial rollout checks, but it does not prove every dependency path by itself.
 - Keep secrets in the parameter file only long enough to pass them to Azure, and prefer secret injection through secure operator workflows in the real environment.
+- If staging already contains older agent-submitted runs from before `collected_at` inference shipped, repair them in place with `DATABASE_DRIVER=postgres DATABASE_URL=<staging-url> bun run db:backfill:collected-at`.

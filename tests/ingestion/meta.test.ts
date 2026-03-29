@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   parseIngestionMeta,
   ingestionRecordFromFormData,
-  inferCollectedAtFromUploadedFile,
 } from "@/lib/ingestion/meta";
+import { inferCollectedAtFromUploadedFile } from "@/lib/ingestion/collected-at";
 
 describe("parseIngestionMeta", () => {
   it("accepts empty input", () => {

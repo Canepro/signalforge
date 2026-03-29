@@ -7,8 +7,8 @@ import {
 import {
   parseIngestionMeta,
   ingestionRecordFromFormData,
-  inferCollectedAtFromUploadedFile,
 } from "@/lib/ingestion/meta";
+import { inferCollectedAtFromUploadedFile } from "@/lib/ingestion/collected-at";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
 import { emitRunLifecycleEvents } from "@/lib/domain-events";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";

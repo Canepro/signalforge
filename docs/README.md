@@ -99,7 +99,7 @@ SignalForge now supports two persistence backends at the app boundary:
 - `sqlite` for local development and simple self-hosting
 - `postgres` for durable remote/serverless deployment
 
-Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` and run `bun run db:migrate:postgres` before starting the app. Migration discipline: [`postgres-migrations.md`](./postgres-migrations.md).
+Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` and run `bun run db:migrate:postgres` before starting the app. If older agent-created runs need timestamp repair, run `bun run db:backfill:collected-at`. Migration discipline: [`postgres-migrations.md`](./postgres-migrations.md).
 
 ## Deployment
 
