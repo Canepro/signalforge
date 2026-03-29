@@ -4,7 +4,11 @@ import {
   detectArtifactType,
   isSupportedArtifactType,
 } from "@/lib/adapter/registry";
-import { parseIngestionMeta, ingestionRecordFromFormData } from "@/lib/ingestion/meta";
+import {
+  parseIngestionMeta,
+  ingestionRecordFromFormData,
+  inferCollectedAtFromUploadedFile,
+} from "@/lib/ingestion/meta";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
 import { emitRunLifecycleEvents } from "@/lib/domain-events";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
@@ -61,6 +65,12 @@ export async function POST(
     target_identifier: ctx.source.target_identifier,
     source_label: `agent:${ctx.registration.id}`,
   };
+  if (ingestionInput.collected_at == null || ingestionInput.collected_at === "") {
+    const inferredCollectedAt = inferCollectedAtFromUploadedFile(file, filename);
+    if (inferredCollectedAt) {
+      ingestionInput.collected_at = inferredCollectedAt;
+    }
+  }
   if (ingestionInput.collector_type == null || ingestionInput.collector_type === "") {
     ingestionInput.collector_type = ctx.source.default_collector_type;
   }

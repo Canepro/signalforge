@@ -65,6 +65,9 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const targetDetail = run.environment?.os
     ? run.environment.os
     : (artifactFamily?.description ?? null);
+  const collectionTimeValue =
+    run.collected_at_label ?? run.created_at_label ?? run.created_at;
+  const collectionTimeLabel = run.collected_at_label ? "Collected at" : "Recorded at";
 
   function handleExport() {
     const url = `/api/runs/${run.id}/report`;
@@ -194,7 +197,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                         { label: "Artifact source", value: run.source_label ?? "Not recorded", mono: !!run.source_label },
                         { label: "Collector", value: run.collector_type ?? "Direct upload", sub: run.collector_version, mono: !!run.collector_type },
                         { label: "Target ID", value: run.target_identifier ?? "Not recorded", mono: !!run.target_identifier },
-                        { label: "Collected at", value: run.collected_at_label ?? "Not recorded" },
+                        { label: collectionTimeLabel, value: collectionTimeValue },
                       ] as Array<{ label: string; value: string; sub?: string | null; mono?: boolean }>).map((cell) => (
                         <div key={cell.label} className="border-b border-outline-variant/10 px-3 py-2">
                           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-outline-variant">

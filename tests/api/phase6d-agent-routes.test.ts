@@ -845,6 +845,73 @@ describe("Phase 6d agent routes", () => {
     expect(getArtifactById(db, artifactId)).toBeNull();
   });
 
+  it("artifact upload infers collected_at from uploaded file metadata when omitted", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-art-collected-at");
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const next = await GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) })
+    );
+    const jobId = (await next.json()).jobs[0].id as string;
+
+    await POST_CLAIM(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/claim`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "ts-a", lease_ttl_seconds: 300 }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+    await POST_START(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/start`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "ts-a" }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    const form = new FormData();
+    form.append("instance_id", "ts-a");
+    form.append(
+      "file",
+      new File([SAMPLE_LOG], "server_audit_20260329_001155.log", {
+        type: "text/plain",
+        lastModified: Date.UTC(2026, 2, 29, 0, 11, 55),
+      })
+    );
+    const art = await POST_ARTIFACT(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/artifact`, {
+        method: "POST",
+        headers: agentAuth(token),
+        body: form,
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    expect(art.status).toBe(200);
+    const body = await art.json();
+    const run = getRun(db, body.run_id as string);
+    expect(run?.collected_at).toBe("2026-03-29T00:11:55.000Z");
+  });
+
   it("heartbeat with active_job_id requires instance_id and validates lease", async () => {
     const { sourceId, token } = await createSourceAndAgent(db, "tid-hb-job");
     await POST_HEARTBEAT(

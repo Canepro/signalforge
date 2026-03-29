@@ -26,6 +26,9 @@ export interface ParsedIngestionMeta {
   collected_at: string | null;
 }
 
+const COLLECTOR_FILENAME_TIME_RE =
+  /^(?:server_audit|container[-_]diagnostics|kubernetes[-_]bundle)(?:_[a-z0-9._-]+)?_(\d{8})_(\d{6})\.[a-z0-9]+$/i;
+
 const EMPTY: ParsedIngestionMeta = {
   target_identifier: null,
   source_label: null,
@@ -140,4 +143,36 @@ export function ingestionRecordFromFormData(formData: FormData): Record<string, 
     }
   }
   return out;
+}
+
+export function inferCollectedAtFromUploadedFile(
+  file: { lastModified?: number },
+  filename: string
+): string | null {
+  if (
+    typeof file.lastModified === "number" &&
+    Number.isFinite(file.lastModified) &&
+    file.lastModified > 0
+  ) {
+    return new Date(file.lastModified).toISOString();
+  }
+
+  const match = filename.match(COLLECTOR_FILENAME_TIME_RE);
+  if (!match) return null;
+
+  const [, yyyymmdd, hhmmss] = match;
+  const year = Number.parseInt(yyyymmdd.slice(0, 4), 10);
+  const month = Number.parseInt(yyyymmdd.slice(4, 6), 10);
+  const day = Number.parseInt(yyyymmdd.slice(6, 8), 10);
+  const hour = Number.parseInt(hhmmss.slice(0, 2), 10);
+  const minute = Number.parseInt(hhmmss.slice(2, 4), 10);
+  const second = Number.parseInt(hhmmss.slice(4, 6), 10);
+
+  if ([year, month, day, hour, minute, second].some(Number.isNaN)) {
+    return null;
+  }
+
+  return new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second)
+  ).toISOString();
 }
