@@ -491,3 +491,24 @@ Why it matters:
 - the screen now uses less vertical space to say the same thing
 - the densified layout keeps more of the operator story above the fold without adding noise
 - labels now communicate state instead of implementation detail
+
+## 2026-03-30: Phase 10 branch merged and ACA staging moved to merged `main`
+
+What changed:
+
+- merged PR `#8` into `main`
+- synced local `main` to merge commit `68fa777`
+- built and pushed `caneprophacr01.azurecr.io/signalforge:staging-68fa777`
+- updated ACA app `ca-signalforge-staging` to revision `ca-signalforge-staging--stg68fa777`
+
+Why it matters:
+
+- the ACA staging app is now running the merged `main` state instead of the older `staging-79b7e81` image
+- the branch work is no longer only validated in the feature branch or PR context
+- the repo history now captures the production-like handoff point for the Phase 10 staging rollout
+
+Verification:
+
+- `curl https://ca-signalforge-staging.kinddune-53ac219d.eastus2.azurecontainerapps.io/api/health` returned `200`
+- `curl https://ca-signalforge-staging.kinddune-53ac219d.eastus2.azurecontainerapps.io/api/runs` returned `200`
+- ACA revision list showed `ca-signalforge-staging--stg68fa777` healthy with `100%` traffic
