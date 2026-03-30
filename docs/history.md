@@ -301,3 +301,39 @@ What is not done yet:
 - the container and Kubernetes agent paths were validated as one-shot runs, not yet as always-on long-lived deployments
 - one historical direct-upload-style row still has no trustworthy collection timestamp evidence and remains intentionally unset
 - the next real migration step is still to make the non-host agent forms durable, starting with the local Podman-backed container agent because it is the closest to the already-proven host `systemd` model
+
+## 2026-03-30: durable local Podman container-agent service
+
+The local `container-diagnostics` path moved from ad hoc one-shot validation into a durable workstation service shape.
+
+What changed:
+
+- reused the existing staging source `MogahPC Podman signalforge-pg`
+- rotated its source-bound token for a clean durable runner
+- created a dedicated user-scoped `systemd` unit:
+  - `~/.config/systemd/user/signalforge-agent-container.service`
+- created dedicated local credential and env files:
+  - `~/.config/signalforge-agent-container/env`
+  - `~/.config/signalforge-agent-container/token`
+- kept the runner narrow-scoped to `collect:container-diagnostics,upload:multipart`
+
+What was learned during rollout:
+
+- the first user-unit attempt copied host-agent hardening that blocked rootless Podman namespace setup
+- removing the blocking service restrictions was necessary on this machine
+- `podman system migrate` was also required after Podman reported an internal pause or namespace error
+
+Result:
+
+- the user-scoped container agent now starts automatically in the active user `systemd` session
+- it successfully claimed, started, collected, uploaded, and completed a real `container-diagnostics` job against ACA staging
+- verified completed job:
+  - job `5330b1fa-f8c1-46f7-a7fe-946881d6c028`
+  - run `9e787140-df00-4227-9b96-bc3ccf430357`
+  - artifact `b2299251-56f6-447c-b62f-672d8eccc694`
+
+Important caveat:
+
+- this is a user-scoped service, not yet a root-owned boot-persistent system service
+- `loginctl show-user vincent` still reported `Linger=no`, so this is durable for the active workstation session but not yet the final always-on form
+- the live ACA staging app also still appears to be on an older image than the latest repo fixes, because the newly completed run did not yet persist `collected_at` despite that logic existing on the branch
