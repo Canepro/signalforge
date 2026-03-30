@@ -1,5 +1,6 @@
 import { deriveSeverityCounts } from "@/lib/db/repository";
 import type { RunRow } from "@/lib/db/repository";
+import { buildRunDetailSummaryModules } from "@/lib/run-detail-summary";
 import type { RunDetail } from "@/types/api";
 import type { GetRunDetailResponse } from "@/types/api-contract";
 
@@ -14,9 +15,10 @@ function formatRunTimestamp(iso: string): string {
 
 export function buildRunDetail(
   row: RunRow & { artifact_type: string },
-  parent_run: { id: string; filename: string } | null = null
+  parent_run: { id: string; filename: string } | null = null,
+  artifactContent?: string | null
 ): RunDetail {
-  return {
+  const detail: RunDetail = {
     id: row.id,
     artifact_id: row.artifact_id,
     parent_run_id: row.parent_run_id,
@@ -45,6 +47,8 @@ export function buildRunDetail(
     noise: row.noise_json ? JSON.parse(row.noise_json) : null,
     pre_findings: row.pre_findings_json ? JSON.parse(row.pre_findings_json) : null,
   };
+  detail.summary_modules = buildRunDetailSummaryModules(detail, artifactContent ?? null);
+  return detail;
 }
 
 /**

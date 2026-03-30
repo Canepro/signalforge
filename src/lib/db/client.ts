@@ -27,6 +27,20 @@ export function setDbOverride(db: Database | null): void {
   _dbOverride = db;
 }
 
+export function resolveSqlJsDistDir(cwd: string = process.cwd()): string {
+  const candidates = [
+    join(cwd, ".next", "standalone", "node_modules", "sql.js", "dist"),
+    join(cwd, "node_modules", "sql.js", "dist"),
+    join(cwd, ".next", "server", "vendor-chunks", "sql.js", "dist"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+
+  return candidates[1]!;
+}
+
 function resolveDbPath(): string {
   return process.env.DATABASE_PATH ?? join(process.cwd(), "signalforge.db");
 }
@@ -60,14 +74,9 @@ async function loadDbFromPath(dbPath: string): Promise<Database> {
 }
 
 function sqlJsInitOptions(): { locateFile: (file: string) => string } {
-  const nodeModulesDist = join(process.cwd(), "node_modules", "sql.js", "dist");
-  const tracedDist = join(process.cwd(), ".next", "server", "vendor-chunks", "sql.js", "dist");
+  const sqlJsDist = resolveSqlJsDistDir();
   return {
-    locateFile: (file: string) => {
-      const tracedPath = join(tracedDist, file);
-      if (existsSync(tracedPath)) return tracedPath;
-      return join(nodeModulesDist, file);
-    },
+    locateFile: (file: string) => join(sqlJsDist, file),
   };
 }
 

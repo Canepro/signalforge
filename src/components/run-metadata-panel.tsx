@@ -29,6 +29,10 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
   const artifactFamily = getArtifactFamilyPresentation(run.artifact_type);
   const artifactFamilyLabel =
     artifactFamily?.label ?? getArtifactTypeLabel(run.artifact_type);
+  const collectionTimeValue = run.collected_at ?? run.created_at;
+  const collectionTimeDisplay =
+    run.collected_at_label ?? run.created_at_label ?? run.created_at;
+  const collectionTimeLabel = run.collected_at_label ? "Collected at" : "Recorded at";
 
   const sections: MetadataSection[] = [
     {
@@ -88,9 +92,9 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
           mono: true,
         },
         {
-          label: "Collected at",
-          value: run.collected_at,
-          display: run.collected_at_label ?? run.collected_at,
+          label: collectionTimeLabel,
+          value: collectionTimeValue,
+          display: collectionTimeDisplay,
         },
       ],
     },

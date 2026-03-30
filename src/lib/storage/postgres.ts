@@ -494,7 +494,11 @@ class PostgresRunsStore implements RunsStore {
     const row = await getRunWithArtifactById(this.q, id);
     if (!row) return null;
     const parent = row.parent_run_id ? await getRunById(this.q, row.parent_run_id) : null;
-    return buildRunDetail(row, parent ? { id: parent.id, filename: parent.filename } : null);
+    return buildRunDetail(
+      row,
+      parent ? { id: parent.id, filename: parent.filename } : null,
+      row.artifact_content
+    );
   }
 
   async getReport(id: string) {

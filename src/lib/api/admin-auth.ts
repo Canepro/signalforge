@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-export function getAdminTokenFromEnv(): string | null {
-  const t = process.env.SIGNALFORGE_ADMIN_TOKEN;
+export function getAdminTokenFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
+  const t = env.SIGNALFORGE_ADMIN_TOKEN;
   if (!t || !t.trim()) return null;
   return t.trim();
 }

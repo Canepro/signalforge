@@ -5,7 +5,7 @@ This file tracks **implemented** work and **recommended next steps**.
 For the canonical long-lived roadmap, see [`roadmap.md`](./roadmap.md).
 For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked historical at the top).
 
-This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, and the merged Phase 9c frontend redesign.
+This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, the merged Phase 9c frontend redesign, and the newly documented ACA migration requirement for production artifact ingestion.
 
 ## Implemented phases
 
@@ -47,6 +47,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is now available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations. The live Vercel deployment uses Neon Postgres.
 - **Deployment workflow:** Vercel preview deployments are available for branches and PRs, so live review does not need to wait for a push or merge to remote `main`.
+- **Production hosting gap:** Vercel remains the current production host, but real host and cluster artifacts can exceed its request-body limits. Migration planning to Azure Container Apps is now tracked explicitly before broader operator rollout.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
 - **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, Vercel.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
@@ -65,9 +66,11 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
 - The current source and agent model is still effectively one registration per source, which may become limiting for Kubernetes or future multi-scope execution.
+- Run detail still under-surfaces some operator-relevant operational evidence, especially when quantitative pressure signals exist in the artifact but the page presents them mainly as text findings instead of artifact-aware summaries.
 
 ## Recommended next work (high level)
 
+- Production hosting migration now needs to move ahead of broader operator rollout. Real `linux-audit-log` artifacts have already exceeded the Vercel upload boundary, and larger Kubernetes artifacts can do the same. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
@@ -81,6 +84,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
   - richer container runtime-health diagnostics such as state, health, restart, OOM, bounded unhealthy log excerpts, memory limits/reservations, and one-shot CPU/memory stats
   - findings and dashboard presentation that surfaces this evidence instead of burying it
   - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
+- The next focused UI follow-on inside that work should be the run-detail operator summary redesign in [`phase-9d-run-detail-operator-summary.md`](./phase-9d-run-detail-operator-summary.md), which defines how charts, structured callouts, and reusable artifact-aware summary modules should reduce operator reading load without turning the page into dashboard filler.
 - Preferred deployment stance for `signalforge-agent` is now environment-specific: host `systemd` remains the preferred path for `linux-audit-log`, a long-running containerized runner on the runtime host is the preferred path for `container-diagnostics`, and a cluster-side Deployment is the preferred path for `kubernetes-bundle`. The sibling repo now includes all three packaging forms plus token-file credential loading, `preflight`, a dry-run installer flow, explicit `kubectl` and kubeconfig pinning, managed kubeconfig install support, and stricter container-runtime readiness checks that require real Docker or Podman access rather than bare binary presence. A real `systemd-run --user` smoke now validates the preferred host-service path without requiring root.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).

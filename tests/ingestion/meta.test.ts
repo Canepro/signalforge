@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseIngestionMeta, ingestionRecordFromFormData } from "@/lib/ingestion/meta";
+import {
+  parseIngestionMeta,
+  ingestionRecordFromFormData,
+} from "@/lib/ingestion/meta";
+import { inferCollectedAtFromUploadedFile } from "@/lib/ingestion/collected-at";
 
 describe("parseIngestionMeta", () => {
   it("accepts empty input", () => {
@@ -56,5 +60,28 @@ describe("ingestionRecordFromFormData", () => {
     const rec = ingestionRecordFromFormData(fd);
     expect(rec.collector_type).toBe("kit");
     expect(rec.target_identifier).toBe("t1");
+  });
+});
+
+describe("inferCollectedAtFromUploadedFile", () => {
+  it("prefers file lastModified when available", () => {
+    const iso = inferCollectedAtFromUploadedFile(
+      { lastModified: Date.UTC(2026, 2, 29, 0, 11, 55) },
+      "server_audit_20260329_001155.log"
+    );
+    expect(iso).toBe("2026-03-29T00:11:55.000Z");
+  });
+
+  it("falls back to known collector filename timestamps", () => {
+    const iso = inferCollectedAtFromUploadedFile(
+      { lastModified: 0 },
+      "kubernetes_bundle_monitoring_20260329_001815.json"
+    );
+    expect(iso).toBe("2026-03-29T00:18:15.000Z");
+  });
+
+  it("returns null when there is no usable timestamp hint", () => {
+    const iso = inferCollectedAtFromUploadedFile({ lastModified: 0 }, "manual-upload.json");
+    expect(iso).toBeNull();
   });
 });

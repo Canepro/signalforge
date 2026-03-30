@@ -71,4 +71,13 @@ describe("admin-auth", () => {
     process.env.SIGNALFORGE_ADMIN_TOKEN = "  x  ";
     expect(getAdminTokenFromEnv()).toBe("x");
   });
+
+  it("getAdminTokenFromEnv can read from an explicit env snapshot", () => {
+    expect(
+      getAdminTokenFromEnv({
+        ...process.env,
+        SIGNALFORGE_ADMIN_TOKEN: "  scoped-secret  ",
+      })
+    ).toBe("scoped-secret");
+  });
 });

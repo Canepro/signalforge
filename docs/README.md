@@ -43,12 +43,19 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`agent-deployment.md`](./agent-deployment.md) | Preferred `signalforge-agent` deployment model, trust boundaries, and security baseline |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
+| [`history.md`](./history.md) | Running project history log for milestones, migration triggers, validations, and major operating decisions |
+| [`ui-system-direction.md`](./ui-system-direction.md) | Current UI-system decision, including how SignalForge should treat `shadcn/ui` versus the existing `sf-*` design primitives |
+| [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
+| [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
+| [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
+| [`aca-staging-runbook.md`](./aca-staging-runbook.md) | Slice 3 staging deployment runbook using the checked-in ACA template and parameter contract |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
 | [`postgres-validation.md`](./postgres-validation.md) | Reproducible live validation notes for the Postgres backend |
 | [`schemas/README.md`](./schemas/README.md) | Lightweight JSON Schemas for the published API contract |
 | [`../AGENTS.md`](../AGENTS.md) | Repo-local instructions, architecture, and working rules for future agents |
 | [`../plans/roadmap.md`](../plans/roadmap.md) | Long-lived product roadmap and future direction |
 | [`../plans/current-plan.md`](../plans/current-plan.md) | Current shipped state and recommended next work |
+| [`../plans/phase-10-aca-migration.md`](../plans/phase-10-aca-migration.md) | Production hosting migration plan from Vercel to Azure Container Apps |
 | [`../plans/phase-9c-frontend-operator-workstation-polish.md`](../plans/phase-9c-frontend-operator-workstation-polish.md) | Frontend redesign and interaction-polish source of truth for the operator workstation pass |
 | [`../plans/phase-9c-stabilization-checklist.md`](../plans/phase-9c-stabilization-checklist.md) | Post-implementation gate for preview QA, browser validation, and final Phase 9c signoff |
 | [`../plans/phase-7-storage-abstraction.md`](../plans/phase-7-storage-abstraction.md) | Planned storage abstraction and multi-backend persistence direction |
@@ -93,7 +100,7 @@ SignalForge now supports two persistence backends at the app boundary:
 - `sqlite` for local development and simple self-hosting
 - `postgres` for durable remote/serverless deployment
 
-Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` and run `bun run db:migrate:postgres` before starting the app. Migration discipline: [`postgres-migrations.md`](./postgres-migrations.md).
+Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` and run `bun run db:migrate:postgres` before starting the app. If older agent-created runs need timestamp repair, run `bun run db:backfill:collected-at`. Migration discipline: [`postgres-migrations.md`](./postgres-migrations.md).
 
 ## Deployment
 

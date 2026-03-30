@@ -137,6 +137,7 @@ Core directories:
 - Keep the backend channel-agnostic.
 - Prefer targeted rule improvements over broad abstraction.
 - Preserve evidence grounding for every finding.
+- Before any meaningful analysis, coding, or review, check the current session skill catalog for a relevant local skill. If one exists, open its `SKILL.md` first, say which skill is being used and why, and do not start implementation until that check is complete. If no relevant skill exists, say that explicitly before continuing.
 - Keep UI operator-first, table-first, and light-theme by default.
 - Use the local `naming-quality` skill whenever naming or renaming files, fixtures, modules, exported identifiers, routes, API fields, or user-facing labels.
 - Treat naming as part of product quality. Prefer scenario-based, open-source-safe names over names tied to the author's machine, provider, runtime, or temporary environment unless that provenance is itself the behavior under test.

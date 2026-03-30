@@ -152,12 +152,13 @@ The live SignalForge instance is deployed on **Vercel** with a **Neon Postgres**
 
 Recommended near-term choices:
 
-1. Use the system with more real submissions and collect friction.
-2. Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
-3. Close the remaining Phase 9 validation tail: live Postgres parity for the new scope columns, plus production-like container-host and cluster-side deployment smoke after the repo-local Linux, container, and Kubernetes job-driven flows. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
-4. Continue agent hardening: keep the environment-specific deployment matrix explicit, preserve the new managed-kubeconfig and user-`systemd` validation path, and carry the stricter container-runtime access checks into a production-like host install smoke plus live container-host and cluster-side deployment validation.
-5. Plan and implement the next diagnostics-enrichment tranche so SignalForge expands beyond posture-only evidence for containers and Kubernetes, and update the dashboard and findings experience so that richer evidence is visible and useful instead of hidden. Source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md).
-6. Add lint to CI.
+1. Migrate production hosting from Vercel to Azure Container Apps so agent-driven host and cluster artifact ingestion is no longer blocked by small function request-body limits. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
+2. Use the system with more real submissions and collect friction once the production ingestion path is credible again.
+3. Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
+4. Close the remaining Phase 9 validation tail: live Postgres parity for the new scope columns, plus production-like container-host and cluster-side deployment smoke after the repo-local Linux, container, and Kubernetes job-driven flows. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
+5. Continue agent hardening: keep the environment-specific deployment matrix explicit, preserve the new managed-kubeconfig and user-`systemd` validation path, and carry the stricter container-runtime access checks into a production-like host install smoke plus live container-host and cluster-side deployment validation.
+6. Plan and implement the next diagnostics-enrichment tranche so SignalForge expands beyond posture-only evidence for containers and Kubernetes, and update the dashboard and findings experience so that richer evidence is visible and useful instead of hidden. Source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md).
+7. Add lint to CI.
 
 ## Future Phases
 
@@ -250,6 +251,19 @@ Possible scope:
 - controlled “collect fresh evidence” workflows
 - likely push-first or hybrid orchestration
 - explicit security and trust model required first
+
+### Phase 10: Azure Container Apps Migration
+
+Source of truth:
+
+- [`phase-10-aca-migration.md`](./phase-10-aca-migration.md)
+
+Possible scope:
+
+- migrate production hosting from Vercel to Azure Container Apps
+- keep Neon Postgres for the first migration slice
+- containerize SignalForge itself
+- validate real host and cluster artifact ingestion against ACA before production cutover
 
 ### Phase 10b: Operational Diagnostics Enrichment and Rich Presentation
 

@@ -4,8 +4,8 @@ out/
 .env
 .env.local
 *.tsbuildinfo
-bun.lock
 *.db
 *.db-wal
 *.db-shm
 .vercel
+infra/aca/main.json

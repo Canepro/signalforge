@@ -27,6 +27,7 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | Route | Use it for |
 |---|---|
 | `POST /api/runs` | Submit new evidence |
+| `GET /api/health` | Read runtime health for container and operator checks |
 | `GET /api/runs` | List known runs |
 | `GET /api/runs/[id]` | Read a run and its stored report |
 | `GET /api/runs/[id]/report` | Read raw report JSON only |
@@ -58,6 +59,49 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | Full `AuditReport` and findings | Evolves with analyzer and LLM output; clients should tolerate unknown fields. |
 
 ## Routes
+
+### `GET /api/health`
+
+Runtime health snapshot for the currently configured app boot path.
+
+Intended for:
+
+- container or App Container health checks
+- operator validation of storage and admin-token wiring
+- confirming whether the app is using deterministic LLM fallback
+
+**200:** app boot path is valid for the current storage selection.
+**503:** runtime config is invalid for the selected storage driver.
+
+**200 / 503 body:**
+
+```json
+{
+  "ok": true,
+  "service": "signalforge",
+  "storage": {
+    "driver": "sqlite",
+    "status": "ok",
+    "missing": []
+  },
+  "llm": {
+    "provider": "openai",
+    "status": "fallback"
+  },
+  "admin_api": {
+    "status": "disabled"
+  }
+}
+```
+
+Notes:
+
+- `storage.driver` follows the same normalized `DATABASE_DRIVER` selection semantics as runtime storage boot.
+- unsupported `DATABASE_DRIVER` values return `storage.status: "error"` and `ok: false`.
+- `llm.status: "fallback"` means SignalForge will continue with deterministic analysis when the configured LLM provider is unavailable or incomplete.
+- `admin_api.status` reflects whether `SIGNALFORGE_ADMIN_TOKEN` is set and non-empty.
+
+---
 
 ### `POST /api/runs`
 

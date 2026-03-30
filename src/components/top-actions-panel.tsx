@@ -29,7 +29,7 @@ export function TopActionsPanel({
   return (
     <section className="shrink-0 border-b border-outline-variant/10 bg-surface-container-lowest shadow-sm">
       {(showToolbar || showGrid) && (
-        <div className="flex flex-col gap-3 border-b border-outline-variant/10 bg-surface-container-low/60 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+        <div className="flex flex-col gap-2.5 border-b border-outline-variant/10 bg-surface-container-low/60 px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex items-center gap-2 min-w-0">
             <svg
               className="h-3.5 w-3.5 text-warning shrink-0"
@@ -45,10 +45,10 @@ export function TopActionsPanel({
             </svg>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warning">
-                {showGrid ? "Top Actions Now" : "Run actions"}
+                {showGrid ? "Operator priorities" : "Run actions"}
               </div>
-              <p className="text-xs text-on-surface-variant">
-                Reanalyze, compare, or export this run without relying on icon-only controls.
+              <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                Canonical action surface for this run.
               </p>
             </div>
           </div>
@@ -149,9 +149,9 @@ export function TopActionsPanel({
       {showGrid ? (
         <div className="grid grid-cols-1 divide-y divide-surface-container-low md:grid-cols-3 md:divide-x md:divide-y-0">
           {actions.map((action, i) => (
-            <div key={i} className="flex gap-3 px-4 py-4 lg:px-5">
+            <div key={i} className="flex gap-3 px-4 py-3.5 lg:px-5">
               <div
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
                   i === 0
                     ? "bg-warning/10 text-warning border border-warning/20"
                     : "bg-surface-container-high text-on-surface-variant"
@@ -159,7 +159,7 @@ export function TopActionsPanel({
               >
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <p className="text-sm font-semibold leading-snug text-on-surface">{action}</p>
+              <p className="text-[13px] font-semibold leading-snug text-on-surface">{action}</p>
             </div>
           ))}
         </div>
