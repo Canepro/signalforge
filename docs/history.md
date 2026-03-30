@@ -365,3 +365,23 @@ Current state after cutover:
 - the root-owned host audit agent remains the durable runner for `linux-audit-log`
 - the root-owned container agent is now the durable runner for `container-diagnostics`
 - the user-scoped container-agent bridge was only a migration aid and is no longer installed
+
+## 2026-03-30: ACA staging redeployed to current branch image
+
+The staging ACA app was rolled forward from the older `staging-8b65719` image to the current branch image so the live environment matched the branch fixes.
+
+What changed:
+
+- built and pushed `caneprophacr01.azurecr.io/signalforge:staging-79b7e81`
+- updated `ca-signalforge-staging` to revision `ca-signalforge-staging--stg79b7e81`
+- waited for the new revision to become the ready revision before running live checks
+
+Result:
+
+- `GET /api/health` stayed healthy after rollout
+- a fresh ACA-driven `container-diagnostics` job completed successfully through the root-owned container agent
+- verified completed job:
+  - job `785c1fec-e5d1-4a4d-af52-3de5276f48dc`
+  - run `d4799328-5a7a-4071-bd17-111004a12c28`
+  - artifact `8dee8157-2fde-4f6e-b162-5914453cbdcc`
+- the new run now carries a real `collected_at = 2026-03-30T17:23:47.363Z`, confirming the previously missing live staging behavior is now deployed
