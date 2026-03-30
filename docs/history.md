@@ -429,3 +429,65 @@ Current state after rollout:
 - `container-diagnostics` has a durable root-owned runtime-host runner
 - `kubernetes-bundle` now has a durable cluster-side OKE runner
 - ACA staging has now been validated end to end across all three current artifact families with real agent-driven flows
+
+## 2026-03-30: UI-system decision and run-detail redesign brief
+
+What changed:
+
+- recorded the UI-system decision in [`docs/ui-system-direction.md`](./ui-system-direction.md)
+- confirmed that SignalForge still does not use `shadcn/ui` today and should not do a blind migration from the current custom `sf-*` system
+- added a focused run-detail redesign brief in [`plans/phase-9d-run-detail-operator-summary.md`](../plans/phase-9d-run-detail-operator-summary.md)
+
+Why it matters:
+
+- this captures the design decision in repo form instead of relying on chat memory
+- it also narrows the next frontend problem from generic "make the findings tab better" into a concrete operator-summary redesign based on evidence the product already collects
+- the brief explicitly keeps charts bounded to naturally quantitative evidence and keeps the findings table as the source of truth
+
+## 2026-03-30: run-detail summary modules implemented on the ACA migration branch
+
+What changed:
+
+- replaced the run-detail-only evidence-card block with a dedicated artifact-aware summary-module layer
+- moved run-detail summary assembly onto the server-side page-detail path so modules can use raw persisted artifact content without widening the public API contract
+- added first-slice summary modules for:
+  - shared run health and immediate next steps
+  - Kubernetes capacity, top consumers, guardrails, and instability
+  - container runtime health, resource snapshot, and guardrails
+  - Linux host pressure and storage watch
+
+Why it matters:
+
+- the page can now tell a stronger operator story before the findings table
+- quantitative signals such as node memory, node CPU, top pod consumers, container CPU or memory, and host disk usage can now be shown as compact bars instead of only text findings
+- the new module contract gives future frontend work one reusable place to add richer artifact-aware summaries instead of layering more page-specific cards
+
+## 2026-03-30: run-detail hierarchy consolidation after live operator review
+
+What changed:
+
+- removed the duplicate `Immediate Next Steps` module so `Top Actions` remains the single canonical recommendation surface
+- added `primary` vs `supporting` prominence to run-detail summary modules so artifact-family lead signals can visually outrank secondary context
+- reordered the page so artifact-aware operator summaries and findings filters appear before the narrative summary
+- reduced the findings overview surface to counts and filters instead of a second synthesis pass
+- collapsed the prose summary into an explicit `Analysis narrative` expander
+
+Why it matters:
+
+- the screen now opens with scan-friendly state instead of explanation, which is the right read path for an operator-first diagnostics product
+- the most important quantitative module can now lead the page without fighting equally weighted secondary cards
+- the page no longer repeats the same recommendation set in multiple places with different chrome
+
+## 2026-03-30: run-detail spacing and density polish pass
+
+What changed:
+
+- tightened summary-module spacing and reduced low-signal helper copy in the summary and findings-filter surfaces
+- replaced generic module count chips with operator-meaningful status labels such as `Needs action` and `Watch closely`
+- made the top-actions strip denser and clearer so it reads more like a control surface and less like a banner
+
+Why it matters:
+
+- the screen now uses less vertical space to say the same thing
+- the densified layout keeps more of the operator story above the fold without adding noise
+- labels now communicate state instead of implementation detail

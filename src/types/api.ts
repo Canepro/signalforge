@@ -5,6 +5,61 @@ import type {
   PreFinding,
 } from "@/lib/analyzer/schema";
 
+export type RunDetailSummaryTone = "critical" | "warning" | "neutral";
+export type RunDetailSummaryProminence = "primary" | "supporting";
+
+export interface RunDetailSummaryStat {
+  label: string;
+  value: string;
+  detail?: string | null;
+  tone?: RunDetailSummaryTone;
+  mono?: boolean;
+}
+
+export interface RunDetailSummaryBar {
+  label: string;
+  value: number;
+  maxValue: number;
+  value_label: string;
+  detail?: string | null;
+  tone?: RunDetailSummaryTone;
+}
+
+export interface RunDetailSummaryCallout {
+  title: string;
+  body: string;
+  tone?: RunDetailSummaryTone;
+}
+
+export type RunDetailSummaryModule =
+  | {
+      id: string;
+      title: string;
+      summary: string;
+      tone: RunDetailSummaryTone;
+      prominence: RunDetailSummaryProminence;
+      kind: "stat-grid";
+      stats: RunDetailSummaryStat[];
+    }
+  | {
+      id: string;
+      title: string;
+      summary: string;
+      tone: RunDetailSummaryTone;
+      prominence: RunDetailSummaryProminence;
+      kind: "bar-list";
+      bars: RunDetailSummaryBar[];
+    }
+  | {
+      id: string;
+      title: string;
+      summary: string;
+      tone: RunDetailSummaryTone;
+      prominence: RunDetailSummaryProminence;
+      kind: "callout-list";
+      callouts: RunDetailSummaryCallout[];
+    };
+
 export interface RunSummary {
   id: string;
   artifact_id: string;
@@ -57,4 +112,5 @@ export interface RunDetail {
   environment: EnvironmentContext | null;
   noise: NoiseItem[] | null;
   pre_findings: PreFinding[] | null;
+  summary_modules?: RunDetailSummaryModule[] | null;
 }

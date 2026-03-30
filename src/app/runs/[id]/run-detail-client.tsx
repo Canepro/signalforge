@@ -9,17 +9,16 @@ import { SeveritySummary } from "@/components/severity-badge";
 import { TopActionsPanel } from "@/components/top-actions-panel";
 import { FindingsTable } from "@/components/findings-table";
 import { FindingsOverview } from "@/components/findings-overview";
-import { RunEvidenceSections } from "@/components/run-evidence-sections";
 import { SuppressedNoisePanel } from "@/components/suppressed-noise-panel";
 import { RunMetadataPanel } from "@/components/run-metadata-panel";
 import { EnvironmentBanner } from "@/components/environment-banner";
 import { UploadModal } from "@/components/upload-modal";
 import { CollectEvidenceModal } from "@/components/collect-evidence-modal";
+import { RunDetailSummaryModules } from "@/components/run-detail-summary-modules";
 import type { Severity } from "@/lib/analyzer/schema";
 import type { RunDetail } from "@/types/api";
 import { compareRunAgainstHref, compareRunHref } from "@/lib/compare/nav";
 import { classifyFindingSignal, type FindingSignal } from "@/lib/findings-presentation";
-import { buildRunEvidenceSections } from "@/lib/run-evidence-presentation";
 import {
   getArtifactFamilyPresentation,
   getArtifactTypeLabel,
@@ -43,7 +42,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const findings = report?.findings ?? [];
   const noise = run.noise ?? report?.noise_or_expected ?? [];
   const topActions = report?.top_actions_now ?? [];
-  const evidenceSections = buildRunEvidenceSections(run.artifact_type, findings);
+  const summaryModules = run.summary_modules ?? [];
   const filteredFindings = findings.filter((finding) => {
     const matchesSignal =
       activeSignal === "all" || classifyFindingSignal(finding) === activeSignal;
@@ -266,55 +265,66 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
 
             {/* Content */}
             <div className="mx-auto max-w-[1440px] px-4 py-5 lg:px-5">
-            <div className="space-y-5">
-              {/* Summary */}
-              {report?.summary && report.summary.length > 0 && (
-                <div className="sf-panel border-l-4 border-l-primary p-5">
-                  <h3 className="mb-2 font-headline text-base font-bold tracking-tight text-on-surface">
-                    Analysis Summary
-                  </h3>
-                  <ul className="space-y-1.5">
-                    {report.summary.map((s, i) => (
-                      <li
-                        key={i}
-                        className="text-xs text-on-surface-variant leading-relaxed pl-4 relative before:absolute before:left-0 before:top-0 before:text-primary before:font-bold before:content-['—']"
-                      >
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div className="space-y-5">
+                <RunDetailSummaryModules modules={summaryModules} />
 
-              {findings.length > 0 ? (
-                <FindingsOverview
-                  findings={findings}
-                  filteredCount={filteredFindings.length}
-                  activeSignal={activeSignal}
-                  activeSeverity={activeSeverity}
-                  onSignalChange={setActiveSignal}
-                  onSeverityChange={setActiveSeverity}
+                {findings.length > 0 ? (
+                  <FindingsOverview
+                    findings={findings}
+                    filteredCount={filteredFindings.length}
+                    activeSignal={activeSignal}
+                    activeSeverity={activeSeverity}
+                    onSignalChange={setActiveSignal}
+                    onSeverityChange={setActiveSeverity}
+                  />
+                ) : null}
+
+                {report?.summary && report.summary.length > 0 ? (
+                  <details className="sf-panel group">
+                    <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 marker:hidden">
+                      <div>
+                        <div className="sf-kicker">Analysis narrative</div>
+                        <div className="mt-1 text-sm font-semibold text-on-surface">
+                          Full narrative summary
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                          Expanded explanation for operators who want the model summary after reviewing state, actions,
+                          and findings filters.
+                        </p>
+                      </div>
+                      <span className="mt-0.5 shrink-0 rounded-md border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+                        ▼
+                      </span>
+                    </summary>
+                    <div className="border-t border-outline-variant/10 px-4 py-4">
+                      <ul className="space-y-1.5">
+                        {report.summary.map((s, i) => (
+                          <li
+                            key={i}
+                            className="relative pl-4 text-xs leading-relaxed text-on-surface-variant before:absolute before:left-0 before:top-0 before:font-bold before:text-primary before:content-['—']"
+                          >
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
+                ) : null}
+
+                <FindingsTable
+                  findings={filteredFindings}
+                  emptyMessage={
+                    filtersActive
+                      ? "No findings match the current overview filters."
+                      : "No findings for this run."
+                  }
                 />
-              ) : null}
 
-              <RunEvidenceSections sections={evidenceSections} />
+                <RunMetadataPanel run={run} />
+                <SuppressedNoisePanel items={noise} />
 
-              {/* Findings Table */}
-              <FindingsTable
-                findings={filteredFindings}
-                emptyMessage={
-                  filtersActive
-                    ? "No findings match the current overview filters."
-                    : "No findings for this run."
-                }
-              />
-
-              <RunMetadataPanel run={run} />
-              <SuppressedNoisePanel items={noise} />
-
-              {/* Environment */}
-              {run.environment && <EnvironmentBanner env={run.environment} />}
-            </div>
+                {run.environment && <EnvironmentBanner env={run.environment} />}
+              </div>
             </div>
           </div>
         </div>

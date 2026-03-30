@@ -33,6 +33,10 @@ export function FindingsOverview({
     count: findings.filter((finding) => finding.severity === severity).length,
   }));
   const filtersActive = activeSignal !== "all" || activeSeverity !== "all";
+  const activeSignalLabel =
+    activeSignal === "all"
+      ? "All signal buckets"
+      : (FINDING_SIGNAL_DEFINITIONS.find((item) => item.signal === activeSignal)?.label ?? activeSignal);
 
   return (
     <section className="sf-panel">
@@ -40,42 +44,38 @@ export function FindingsOverview({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="sf-kicker">
-              Findings overview
+              Findings filters
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              Group the run by the kind of operator attention it needs, then
-              narrow the table without losing the full evidence trail.
+            <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+              Narrow the findings table by signal or severity without losing the full evidence trail.
             </p>
           </div>
-          <span className="shrink-0 text-xs font-semibold text-on-surface-variant">
-            {filteredCount} of {findings.length}
-          </span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+            <span>{filteredCount} of {findings.length} visible</span>
+            <span className="text-outline-variant/60">·</span>
+            <span>{activeSignalLabel}</span>
+            <span className="text-outline-variant/60">·</span>
+            <span>{activeSeverity === "all" ? "All severities" : activeSeverity}</span>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4 px-4 py-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="space-y-3.5 px-4 py-3.5">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           {signalSummary.map((item) => {
-            const selected = activeSignal === item.signal;
-            const muted = item.count === 0;
             return (
-              <button
+              <div
                 key={item.signal}
-                type="button"
-                className={`cursor-pointer rounded-xl border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ${
-                  selected
-                    ? "border-primary/30 bg-primary/[0.07] shadow-sm"
-                    : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/25 hover:bg-surface-container hover:shadow-sm"
-                } ${muted ? "opacity-60" : ""}`}
-                onClick={() => onSignalChange(selected ? "all" : item.signal)}
-                aria-pressed={selected}
+                className={`rounded-xl border px-3 py-3 ${
+                  item.count > 0
+                    ? "border-outline-variant/15 bg-surface-container-low"
+                    : "border-outline-variant/10 bg-surface-container-low/60 opacity-70"
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="sf-kicker text-outline-variant">
-                      {item.label}
-                    </div>
-                    <div className="mt-1 text-lg font-bold leading-none text-on-surface">
+                    <div className="sf-kicker text-outline-variant">{item.label}</div>
+                    <div className="mt-1 text-base font-bold leading-none text-on-surface">
                       {item.count}
                     </div>
                   </div>
@@ -87,34 +87,23 @@ export function FindingsOverview({
                     </span>
                   )}
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
+                <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
                   {item.description}
                 </p>
-                {item.sampleTitle ? (
-                  <div className="mt-3 rounded-md border border-outline-variant/10 bg-surface-container-lowest px-2.5 py-2 text-xs leading-relaxed text-on-surface">
-                    {item.sampleTitle}
-                  </div>
-                ) : (
-                  <div className="mt-3 text-xs font-medium text-outline-variant">
-                    No findings in this bucket.
-                  </div>
-                )}
-              </button>
+              </div>
             );
           })}
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 rounded-xl border border-outline-variant/15 bg-surface-container-low/55 px-3.5 py-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="sf-kicker text-outline-variant">
-              Filter by signal
-            </span>
+            <span className="sf-kicker text-outline-variant">Filter by signal</span>
             <button
               type="button"
               className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeSignal === "all"
                   ? "border-primary/30 bg-primary/[0.08] text-primary"
-                  : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                  : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-lowest"
               }`}
               onClick={() => onSignalChange("all")}
             >
@@ -127,7 +116,7 @@ export function FindingsOverview({
                 className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   activeSignal === definition.signal
                     ? "border-primary/30 bg-primary/[0.08] text-primary"
-                    : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                    : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-lowest"
                 }`}
                 onClick={() => onSignalChange(definition.signal)}
               >
@@ -137,15 +126,13 @@ export function FindingsOverview({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="sf-kicker text-outline-variant">
-              Filter by severity
-            </span>
+            <span className="sf-kicker text-outline-variant">Filter by severity</span>
             <button
               type="button"
               className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeSeverity === "all"
                   ? "border-primary/30 bg-primary/[0.08] text-primary"
-                  : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                  : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-lowest"
               }`}
               onClick={() => onSeverityChange("all")}
             >
@@ -158,7 +145,7 @@ export function FindingsOverview({
                 className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   activeSeverity === severity
                     ? "border-primary/30 bg-primary/[0.08] text-primary"
-                    : "border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                    : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-lowest"
                 } ${count === 0 ? "opacity-60" : ""}`}
                 onClick={() => onSeverityChange(severity)}
               >
@@ -171,11 +158,11 @@ export function FindingsOverview({
           </div>
 
           {filtersActive ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-3">
-              <p className="text-xs leading-relaxed text-on-surface-variant">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-2.5">
+              <p className="text-[11px] leading-relaxed text-on-surface-variant">
                 Showing {filteredCount} of {findings.length} findings with{" "}
                 <span className="font-semibold text-on-surface">
-                  {activeSignal === "all" ? "all signal buckets" : FINDING_SIGNAL_DEFINITIONS.find((item) => item.signal === activeSignal)?.label}
+                  {activeSignalLabel.toLowerCase()}
                 </span>{" "}
                 and{" "}
                 <span className="font-semibold text-on-surface">

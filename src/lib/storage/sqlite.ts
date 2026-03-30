@@ -85,7 +85,8 @@ class SqliteRunsStore implements RunsStore {
       row.parent_run_id ? getRun(this.db, row.parent_run_id) : null;
     return buildRunDetail(
       row,
-      parent ? { id: parent.id, filename: parent.filename } : null
+      parent ? { id: parent.id, filename: parent.filename } : null,
+      row.artifact_content
     );
   }
 
