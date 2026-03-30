@@ -385,3 +385,47 @@ Result:
   - run `d4799328-5a7a-4071-bd17-111004a12c28`
   - artifact `8dee8157-2fde-4f6e-b162-5914453cbdcc`
 - the new run now carries a real `collected_at = 2026-03-30T17:23:47.363Z`, confirming the previously missing live staging behavior is now deployed
+
+## 2026-03-30: durable OKE Kubernetes agent rollout completed
+
+The Kubernetes runner moved from one-shot validation into a real cluster-side deployment shape.
+
+What changed:
+
+- built and published repeatable arm64 agent images from the `signalforge-agent` repo with ACR build
+- standardized the product namespace to `signalforge` and removed the obsolete failed namespace `signalforge-agent-system`
+- deployed the Kubernetes runner as a dedicated `Deployment` with:
+  - dedicated `signalforge` namespace
+  - dedicated service account
+  - read-only cluster RBAC
+  - in-cluster kubeconfig ConfigMap with `oke-cluster` alias
+  - writable `/work` volume for collector output
+- fixed the stale rollout mismatch where the live pod still lacked the newer writable workdir behavior
+- documented the publish and deploy flow in the `signalforge-agent` repo so the rollout is repeatable instead of chat-only
+
+What was learned during rollout:
+
+- the early failed namespace was not a Kubernetes design problem, it was stale amd64 and pre-fix image state on arm64 OKE nodes
+- cluster-side collection needed both:
+  - a writable collector output directory
+  - the actual latest image, not only the latest manifest
+- rollout overlap can briefly let an old terminating pod claim a job; clean validation should happen only after the deployment settles to one live pod
+- `POST /api/collection-jobs/{id}/artifact` can take materially longer for `kubernetes-bundle` than for host or container artifacts, because the route does not return until analysis work completes
+
+Result:
+
+- the settled Kubernetes runner in namespace `signalforge` successfully claimed, started, collected, uploaded, and completed a real cluster-scope `kubernetes-bundle` job against ACA staging
+- verified completed job:
+  - job `acb7e4ac-1fea-41bb-85c1-a83a93740277`
+  - run `1ac91502-4fc7-4cd1-b2ce-0b94d0abd344`
+  - artifact `c945788e-c1f6-4a46-8de2-e48a2ac8ef46`
+- verified live image:
+  - `caneprophacr01.azurecr.io/signalforge-agent:oke-arm64-20260330-203837`
+  - digest `sha256:971f48a393f2a18c6500fcf962851142a423adceb6de1596b8b80b5047c618e1`
+
+Current state after rollout:
+
+- `linux-audit-log` has a durable host `systemd` runner
+- `container-diagnostics` has a durable root-owned runtime-host runner
+- `kubernetes-bundle` now has a durable cluster-side OKE runner
+- ACA staging has now been validated end to end across all three current artifact families with real agent-driven flows
