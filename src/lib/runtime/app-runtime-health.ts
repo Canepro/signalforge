@@ -1,5 +1,6 @@
 import { getAdminTokenFromEnv } from "@/lib/api/admin-auth";
 import { resolveLlmConfig, type LlmProviderId } from "@/lib/analyzer/llm-provider";
+import { resolveStorageDriver } from "@/lib/storage";
 
 type StorageHealth = {
   driver: string;
@@ -27,9 +28,10 @@ export type AppRuntimeHealthReport = {
 };
 
 function resolveStorageHealth(env: NodeJS.ProcessEnv): StorageHealth {
-  const rawDriver = (env.DATABASE_DRIVER ?? "sqlite").trim().toLowerCase() || "sqlite";
+  const storageDriver = resolveStorageDriver(env);
+  const rawDriver = storageDriver.raw;
 
-  if (rawDriver !== "sqlite" && rawDriver !== "postgres") {
+  if (!storageDriver.supported) {
     return {
       driver: rawDriver,
       status: "error",
@@ -77,9 +79,9 @@ function resolveLlmHealth(env: NodeJS.ProcessEnv): LlmHealth {
   };
 }
 
-function resolveAdminApiHealth(): AdminApiHealth {
+function resolveAdminApiHealth(env: NodeJS.ProcessEnv): AdminApiHealth {
   return {
-    status: getAdminTokenFromEnv() ? "enabled" : "disabled",
+    status: getAdminTokenFromEnv(env) ? "enabled" : "disabled",
   };
 }
 
@@ -88,7 +90,7 @@ export function getAppRuntimeHealthReport(
 ): AppRuntimeHealthReport {
   const storage = resolveStorageHealth(env);
   const llm = resolveLlmHealth(env);
-  const admin_api = resolveAdminApiHealth();
+  const admin_api = resolveAdminApiHealth(env);
 
   return {
     ok: storage.status === "ok",

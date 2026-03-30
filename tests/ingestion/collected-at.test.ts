@@ -2,12 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   backfillMissingCollectedAtInSqlite,
   inferCollectedAtForStoredRun,
+  inferCollectedAtFromUploadedFile,
 } from "@/lib/ingestion/collected-at";
 import { getTestDb } from "@/lib/db/client";
 import { insertArtifact, insertRun, getRun } from "@/lib/db/repository";
 import { analyzeArtifact } from "@/lib/analyzer/index";
 
 describe("inferCollectedAtForStoredRun", () => {
+  it("prefers collector filename timestamps over unstable uploaded file metadata", () => {
+    const collectedAt = inferCollectedAtFromUploadedFile(
+      {
+        lastModified: Date.UTC(2026, 2, 30, 22, 29, 46),
+      },
+      "server_audit_20260329_001155.log"
+    );
+
+    expect(collectedAt).toBe("2026-03-29T00:11:55.000Z");
+  });
+
   it("prefers kubernetes bundle manifest collected_at when present", () => {
     const collectedAt = inferCollectedAtForStoredRun({
       id: "r1",

@@ -55,6 +55,11 @@ export function inferCollectedAtFromUploadedFile(
   file: { lastModified?: number },
   filename: string
 ): string | null {
+  const fromFilename = inferCollectedAtFromFilename(filename);
+  if (fromFilename) {
+    return fromFilename;
+  }
+
   if (
     typeof file.lastModified === "number" &&
     Number.isFinite(file.lastModified) &&
@@ -63,7 +68,7 @@ export function inferCollectedAtFromUploadedFile(
     return new Date(file.lastModified).toISOString();
   }
 
-  return inferCollectedAtFromFilename(filename);
+  return null;
 }
 
 export function inferCollectedAtForStoredRun(row: BackfillRow): string | null {
