@@ -337,3 +337,31 @@ Important caveat:
 - this is a user-scoped service, not yet a root-owned boot-persistent system service
 - `loginctl show-user vincent` still reported `Linger=no`, so this is durable for the active workstation session but not yet the final always-on form
 - the live ACA staging app also still appears to be on an older image than the latest repo fixes, because the newly completed run did not yet persist `collected_at` despite that logic existing on the branch
+
+## 2026-03-30: root-owned Podman container-agent cutover
+
+The temporary user-scoped Podman agent was replaced with the intended root-owned system service form.
+
+What changed:
+
+- installed `signalforge-agent-container.service` under `/etc/systemd/system`
+- installed its copied runtime config under:
+  - `/etc/signalforge-agent-container.env`
+  - `/etc/signalforge-agent-container/token`
+- used the new `runtime-host` installer profile from the external `signalforge-agent` repo so the service keeps the right runtime access without the stricter host-audit hardening that blocked rootless Podman earlier
+- disabled and removed the temporary user-scoped fallback unit and its local credential files so only one durable container agent remains on this machine
+
+Result:
+
+- the root-owned service is enabled and active on `MogahPC`
+- it successfully claimed, started, collected, uploaded, and completed a real `container-diagnostics` job against ACA staging
+- verified completed job:
+  - job `8a6a08b2-ba76-466e-94c7-5df7adf06a92`
+  - run `894a058c-94a8-494c-8b28-3307be5f7dc3`
+  - artifact `99be754a-2d5d-4828-a7a3-f09d038fdf4b`
+
+Current state after cutover:
+
+- the root-owned host audit agent remains the durable runner for `linux-audit-log`
+- the root-owned container agent is now the durable runner for `container-diagnostics`
+- the user-scoped container-agent bridge was only a migration aid and is no longer installed
