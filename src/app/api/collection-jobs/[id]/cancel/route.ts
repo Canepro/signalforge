@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
 export async function POST(
@@ -35,7 +36,6 @@ export async function POST(
       throw e;
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return internalServerErrorResponse(err, "POST /api/collection-jobs/[id]/cancel");
   }
 }

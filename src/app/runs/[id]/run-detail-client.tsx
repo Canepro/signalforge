@@ -18,6 +18,7 @@ import { RunDetailSummaryModules } from "@/components/run-detail-summary-modules
 import type { Severity } from "@/lib/analyzer/schema";
 import type { RunDetail } from "@/types/api";
 import { compareRunAgainstHref, compareRunHref } from "@/lib/compare/nav";
+import { copyWithPromptFallback } from "@/lib/copy-text";
 import { classifyFindingSignal, type FindingSignal } from "@/lib/findings-presentation";
 import {
   getArtifactFamilyPresentation,
@@ -83,9 +84,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
       (f) => `[${f.severity.toUpperCase()}] ${f.title}${f.evidence ? ` — ${f.evidence}` : ""}`
     );
     const text = lines.join("\n");
-    void navigator.clipboard.writeText(text).catch(() => {
-      window.prompt("Copy findings:", text);
-    });
+    void copyWithPromptFallback(text, "Copy findings:");
   }
 
   async function handleReanalyze() {
@@ -279,6 +278,15 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                   />
                 ) : null}
 
+                <FindingsTable
+                  findings={filteredFindings}
+                  emptyMessage={
+                    filtersActive
+                      ? "No findings match the current overview filters."
+                      : "No findings for this run."
+                  }
+                />
+
                 {report?.summary && report.summary.length > 0 ? (
                   <details className="sf-panel group">
                     <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 marker:hidden">
@@ -288,8 +296,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                           Full narrative summary
                         </div>
                         <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                          Expanded explanation for operators who want the model summary after reviewing state, actions,
-                          and findings filters.
+                          Expanded explanation for operators who want the model summary after reviewing the findings table.
                         </p>
                       </div>
                       <span className="mt-0.5 shrink-0 rounded-md border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
@@ -310,15 +317,6 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                     </div>
                   </details>
                 ) : null}
-
-                <FindingsTable
-                  findings={filteredFindings}
-                  emptyMessage={
-                    filtersActive
-                      ? "No findings match the current overview filters."
-                      : "No findings for this run."
-                  }
-                />
 
                 <RunMetadataPanel run={run} />
                 <SuppressedNoisePanel items={noise} />

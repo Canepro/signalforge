@@ -6,6 +6,7 @@ import {
   COLLECTION_STACK_ROLES,
   listArtifactFamilyPresentations,
 } from "@/lib/source-catalog";
+import { writeClipboard } from "@/lib/copy-text";
 import { ModalShell } from "./modal-shell";
 
 interface CollectEvidenceModalProps {
@@ -14,15 +15,16 @@ interface CollectEvidenceModalProps {
 }
 
 function CopyBlock({ label, text }: { label: string; text: string }) {
-  const [done, setDone] = useState(false);
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
 
   const copy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(text);
-      setDone(true);
-      setTimeout(() => setDone(false), 2000);
+      await writeClipboard(text);
+      setState("copied");
+      window.setTimeout(() => setState("idle"), 2000);
     } catch {
-      /* ignore */
+      setState("error");
+      window.setTimeout(() => setState("idle"), 2000);
     }
   }, [text]);
 
@@ -37,7 +39,7 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
           onClick={() => void copy()}
           className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary hover:underline"
         >
-          {done ? "Copied" : "Copy"}
+          {state === "copied" ? "Copied" : state === "error" ? "Copy failed" : "Copy"}
         </button>
       </div>
       <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-outline-variant/20 bg-surface-container-low p-3 font-mono text-xs leading-relaxed text-on-surface">

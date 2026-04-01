@@ -12,6 +12,7 @@ import { POST as POST_AGENT_REG } from "@/app/api/agent/registrations/route";
 import * as dbClient from "@/lib/db/client";
 import { getTestDb } from "@/lib/db/client";
 import type { Database } from "sql.js";
+import * as storageModule from "@/lib/storage";
 import { getStorage } from "@/lib/storage";
 
 const ADMIN = "test-admin-token-phase6";
@@ -518,5 +519,42 @@ describe("Phase 6 API routes", () => {
     expect(del.status).toBe(409);
     const body = await del.json();
     expect(body.code).toBe("active_jobs");
+  });
+
+  it("GET /api/sources returns generic 500 when storage listing throws", async () => {
+    const spy = vi.spyOn(storageModule, "getStorage").mockResolvedValueOnce({
+      sources: {
+        list: vi.fn().mockRejectedValueOnce(new Error("SECRET_SOURCE_DETAIL")),
+      },
+    } as unknown as Awaited<ReturnType<typeof getStorage>>);
+
+    const res = await GET_SOURCES(
+      new NextRequest("http://localhost/api/sources", { headers: authHeaders() })
+    );
+
+    spy.mockRestore();
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({
+      error: "Internal server error",
+      code: "internal_error",
+    });
+  });
+
+  it("GET /api/collection-jobs/:id returns generic 500 when storage fails unexpectedly", async () => {
+    const spy = vi.spyOn(storageModule, "getStorage").mockResolvedValueOnce({
+      withTransaction: vi.fn().mockRejectedValueOnce(new Error("SECRET_JOB_DETAIL")),
+    } as unknown as Awaited<ReturnType<typeof getStorage>>);
+
+    const res = await GET_JOB(
+      new NextRequest("http://localhost/api/collection-jobs/job-1", { headers: authHeaders() }),
+      { params: Promise.resolve({ id: "job-1" }) }
+    );
+
+    spy.mockRestore();
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({
+      error: "Internal server error",
+      code: "internal_error",
+    });
   });
 });

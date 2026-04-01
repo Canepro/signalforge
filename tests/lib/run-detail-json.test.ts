@@ -63,4 +63,39 @@ describe("toRunDetailJson", () => {
     expect(j.report).not.toBeNull();
     expect(j.severity_counts).toEqual({ critical: 0, high: 0, medium: 0, low: 0 });
   });
+
+  it("falls back to null for malformed persisted JSON fields", () => {
+    const row = {
+      id: "rid",
+      artifact_id: "aid",
+      parent_run_id: null,
+      created_at: "2025-01-01T00:00:00.000Z",
+      status: "complete",
+      report_json: "{invalid",
+      environment_json: "{invalid",
+      noise_json: "{invalid",
+      pre_findings_json: "{invalid",
+      is_incomplete: 0,
+      incomplete_reason: null,
+      analysis_error: null,
+      model_used: "test",
+      tokens_used: 0,
+      duration_ms: 1,
+      filename: "f.log",
+      source_type: "api",
+      target_identifier: null,
+      source_label: null,
+      collector_type: null,
+      collector_version: null,
+      collected_at: null,
+      artifact_type: "linux-audit-log",
+    } as RunRow & { artifact_type: string };
+
+    const j = toRunDetailJson(row);
+    expect(j.report).toBeNull();
+    expect(j.environment).toBeNull();
+    expect(j.noise).toBeNull();
+    expect(j.pre_findings).toBeNull();
+    expect(j.severity_counts).toEqual({});
+  });
 });

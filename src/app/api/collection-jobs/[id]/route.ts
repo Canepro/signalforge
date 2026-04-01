@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminBearer } from "@/lib/api/admin-auth";
+import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
 export async function GET(
@@ -21,7 +22,6 @@ export async function GET(
     }
     return NextResponse.json(row);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return internalServerErrorResponse(err, "GET /api/collection-jobs/[id]");
   }
 }
