@@ -2,7 +2,9 @@
 
 **Infrastructure Diagnostics** for evidence artifacts.
 
-SignalForge ingests infrastructure evidence, turns it into findings, stores immutable artifacts and runs, and helps operators answer three practical questions:
+SignalForge is an operator-first control plane for infrastructure evidence.
+
+It ingests external diagnostics, turns them into deterministic findings plus one explanation pass, stores immutable artifacts and runs, and helps operators answer three practical questions:
 
 - what did this artifact show?
 - what changed since the last run?
@@ -15,6 +17,16 @@ SignalForge currently supports three artifact families:
 - `kubernetes-bundle`
 
 That means Linux and WSL audit logs in the `signalforge-collectors` style, text-based container diagnostics for a single container or workload, and UTF-8 JSON Kubernetes evidence bundles.
+
+## Repo Boundary
+
+SignalForge is the analysis and control-plane repo.
+
+- this repo ingests, analyzes, stores, and presents evidence
+- `signalforge-collectors` produces evidence artifacts
+- `signalforge-agent` runs job-driven collection and uploads artifacts back to SignalForge
+
+That separation is intentional. SignalForge is not the collector runtime.
 
 ## What SignalForge Is
 
