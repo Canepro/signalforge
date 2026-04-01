@@ -111,20 +111,17 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Verify package is publicly pullable
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
 
-          visibility="$(gh api /orgs/Canepro/packages/container/signalforge --jq .visibility)"
-          echo "Package visibility: $visibility"
+          token="$(curl -fsS "https://ghcr.io/token?scope=repository:canepro/signalforge:pull&service=ghcr.io" | jq -r .token)"
+          manifest_url="https://ghcr.io/v2/canepro/signalforge/manifests/${{ steps.tags.outputs.full_sha }}"
 
-          if [[ "$visibility" != "public" ]]; then
-            echo "The GHCR package exists but is not public." >&2
-            echo "Set the container package visibility to public in GitHub Packages, then rerun this workflow." >&2
-            exit 1
-          fi
+          curl -fsSI \
+            -H "Authorization: Bearer ${token}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            "${manifest_url}" >/dev/null
 
       - name: Write summary
         shell: bash
