@@ -257,7 +257,7 @@ Implication:
 
 - the remaining blocker on this machine is now in the collector or agent execution path, not ACA ingress
 
-### Historical collected_at repair for agent-submitted runs
+## 2026-03-29: historical collected_at repair for agent-submitted runs
 
 On 2026-03-29, a real data-quality gap was closed for historical ACA staging runs.
 
@@ -519,3 +519,24 @@ Verification:
 - `curl https://ca-signalforge-staging.kinddune-53ac219d.eastus2.azurecontainerapps.io/api/health` returned `200`
 - `curl https://ca-signalforge-staging.kinddune-53ac219d.eastus2.azurecontainerapps.io/api/runs` returned `200`
 - ACA revision list showed `ca-signalforge-staging--stg68fa777` healthy with `100%` traffic
+
+## 2026-04-01: repo-owned GHCR release and ACA deploy automation landed
+
+What changed in this repo:
+
+- added a repo-owned `Publish App Image` GitHub Actions workflow for `ghcr.io/canepro/signalforge`
+- added a repo-owned `Deploy ACA App` manual-dispatch workflow with Azure OIDC
+- added checked-in shell helpers for ACA deploys and API smoke checks
+- updated the ACA runbooks around the real primary-app story and the `ca-signalforge-staging` to `ca-signalforge` cutover
+
+What was verified before landing the repo changes:
+
+- the live ACA app is still `ca-signalforge-staging`
+- the live app still runs from `caneprophacr01.azurecr.io/signalforge:staging-68fa777`
+- the live app still uses public ingress, target port `3000`, `minReplicas=0`, and the shared ACA environment `cae-canepro-ph-dev-eus`
+- GitHub Actions in the repo previously only covered `CI`; there was no repo-owned publish or deploy workflow
+
+Why it matters:
+
+- the app image and deploy path are now encoded in the repo instead of living in personal release muscle memory
+- the remaining work is operational cutover and soak, not missing automation

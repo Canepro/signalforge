@@ -48,7 +48,9 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
+| [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md) | Repo-owned GHCR image publication, GitHub Actions deploy flow, and required GitHub environment config |
 | [`aca-primary-app-runbook.md`](./aca-primary-app-runbook.md) | Primary ACA app runbook using the checked-in ACA template and parameter contract |
+| [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) | Exact additive cutover steps from `ca-signalforge-staging` to `ca-signalforge` |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
 | [`postgres-validation.md`](./postgres-validation.md) | Reproducible live validation notes for the Postgres backend |
 | [`schemas/README.md`](./schemas/README.md) | Lightweight JSON Schemas for the published API contract |
@@ -126,6 +128,16 @@ Keep the wording precise:
 - do describe ACA as the primary app-hosting path when that distinction matters
 - do treat legacy `staging` names as historical resource identifiers rather than the canonical environment taxonomy
 
-## CI
+## CI And Release
 
-GitHub Actions runs typecheck, tests, build, and a Postgres parity job on every push to `main` and on pull requests. See [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+GitHub Actions now covers:
+
+- `CI`: typecheck, tests, build, and Postgres parity on pushes to `main` and on pull requests
+- `Publish App Image`: public GHCR image publication after successful `CI` on `main`
+- `Deploy ACA App`: manual-dispatch ACA deployment with Azure OIDC and explicit image-tag selection
+
+See:
+
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+- [`.github/workflows/publish-app-image.yml`](../.github/workflows/publish-app-image.yml)
+- [`.github/workflows/deploy-aca-app.yml`](../.github/workflows/deploy-aca-app.yml)

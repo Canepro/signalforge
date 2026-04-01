@@ -1,0 +1,140 @@
+name: Publish App Image
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Git ref to publish. Defaults to main.
+        required: false
+        default: main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/canepro/signalforge
+
+jobs:
+  publish:
+    name: Publish GHCR image
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+
+    steps:
+      - name: Resolve git ref
+        id: ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            git_ref="${{ inputs.git_ref }}"
+          else
+            git_ref="${{ github.event.workflow_run.head_sha }}"
+          fi
+
+          if [[ -z "$git_ref" ]]; then
+            git_ref="main"
+          fi
+
+          echo "git_ref=$git_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.ref.outputs.git_ref }}
+
+      - name: Resolve image tags
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          full_sha="$(git rev-parse HEAD)"
+          short_sha="$(git rev-parse --short=12 HEAD)"
+          publish_main_tag="false"
+
+          if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
+            publish_main_tag="true"
+          elif [[ "${{ steps.ref.outputs.git_ref }}" == "main" || "${{ steps.ref.outputs.git_ref }}" == "refs/heads/main" ]]; then
+            publish_main_tag="true"
+          fi
+
+          docker_tags="${IMAGE_REPOSITORY}:${full_sha}"$'\n'"${IMAGE_REPOSITORY}:${short_sha}"
+          if [[ "$publish_main_tag" == "true" ]]; then
+            docker_tags="${docker_tags}"$'\n'"${IMAGE_REPOSITORY}:main"
+          fi
+
+          {
+            echo "full_sha=$full_sha"
+            echo "short_sha=$short_sha"
+            echo "publish_main_tag=$publish_main_tag"
+            echo "docker_tags<<EOF"
+            printf '%s\n' "$docker_tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.docker_tags }}
+          labels: |
+            org.opencontainers.image.title=SignalForge
+            org.opencontainers.image.description=SignalForge Infrastructure Diagnostics app
+            org.opencontainers.image.source=https://github.com/Canepro/signalforge
+            org.opencontainers.image.revision=${{ steps.tags.outputs.full_sha }}
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify package is publicly pullable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          visibility="$(gh api /orgs/Canepro/packages/container/signalforge --jq .visibility)"
+          echo "Package visibility: $visibility"
+
+          if [[ "$visibility" != "public" ]]; then
+            echo "The GHCR package exists but is not public." >&2
+            echo "Set the container package visibility to public in GitHub Packages, then rerun this workflow." >&2
+            exit 1
+          fi
+
+      - name: Write summary
+        shell: bash
+        run: |
+          {
+            echo "## Published image"
+            echo
+            echo "- \`${IMAGE_REPOSITORY}:${{ steps.tags.outputs.full_sha }}\`"
+            echo "- \`${IMAGE_REPOSITORY}:${{ steps.tags.outputs.short_sha }}\`"
+            if [[ "${{ steps.tags.outputs.publish_main_tag }}" == "true" ]]; then
+              echo "- \`${IMAGE_REPOSITORY}:main\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -50,7 +50,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - **Primary ACA hosting:** the live ACA app is now the repo-documented primary app-hosting path for real host, container, and Kubernetes agent traffic; existing resource names may still contain `staging`; see `docs/history.md`.
 - **Preview hosting:** Vercel remains in the preview/review role; source of truth for the ACA transition and remaining cleanup is `phase-10-aca-migration.md`.
 - **ACA identity cleanup:** the next naming and infra hygiene slice is the explicit `ca-signalforge-staging` to `ca-signalforge` cutover; source of truth: `phase-10b-aca-resource-rename-cutover.md`.
-- **Release pipeline gap:** the app still lacks a repo-owned public-image publishing path; source of truth: `phase-10c-public-image-and-release-pipeline.md`.
+- **Release path:** the repo now has a GHCR publish workflow, a manual-dispatch ACA deploy workflow, and checked-in deploy or smoke helpers; remaining work is the live `ca-signalforge-staging` to `ca-signalforge` cutover and soak.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
 - **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon, Vitest, GitHub Actions, and a committed Docker/ACA deployment path.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
@@ -75,7 +75,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 
 - Production hosting migration now needs to move ahead of broader operator rollout. Real `linux-audit-log` artifacts have already exceeded the Vercel upload boundary, and larger Kubernetes artifacts can do the same. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
 - Replace the legacy ACA app identity `ca-signalforge-staging` with `ca-signalforge` using an additive parallel-app cutover instead of living with rollout-phase naming forever. Source of truth: [`phase-10b-aca-resource-rename-cutover.md`](./phase-10b-aca-resource-rename-cutover.md).
-- Replace the manual ACR-based app shipping path with a repo-owned public GHCR image and explicit release workflow. Source of truth: [`phase-10c-public-image-and-release-pipeline.md`](./phase-10c-public-image-and-release-pipeline.md).
+- Execute the live additive cutover from `ca-signalforge-staging` to `ca-signalforge` using the new repo-owned GHCR publish and ACA deploy path, then decommission the legacy app after soak. Source of truth: [`phase-10b-aca-resource-rename-cutover.md`](./phase-10b-aca-resource-rename-cutover.md).
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.

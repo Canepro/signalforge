@@ -197,24 +197,27 @@ For local Postgres parity:
 bash scripts/run-postgres-parity-local.sh
 ```
 
-## CI
+## CI And Release
 
-GitHub Actions runs on every push to `main` and on pull requests:
+GitHub Actions now covers:
 
-- typecheck
-- test
-- build
-- Postgres parity
+- `CI`: typecheck, test, build, and Postgres parity on pushes to `main` and on pull requests
+- `Publish App Image`: repo-owned GHCR image publication after successful `CI` on `main`
+- `Deploy ACA App`: manual-dispatch ACA deployment using a chosen published image tag
 
-See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+See:
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- [.github/workflows/publish-app-image.yml](.github/workflows/publish-app-image.yml)
+- [.github/workflows/deploy-aca-app.yml](.github/workflows/deploy-aca-app.yml)
 
 ## Current Priorities
 
 The highest-signal current infrastructure and release work is now:
 
-- rename the ACA app identity from `ca-signalforge-staging` to `ca-signalforge`
-- replace the manual ACA image shipping path with a repo-owned release pipeline
-- make the app image publicly pullable as an open-source image while keeping ACA deployment personal
+- run the live additive cutover from `ca-signalforge-staging` to `ca-signalforge`
+- switch the primary ACA app from the legacy ACR tag path to the repo-owned GHCR release path
+- keep the deploy path explicit and operator-controlled while the new app soaks
 
 Source-of-truth plans:
 
@@ -231,7 +234,9 @@ Source-of-truth plans:
 - [docs/postgres-validation.md](docs/postgres-validation.md)
 - [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
 - [docs/aca-env-contract.md](docs/aca-env-contract.md)
+- [docs/app-release-and-aca-deploy.md](docs/app-release-and-aca-deploy.md)
 - [docs/aca-primary-app-runbook.md](docs/aca-primary-app-runbook.md)
+- [docs/aca-cutover-runbook.md](docs/aca-cutover-runbook.md)
 - [docs/history.md](docs/history.md)
 - [plans/roadmap.md](plans/roadmap.md)
 - [plans/current-plan.md](plans/current-plan.md)

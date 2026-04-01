@@ -87,6 +87,7 @@ param revisionSuffix string = ''
 @description('Tags applied to the Container App.')
 param tags object = {
   app: 'signalforge'
+  environment: 'primary'
   slice: 'aca-primary'
 }
 

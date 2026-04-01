@@ -1,0 +1,157 @@
+name: Deploy ACA App
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: GHCR tag to deploy. Prefer the immutable full commit SHA tag.
+        required: true
+      container_app_name:
+        description: ACA app name to deploy. Default is the primary app target.
+        required: false
+        default: ca-signalforge
+      revision_suffix:
+        description: Optional ACA revision suffix. Leave blank to auto-derive sha<12> from a SHA tag.
+        required: false
+        default: ""
+      what_if:
+        description: Run Azure what-if instead of creating or updating the app.
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/canepro/signalforge
+
+jobs:
+  deploy:
+    name: Deploy ACA app
+    runs-on: ubuntu-latest
+    environment: aca-primary
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy with checked-in ACA template
+        env:
+          ACA_RESOURCE_GROUP: ${{ vars.ACA_PRIMARY_RESOURCE_GROUP }}
+          ACA_ENVIRONMENT_ID: ${{ vars.ACA_PRIMARY_ENVIRONMENT_ID }}
+          ACA_CPU: ${{ vars.ACA_PRIMARY_CPU }}
+          ACA_MEMORY: ${{ vars.ACA_PRIMARY_MEMORY }}
+          ACA_MIN_REPLICAS: ${{ vars.ACA_PRIMARY_MIN_REPLICAS }}
+          ACA_MAX_REPLICAS: ${{ vars.ACA_PRIMARY_MAX_REPLICAS }}
+          ACA_TARGET_PORT: ${{ vars.ACA_PRIMARY_TARGET_PORT }}
+          ACA_LLM_PROVIDER: ${{ vars.ACA_PRIMARY_LLM_PROVIDER }}
+          ACA_OPENAI_MODEL: ${{ vars.ACA_PRIMARY_OPENAI_MODEL }}
+          ACA_AZURE_OPENAI_ENDPOINT: ${{ vars.ACA_PRIMARY_AZURE_OPENAI_ENDPOINT }}
+          ACA_AZURE_OPENAI_DEPLOYMENT: ${{ vars.ACA_PRIMARY_AZURE_OPENAI_DEPLOYMENT }}
+          ACA_AZURE_OPENAI_API_VERSION: ${{ vars.ACA_PRIMARY_AZURE_OPENAI_API_VERSION }}
+          ACA_DATABASE_URL: ${{ secrets.ACA_PRIMARY_DATABASE_URL }}
+          ACA_ADMIN_TOKEN: ${{ secrets.ACA_PRIMARY_ADMIN_TOKEN }}
+          ACA_OPENAI_API_KEY: ${{ secrets.ACA_PRIMARY_OPENAI_API_KEY }}
+          ACA_AZURE_OPENAI_API_KEY: ${{ secrets.ACA_PRIMARY_AZURE_OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image_ref="${IMAGE_REPOSITORY}:${{ inputs.image_tag }}"
+          args=(
+            --resource-group "${ACA_RESOURCE_GROUP}"
+            --environment-id "${ACA_ENVIRONMENT_ID}"
+            --app-name "${{ inputs.container_app_name }}"
+            --image "$image_ref"
+          )
+
+          if [[ -n "${ACA_CPU}" ]]; then
+            args+=(--cpu "${ACA_CPU}")
+          fi
+          if [[ -n "${ACA_MEMORY}" ]]; then
+            args+=(--memory "${ACA_MEMORY}")
+          fi
+          if [[ -n "${ACA_MIN_REPLICAS}" ]]; then
+            args+=(--min-replicas "${ACA_MIN_REPLICAS}")
+          fi
+          if [[ -n "${ACA_MAX_REPLICAS}" ]]; then
+            args+=(--max-replicas "${ACA_MAX_REPLICAS}")
+          fi
+          if [[ -n "${ACA_TARGET_PORT}" ]]; then
+            args+=(--target-port "${ACA_TARGET_PORT}")
+          fi
+          if [[ -n "${ACA_LLM_PROVIDER}" ]]; then
+            args+=(--llm-provider "${ACA_LLM_PROVIDER}")
+          fi
+          if [[ -n "${ACA_OPENAI_MODEL}" ]]; then
+            args+=(--openai-model "${ACA_OPENAI_MODEL}")
+          fi
+          if [[ -n "${ACA_AZURE_OPENAI_ENDPOINT}" ]]; then
+            args+=(--azure-openai-endpoint "${ACA_AZURE_OPENAI_ENDPOINT}")
+          fi
+          if [[ -n "${ACA_AZURE_OPENAI_DEPLOYMENT}" ]]; then
+            args+=(--azure-openai-deployment "${ACA_AZURE_OPENAI_DEPLOYMENT}")
+          fi
+          if [[ -n "${ACA_AZURE_OPENAI_API_VERSION}" ]]; then
+            args+=(--azure-openai-api-version "${ACA_AZURE_OPENAI_API_VERSION}")
+          fi
+          if [[ -n "${{ inputs.revision_suffix }}" ]]; then
+            args+=(--revision-suffix "${{ inputs.revision_suffix }}")
+          fi
+          if [[ "${{ inputs.what_if }}" == "true" ]]; then
+            args+=(--what-if)
+          fi
+
+          bash scripts/deploy-aca-app.sh "${args[@]}"
+
+      - name: Resolve ACA hostname
+        id: app
+        if: ${{ !inputs.what_if }}
+        env:
+          ACA_RESOURCE_GROUP: ${{ vars.ACA_PRIMARY_RESOURCE_GROUP }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fqdn="$(az containerapp show \
+            --name "${{ inputs.container_app_name }}" \
+            --resource-group "${ACA_RESOURCE_GROUP}" \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv)"
+
+          echo "fqdn=$fqdn" >> "$GITHUB_OUTPUT"
+
+      - name: Run API smoke checks
+        if: ${{ !inputs.what_if }}
+        env:
+          SIGNALFORGE_ADMIN_TOKEN: ${{ secrets.ACA_PRIMARY_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/check-aca-app.sh "https://${{ steps.app.outputs.fqdn }}"
+
+      - name: Write summary
+        shell: bash
+        run: |
+          {
+            echo "## ACA deploy request"
+            echo
+            echo "- app: \`${{ inputs.container_app_name }}\`"
+            echo "- image: \`${IMAGE_REPOSITORY}:${{ inputs.image_tag }}\`"
+            echo "- what-if: \`${{ inputs.what_if }}\`"
+            if [[ -n "${{ inputs.revision_suffix }}" ]]; then
+              echo "- revision suffix: \`${{ inputs.revision_suffix }}\`"
+            fi
+            if [[ "${{ inputs.what_if }}" != "true" && -n "${{ steps.app.outputs.fqdn }}" ]]; then
+              echo "- hostname: \`https://${{ steps.app.outputs.fqdn }}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
