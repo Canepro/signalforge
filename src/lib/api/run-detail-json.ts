@@ -13,6 +13,15 @@ function formatRunTimestamp(iso: string): string {
   }).format(new Date(iso));
 }
 
+function safeParseJson<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export function buildRunDetail(
   row: RunRow & { artifact_type: string },
   parent_run: { id: string; filename: string } | null = null,
@@ -42,10 +51,10 @@ export function buildRunDetail(
     tokens_used: row.tokens_used,
     duration_ms: row.duration_ms,
     severity_counts: deriveSeverityCounts(row.report_json),
-    report: row.report_json ? JSON.parse(row.report_json) : null,
-    environment: row.environment_json ? JSON.parse(row.environment_json) : null,
-    noise: row.noise_json ? JSON.parse(row.noise_json) : null,
-    pre_findings: row.pre_findings_json ? JSON.parse(row.pre_findings_json) : null,
+    report: safeParseJson(row.report_json, null),
+    environment: safeParseJson(row.environment_json, null),
+    noise: safeParseJson(row.noise_json, null),
+    pre_findings: safeParseJson(row.pre_findings_json, null),
   };
   detail.summary_modules = buildRunDetailSummaryModules(detail, artifactContent ?? null);
   return detail;

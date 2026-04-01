@@ -43,11 +43,9 @@ export function FindingsOverview({
       <div className="sf-panel-header">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="sf-kicker">
-              Findings filters
-            </div>
+            <div className="sf-kicker">Findings table controls</div>
             <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
-              Narrow the findings table by signal or severity without losing the full evidence trail.
+              Filter the findings table by signal or severity while keeping the current visible count in view.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
@@ -61,16 +59,24 @@ export function FindingsOverview({
       </div>
 
       <div className="space-y-3.5 px-4 py-3.5">
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="sf-kicker text-outline-variant">Filter by signal</div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {signalSummary.map((item) => {
+            const selected = activeSignal === item.signal;
             return (
-              <div
+              <button
                 key={item.signal}
-                className={`rounded-xl border px-3 py-3 ${
-                  item.count > 0
-                    ? "border-outline-variant/15 bg-surface-container-low"
-                    : "border-outline-variant/10 bg-surface-container-low/60 opacity-70"
+                type="button"
+                title={item.description}
+                aria-pressed={selected}
+                className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                  selected
+                    ? "border-primary/30 bg-primary/[0.07] shadow-sm"
+                    : item.count > 0
+                      ? "border-outline-variant/15 bg-surface-container-low hover:bg-surface-container"
+                      : "border-outline-variant/10 bg-surface-container-low/60 opacity-70 hover:bg-surface-container-low/70"
                 }`}
+                onClick={() => onSignalChange(selected ? "all" : item.signal)}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -87,44 +93,12 @@ export function FindingsOverview({
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
-                  {item.description}
-                </p>
-              </div>
+              </button>
             );
           })}
         </div>
 
         <div className="space-y-3 rounded-xl border border-outline-variant/15 bg-surface-container-low/55 px-3.5 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="sf-kicker text-outline-variant">Filter by signal</span>
-            <button
-              type="button"
-              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                activeSignal === "all"
-                  ? "border-primary/30 bg-primary/[0.08] text-primary"
-                  : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-lowest"
-              }`}
-              onClick={() => onSignalChange("all")}
-            >
-              All findings
-            </button>
-            {FINDING_SIGNAL_DEFINITIONS.map((definition) => (
-              <button
-                key={definition.signal}
-                type="button"
-                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  activeSignal === definition.signal
-                    ? "border-primary/30 bg-primary/[0.08] text-primary"
-                    : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-lowest"
-                }`}
-                onClick={() => onSignalChange(definition.signal)}
-              >
-                {definition.label}
-              </button>
-            ))}
-          </div>
-
           <div className="flex flex-wrap items-center gap-2">
             <span className="sf-kicker text-outline-variant">Filter by severity</span>
             <button

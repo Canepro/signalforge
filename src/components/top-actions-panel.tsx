@@ -29,7 +29,7 @@ export function TopActionsPanel({
   return (
     <section className="shrink-0 border-b border-outline-variant/10 bg-surface-container-lowest shadow-sm">
       {(showToolbar || showGrid) && (
-        <div className="flex flex-col gap-2.5 border-b border-outline-variant/10 bg-surface-container-low/60 px-4 py-2.5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+        <div className="flex flex-col gap-2 border-b border-outline-variant/10 bg-surface-container-low/60 px-4 py-2 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="flex items-center gap-2 min-w-0">
             <svg
               className="h-3.5 w-3.5 text-warning shrink-0"
@@ -43,13 +43,15 @@ export function TopActionsPanel({
                 clipRule="evenodd"
               />
             </svg>
-            <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warning">
                 {showGrid ? "Operator priorities" : "Run actions"}
               </div>
-              <p className="text-[11px] leading-relaxed text-on-surface-variant">
-                Canonical action surface for this run.
-              </p>
+              {showGrid ? (
+                <div className="text-[11px] text-on-surface-variant">
+                  {actions.length} ranked action{actions.length === 1 ? "" : "s"}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0" role="toolbar" aria-label="Run actions">
@@ -149,9 +151,9 @@ export function TopActionsPanel({
       {showGrid ? (
         <div className="grid grid-cols-1 divide-y divide-surface-container-low md:grid-cols-3 md:divide-x md:divide-y-0">
           {actions.map((action, i) => (
-            <div key={i} className="flex gap-3 px-4 py-3.5 lg:px-5">
+            <div key={i} className="flex gap-2.5 px-4 py-2.5 lg:px-5">
               <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
                   i === 0
                     ? "bg-warning/10 text-warning border border-warning/20"
                     : "bg-surface-container-high text-on-surface-variant"
@@ -159,7 +161,7 @@ export function TopActionsPanel({
               >
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <p className="text-[13px] font-semibold leading-snug text-on-surface">{action}</p>
+              <p className="text-xs font-semibold leading-snug text-on-surface">{action}</p>
             </div>
           ))}
         </div>
