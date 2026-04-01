@@ -24,6 +24,7 @@ jobs:
   publish:
     name: Publish GHCR image
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
@@ -95,20 +96,53 @@ jobs:
           password: ${{ github.token }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.tags.outputs.docker_tags }}
-          labels: |
-            org.opencontainers.image.title=SignalForge
-            org.opencontainers.image.description=SignalForge Infrastructure Diagnostics app
-            org.opencontainers.image.source=https://github.com/Canepro/signalforge
-            org.opencontainers.image.revision=${{ steps.tags.outputs.full_sha }}
-            org.opencontainers.image.licenses=MIT
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t docker_tags <<< "${{ steps.tags.outputs.docker_tags }}"
+
+          tag_args=()
+          for tag in "${docker_tags[@]}"; do
+            tag_args+=(--tag "$tag")
+          done
+
+          label_args=(
+            --label "org.opencontainers.image.title=SignalForge"
+            --label "org.opencontainers.image.description=SignalForge Infrastructure Diagnostics app"
+            --label "org.opencontainers.image.source=https://github.com/Canepro/signalforge"
+            --label "org.opencontainers.image.revision=${{ steps.tags.outputs.full_sha }}"
+            --label "org.opencontainers.image.licenses=MIT"
+          )
+
+          max_attempts=3
+          attempt=1
+
+          while true; do
+            echo "Starting GHCR build/push attempt ${attempt}/${max_attempts}"
+
+            if docker buildx build \
+              --file ./Dockerfile \
+              --push \
+              --cache-from type=gha \
+              --cache-to type=gha,mode=max \
+              "${tag_args[@]}" \
+              "${label_args[@]}" \
+              .; then
+              echo "GHCR build/push succeeded on attempt ${attempt}"
+              break
+            fi
+
+            if [[ "${attempt}" -ge "${max_attempts}" ]]; then
+              echo "GHCR build/push failed after ${max_attempts} attempts" >&2
+              exit 1
+            fi
+
+            sleep_seconds=$(( attempt * 15 ))
+            echo "GHCR build/push attempt ${attempt} failed; retrying in ${sleep_seconds}s" >&2
+            sleep "${sleep_seconds}"
+            attempt=$(( attempt + 1 ))
+          done
 
       - name: Verify package is publicly pullable
         shell: bash
