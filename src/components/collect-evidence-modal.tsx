@@ -127,7 +127,11 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `bun run src/cli.ts once`,
   ].join("\n");
 
-  const cliSubmit = `SIGNALFORGE_BASE_URL=${origin} ./scripts/analyze.sh /path/to/your-artifact.log`;
+  const cliSubmit = [
+    `SIGNALFORGE_BASE_URL=${origin} ./scripts/analyze.sh /path/to/your-artifact.log`,
+    `SIGNALFORGE_BASE_URL=${origin} ./scripts/analyze.sh --artifact-type container-diagnostics /path/to/container-diagnostics.txt`,
+    `SIGNALFORGE_BASE_URL=${origin} ./scripts/analyze.sh --artifact-type kubernetes-bundle /path/to/kubernetes-bundle.json`,
+  ].join("\n");
 
   const collectorPushLinux = [
     `cd /path/to/signalforge-collectors`,
@@ -311,7 +315,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             </p>
           </div>
 
-          <CopyBlock label="Submit from the SignalForge repo" text={cliSubmit} />
+          <CopyBlock label="Quick submit from the SignalForge repo" text={cliSubmit} />
 
           <CopyBlock label="Reference push: Linux audit" text={collectorPushLinux} />
 

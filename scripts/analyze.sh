@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Submit a log artifact to SignalForge and print the new run id + URL.
+# Submit an artifact to SignalForge and print the new run id + URL.
 # Full usage: ./scripts/analyze.sh --help
 # Contract: docs/external-submit.md
 set -euo pipefail
 
 BASE_URL="${SIGNALFORGE_BASE_URL:-${SIGNALFORGE_URL:-http://localhost:3000}}"
+ARTIFACT_TYPE="${SIGNALFORGE_ARTIFACT_TYPE:-}"
 TARGET_ID="${SIGNALFORGE_TARGET_IDENTIFIER:-}"
 SOURCE_LABEL="${SIGNALFORGE_SOURCE_LABEL:-}"
 COLLECTOR_TYPE="${SIGNALFORGE_COLLECTOR_TYPE:-}"
@@ -13,13 +14,14 @@ COLLECTED_AT="${SIGNALFORGE_COLLECTED_AT:-}"
 
 show_help() {
   cat <<'EOF'
-Submit a log artifact to SignalForge (multipart POST /api/runs) and print run_id, URLs, and handy read/compare commands.
+Submit an artifact to SignalForge (multipart POST /api/runs) and print run_id, URLs, and handy read/compare commands.
 
 Usage:
-  ./scripts/analyze.sh [options] <path-to-log>
+  ./scripts/analyze.sh [options] <path-to-artifact>
 
 Options:
   --url, -u BASE          API base URL (default: SIGNALFORGE_BASE_URL or SIGNALFORGE_URL, then http://localhost:3000)
+  --artifact-type VALUE   Optional explicit artifact family (linux-audit-log, container-diagnostics, kubernetes-bundle)
   --target-id VALUE       Optional stable target key (target_identifier; preferred for compare/baseline)
   --source-label VALUE    Optional human label (e.g. CI job, bastion)
   --collector-type VALUE  Optional implementation id (e.g. signalforge-collectors)
@@ -30,6 +32,7 @@ Options:
 Environment (optional; flags override env):
   SIGNALFORGE_BASE_URL
   SIGNALFORGE_URL
+  SIGNALFORGE_ARTIFACT_TYPE
   SIGNALFORGE_TARGET_IDENTIFIER
   SIGNALFORGE_SOURCE_LABEL
   SIGNALFORGE_COLLECTOR_TYPE
@@ -48,6 +51,10 @@ while [[ $# -gt 0 ]]; do
   case "${1}" in
     --url|-u)
       BASE_URL="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --artifact-type)
+      ARTIFACT_TYPE="${2:?missing value after $1}"
       shift 2
       ;;
     --target-id)
@@ -82,7 +89,7 @@ done
 
 FILE="${1:-}"
 if [[ -z "$FILE" ]]; then
-  echo "usage: $0 [--url|-u BASE_URL] [--target-id ...] ... <path-to-log-file>" >&2
+  echo "usage: $0 [--url|-u BASE_URL] [--artifact-type ...] [--target-id ...] ... <path-to-artifact-file>" >&2
   echo "Try: $0 --help" >&2
   exit 1
 fi
@@ -93,6 +100,7 @@ fi
 
 CURL_ARGS=(-sS -X POST)
 CURL_ARGS+=(-F "file=@${FILE}")
+[[ -n "$ARTIFACT_TYPE" ]] && CURL_ARGS+=(-F "artifact_type=${ARTIFACT_TYPE}")
 [[ -n "$TARGET_ID" ]] && CURL_ARGS+=(-F "target_identifier=${TARGET_ID}")
 [[ -n "$SOURCE_LABEL" ]] && CURL_ARGS+=(-F "source_label=${SOURCE_LABEL}")
 [[ -n "$COLLECTOR_TYPE" ]] && CURL_ARGS+=(-F "collector_type=${COLLECTOR_TYPE}")

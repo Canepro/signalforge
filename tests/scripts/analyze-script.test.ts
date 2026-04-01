@@ -14,6 +14,8 @@ describe("scripts/analyze.sh", () => {
 
   it("prints help with --help", () => {
     const out = execSync(`bash "${script}" --help`, { encoding: "utf8" });
+    expect(out).toContain("--artifact-type");
+    expect(out).toContain("SIGNALFORGE_ARTIFACT_TYPE");
     expect(out).toContain("--target-id");
     expect(out).toContain("SIGNALFORGE_TARGET_IDENTIFIER");
     expect(out).toContain("external-submit.md");
@@ -22,11 +24,13 @@ describe("scripts/analyze.sh", () => {
 
   it("maps CLI flags to multipart field names used by POST /api/runs", () => {
     const src = readFileSync(script, "utf8");
+    expect(src).toMatch(/artifact_type/);
     expect(src).toMatch(/target_identifier/);
     expect(src).toMatch(/source_label/);
     expect(src).toMatch(/collector_type/);
     expect(src).toMatch(/collector_version/);
     expect(src).toMatch(/collected_at/);
+    expect(src).toContain('--artifact-type');
     expect(src).toContain('--target-id');
     expect(src).toContain('--source-label');
     expect(src).toContain('--collector-type');

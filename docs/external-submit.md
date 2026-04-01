@@ -118,6 +118,13 @@ Submit a local file with the built-in helper:
 ./scripts/analyze.sh ./audit.log
 ```
 
+For non-Linux artifacts, prefer an explicit type:
+
+```bash
+./scripts/analyze.sh --artifact-type container-diagnostics ./payments-container.txt
+./scripts/analyze.sh --artifact-type kubernetes-bundle ./payments-bundle.json
+```
+
 On success it prints `run_id`, the run URL, **compare** UI/API URLs, and ready-to-run `signalforge-read.sh` lines (use `--url` if SignalForge is not on port 3000).
 
 Read the created run back:
@@ -157,7 +164,9 @@ From the shell, `scripts/signalforge-read.sh compare <run-id>` prints the same J
 
 ```bash
 ./scripts/analyze.sh ./audit.log
+./scripts/analyze.sh --artifact-type container-diagnostics ./payments-container.txt
 ./scripts/analyze.sh --target-id 'fleet:prod:web-01' --collector-type signalforge-collectors ./audit.log
+SIGNALFORGE_ARTIFACT_TYPE=kubernetes-bundle ./scripts/analyze.sh ./payments-bundle.json
 SIGNALFORGE_BASE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" ./scripts/analyze.sh ./audit.log
 ```
 
