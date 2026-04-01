@@ -19,8 +19,8 @@ Options:
   -h, --help            Show this help
 
 Examples:
-  bash scripts/check-aca-app.sh https://ca-signalforge.kinddune-53ac219d.eastus2.azurecontainerapps.io
-  SIGNALFORGE_ADMIN_TOKEN=replace-me bash scripts/check-aca-app.sh https://ca-signalforge.kinddune-53ac219d.eastus2.azurecontainerapps.io
+  bash scripts/check-aca-app.sh https://ca-signalforge.<aca-default-domain>
+  SIGNALFORGE_ADMIN_TOKEN=replace-me bash scripts/check-aca-app.sh https://ca-signalforge.<aca-default-domain>
 EOF
 }
 

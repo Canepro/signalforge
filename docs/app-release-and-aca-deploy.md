@@ -6,20 +6,9 @@ It keeps three concerns separate on purpose:
 
 - preview and review stay on Vercel
 - app-image publishing happens on GHCR
-- the primary app runs on Azure Container Apps
+- the app runs on Azure Container Apps
 
-That keeps rollback and operator ownership straightforward.
-
-## Current verified baseline
-
-Verified on April 1, 2026 from this repo checkout and live read-only infra:
-
-- GitHub Actions currently has one checked-in repo workflow for CI plus the GitHub-provided Copilot workflow
-- the live app resource is still `ca-signalforge-staging`
-- the live app is public, runs in `rg-canepro-ph-dev-eus`, and uses `caneprophacr01.azurecr.io/signalforge:staging-68fa777`
-- there is not yet a live `ca-signalforge` app
-
-This document describes the repo-owned path that replaces the manual ACR-to-ACA release muscle memory.
+That keeps rollback and operator ownership straightforward without baking one operator's Azure layout into the product contract.
 
 ## Release shape
 
@@ -62,7 +51,7 @@ That means public pullability is an enforced release condition, not a hope.
 It requires a chosen `image_tag` and defaults to:
 
 - app name: `ca-signalforge`
-- mode: `what-if=true`
+- mode: `what_if=true`
 
 That keeps release and deploy separate and makes the first deployment action non-destructive by default.
 
@@ -70,54 +59,61 @@ That keeps release and deploy separate and makes the first deployment action non
 
 The deploy workflow uses `azure/login` with GitHub OIDC.
 
-Required GitHub environment secrets in the `aca-primary` environment:
+Preferred GitHub environment secrets in the deploy environment:
 
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
-- `ACA_PRIMARY_DATABASE_URL`
-- `ACA_PRIMARY_ADMIN_TOKEN`
+- `ACA_APP_DATABASE_URL`
+- `ACA_APP_ADMIN_TOKEN`
 
 Optional GitHub environment secrets:
 
-- `ACA_PRIMARY_OPENAI_API_KEY`
-- `ACA_PRIMARY_AZURE_OPENAI_API_KEY`
+- `ACA_APP_OPENAI_API_KEY`
+- `ACA_APP_AZURE_OPENAI_API_KEY`
 
-Required GitHub environment variables in the `aca-primary` environment:
+Required GitHub environment variables in the deploy environment:
 
-- `ACA_PRIMARY_RESOURCE_GROUP`
-- `ACA_PRIMARY_ENVIRONMENT_ID`
+- `ACA_APP_RESOURCE_GROUP`
+- `ACA_APP_ENVIRONMENT_ID`
 
 Optional GitHub environment variables:
 
-- `ACA_PRIMARY_CPU`
-- `ACA_PRIMARY_MEMORY`
-- `ACA_PRIMARY_MIN_REPLICAS`
-- `ACA_PRIMARY_MAX_REPLICAS`
-- `ACA_PRIMARY_TARGET_PORT`
-- `ACA_PRIMARY_LLM_PROVIDER`
-- `ACA_PRIMARY_OPENAI_MODEL`
-- `ACA_PRIMARY_AZURE_OPENAI_ENDPOINT`
-- `ACA_PRIMARY_AZURE_OPENAI_DEPLOYMENT`
-- `ACA_PRIMARY_AZURE_OPENAI_API_VERSION`
+- `ACA_APP_CPU`
+- `ACA_APP_MEMORY`
+- `ACA_APP_MIN_REPLICAS`
+- `ACA_APP_MAX_REPLICAS`
+- `ACA_APP_TARGET_PORT`
+- `ACA_APP_LLM_PROVIDER`
+- `ACA_APP_OPENAI_MODEL`
+- `ACA_APP_AZURE_OPENAI_ENDPOINT`
+- `ACA_APP_AZURE_OPENAI_DEPLOYMENT`
+- `ACA_APP_AZURE_OPENAI_API_VERSION`
+
+Backward compatibility note:
+
+- the checked-in workflow still accepts legacy `ACA_PRIMARY_*` variable and secret names
+- operators can keep a legacy GitHub environment name such as `aca-primary` during migration, or use a cleaner name such as `aca-app` for new setups
+
+The checked-in workflow expects those values to come from GitHub environment configuration, not from repo edits.
 
 ### 3. The deploy workflow calls the checked-in shell helper
 
-`scripts/deploy-aca-app.sh` is the local and CI-safe deploy entrypoint.
+[`../scripts/deploy-aca-app.sh`](../scripts/deploy-aca-app.sh) is the local and CI-safe deploy entrypoint.
 
 It wraps:
 
-- `infra/aca/main.bicep`
+- [`../infra/aca/main.bicep`](../infra/aca/main.bicep)
 - explicit required inputs
 - derived revision suffixes for SHA-tag deploys
 - `az deployment group what-if`
 - `az deployment group create`
 
-The script defaults to the primary-role contract:
+The script defaults to the app-role contract:
 
 - `ca-signalforge`
-- `environment=primary`
-- `slice=aca-primary`
+- `surface=aca`
+- `role=app`
 - `DATABASE_DRIVER=postgres`
 - public ingress on port `3000`
 
@@ -142,12 +138,12 @@ ACA_DATABASE_URL='postgres://<user>:<password>@<host>/<db>?sslmode=require' \
 ACA_ADMIN_TOKEN='<long-random-secret>' \
 ACA_AZURE_OPENAI_API_KEY='<azure-openai-key>' \
 bash scripts/deploy-aca-app.sh \
-  --resource-group rg-canepro-ph-dev-eus \
-  --environment-id /subscriptions/<subscription-id>/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.App/managedEnvironments/cae-canepro-ph-dev-eus \
+  --resource-group <resource-group> \
+  --environment-id /subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.App/managedEnvironments/<managed-environment-name> \
   --image ghcr.io/canepro/signalforge:<full-commit-sha> \
   --llm-provider azure \
-  --azure-openai-endpoint https://Signalforge-resource.openai.azure.com/openai/v1/ \
-  --azure-openai-deployment gpt-5.4-mini \
+  --azure-openai-endpoint https://<resource-name>.openai.azure.com/openai/v1/ \
+  --azure-openai-deployment <deployment-name> \
   --what-if
 ```
 
@@ -162,4 +158,4 @@ Then remove `--what-if` for the real deploy.
 5. Run `Deploy ACA App` with that full SHA tag.
 6. Start with `what_if=true`.
 7. Rerun with `what_if=false` once the plan looks correct.
-8. Run the deeper cutover or traffic-move steps from `aca-cutover-runbook.md` when replacing `ca-signalforge-staging`.
+8. Run the deeper migration steps from [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) only if your operator instance still carries a legacy ACA app name.

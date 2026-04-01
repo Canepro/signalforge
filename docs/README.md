@@ -48,9 +48,9 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
-| [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md) | Repo-owned GHCR image publication, GitHub Actions deploy flow, and required GitHub environment config |
-| [`aca-primary-app-runbook.md`](./aca-primary-app-runbook.md) | Primary ACA app runbook using the checked-in ACA template and parameter contract |
-| [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) | Exact additive cutover steps from `ca-signalforge-staging` to `ca-signalforge` |
+| [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md) | Repo-owned GHCR image publication, GitHub Actions deploy flow, and the portable ACA release contract |
+| [`aca-app-runbook.md`](./aca-app-runbook.md) | ACA app runbook using the checked-in ACA template without assuming one operator's Azure layout |
+| [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) | Legacy-name migration guide for operators still replacing an older ACA app name with `ca-signalforge` |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
 | [`postgres-validation.md`](./postgres-validation.md) | Reproducible live validation notes for the Postgres backend |
 | [`schemas/README.md`](./schemas/README.md) | Lightweight JSON Schemas for the published API contract |
@@ -58,7 +58,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`../plans/roadmap.md`](../plans/roadmap.md) | Long-lived product roadmap and future direction |
 | [`../plans/current-plan.md`](../plans/current-plan.md) | Current shipped state and recommended next work |
 | [`../plans/phase-10-aca-migration.md`](../plans/phase-10-aca-migration.md) | Production hosting migration plan from Vercel to Azure Container Apps |
-| [`../plans/phase-10b-aca-resource-rename-cutover.md`](../plans/phase-10b-aca-resource-rename-cutover.md) | Concrete cutover plan from `ca-signalforge-staging` to `ca-signalforge` |
+| [`../plans/phase-10b-aca-resource-rename-cutover.md`](../plans/phase-10b-aca-resource-rename-cutover.md) | Historical implementation plan for the legacy-name ACA cutover |
 | [`../plans/phase-10c-public-image-and-release-pipeline.md`](../plans/phase-10c-public-image-and-release-pipeline.md) | Public GHCR image and repo-owned release-pipeline plan |
 | [`../plans/phase-9c-frontend-operator-workstation-polish.md`](../plans/phase-9c-frontend-operator-workstation-polish.md) | Frontend redesign and interaction-polish source of truth for the operator workstation pass |
 | [`../plans/phase-9c-stabilization-checklist.md`](../plans/phase-9c-stabilization-checklist.md) | Post-implementation gate for preview QA, browser validation, and final Phase 9c signoff |
@@ -117,15 +117,15 @@ The repo currently documents and ships three deployment surfaces:
 Code and infra sources of truth:
 
 - container runtime: [`../Dockerfile`](../Dockerfile), [`app-container-runtime.md`](./app-container-runtime.md)
-- ACA contract: [`aca-env-contract.md`](./aca-env-contract.md), [`aca-app-deployment.md`](./aca-app-deployment.md), [`aca-primary-app-runbook.md`](./aca-primary-app-runbook.md)
+- ACA contract: [`aca-env-contract.md`](./aca-env-contract.md), [`aca-app-deployment.md`](./aca-app-deployment.md), [`aca-app-runbook.md`](./aca-app-runbook.md)
 - migration plan: [`../plans/phase-10-aca-migration.md`](../plans/phase-10-aca-migration.md)
 - ACA operating history: [`history.md`](./history.md)
 
 Keep the wording precise:
 
 - do not describe Vercel as the only deployment environment
-- do not describe Vercel as the primary app-hosting path
-- do describe ACA as the primary app-hosting path when that distinction matters
+- do not describe Vercel as the main app-hosting path
+- do describe ACA as the app-hosting path when that distinction matters
 - do treat legacy `staging` names as historical resource identifiers rather than the canonical environment taxonomy
 
 ## CI And Release

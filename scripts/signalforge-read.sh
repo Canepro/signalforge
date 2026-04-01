@@ -3,7 +3,7 @@
 # Uses GET /api/runs/[id], /report, /compare — see README and docs/external-submit.md.
 set -euo pipefail
 
-BASE_URL="${SIGNALFORGE_URL:-http://localhost:3000}"
+BASE_URL="${SIGNALFORGE_BASE_URL:-${SIGNALFORGE_URL:-http://localhost:3000}}"
 
 show_help() {
   cat <<'EOF'
@@ -18,10 +18,11 @@ Commands:
   compare <run-id> [--against <other-run-id>]   GET /api/runs/[id]/compare (drift)
 
 Options:
-  --url, -u BASE   API base URL (default: SIGNALFORGE_URL or http://localhost:3000)
+  --url, -u BASE   API base URL (default: SIGNALFORGE_BASE_URL or SIGNALFORGE_URL, then http://localhost:3000)
   -h, --help       Show this help
 
 Environment:
+  SIGNALFORGE_BASE_URL
   SIGNALFORGE_URL
 
 Exit codes:

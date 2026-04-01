@@ -158,7 +158,7 @@ From the shell, `scripts/signalforge-read.sh compare <run-id>` prints the same J
 ```bash
 ./scripts/analyze.sh ./audit.log
 ./scripts/analyze.sh --target-id 'fleet:prod:web-01' --collector-type signalforge-collectors ./audit.log
-SIGNALFORGE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" ./scripts/analyze.sh ./audit.log
+SIGNALFORGE_BASE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" ./scripts/analyze.sh ./audit.log
 ```
 
 ## What SignalForge Does Not Do

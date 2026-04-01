@@ -331,7 +331,8 @@ Use that port in:
 
 - your browser
 - `--url` for helper scripts
-- `SIGNALFORGE_URL`
+- `SIGNALFORGE_BASE_URL`
+- `SIGNALFORGE_URL` only when you are using the older compatibility name
 
 ### The LLM is unavailable
 

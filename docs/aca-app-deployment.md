@@ -47,10 +47,10 @@ Rationale: Slice 2 needs predictable rollback more than traffic splitting.
 
 ### Replica policy
 
-- current primary ACA app: `minReplicas=0`
+- current ACA app: `minReplicas=0`
 - increase to `minReplicas=1` only if cold-start cost becomes unacceptable for the live agent path
 
-Rationale: as of April 1, 2026, the live ACA app `ca-signalforge-staging` is running with `minReplicas=0`. The docs should reflect that current operating posture instead of preserving an older validation-only framing. Revisit only when the team explicitly decides to trade idle cost for faster poll and upload responsiveness.
+Rationale: the current ACA app runs with `minReplicas=0`. The docs should reflect that current operating posture instead of preserving an older validation-only framing. Revisit only when the team explicitly decides to trade idle cost for faster poll and upload responsiveness.
 
 ## Required ACA configuration
 
@@ -71,9 +71,9 @@ An operator should not have to guess these values:
 
 For exact app variables and secret classification, use [`aca-env-contract.md`](./aca-env-contract.md).
 
-## Primary ACA app rollout contract
+## ACA app rollout contract
 
-For any create, refresh, or rebuild of the primary ACA app:
+For any create, refresh, or rebuild of the ACA app:
 
 1. deploy or update the ACA app with the current SignalForge image
 2. wire it to the dedicated Postgres target that follows the same `postgres` app path
@@ -85,7 +85,7 @@ For any create, refresh, or rebuild of the primary ACA app:
 
 ## Rollback contract
 
-If the primary ACA app rollout regresses:
+If the ACA app rollout regresses:
 
 1. stop new traffic from moving to the bad ACA revision
 2. reactivate the previous known-good ACA revision

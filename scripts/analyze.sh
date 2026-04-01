@@ -4,7 +4,7 @@
 # Contract: docs/external-submit.md
 set -euo pipefail
 
-BASE_URL="${SIGNALFORGE_URL:-http://localhost:3000}"
+BASE_URL="${SIGNALFORGE_BASE_URL:-${SIGNALFORGE_URL:-http://localhost:3000}}"
 TARGET_ID="${SIGNALFORGE_TARGET_IDENTIFIER:-}"
 SOURCE_LABEL="${SIGNALFORGE_SOURCE_LABEL:-}"
 COLLECTOR_TYPE="${SIGNALFORGE_COLLECTOR_TYPE:-}"
@@ -19,7 +19,7 @@ Usage:
   ./scripts/analyze.sh [options] <path-to-log>
 
 Options:
-  --url, -u BASE          API base URL (default: SIGNALFORGE_URL or http://localhost:3000)
+  --url, -u BASE          API base URL (default: SIGNALFORGE_BASE_URL or SIGNALFORGE_URL, then http://localhost:3000)
   --target-id VALUE       Optional stable target key (target_identifier; preferred for compare/baseline)
   --source-label VALUE    Optional human label (e.g. CI job, bastion)
   --collector-type VALUE  Optional implementation id (e.g. signalforge-collectors)
@@ -28,6 +28,7 @@ Options:
   -h, --help              Show this help
 
 Environment (optional; flags override env):
+  SIGNALFORGE_BASE_URL
   SIGNALFORGE_URL
   SIGNALFORGE_TARGET_IDENTIFIER
   SIGNALFORGE_SOURCE_LABEL

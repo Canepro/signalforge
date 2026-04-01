@@ -1,6 +1,6 @@
-# ACA Primary App Runbook
+# ACA App Runbook
 
-This runbook turns the checked-in ACA contract into the deploy or refresh path for the primary SignalForge ACA app.
+This runbook turns the checked-in ACA contract into the deploy or refresh path for the SignalForge ACA app.
 
 The repo now has two real deploy entrypoints:
 
@@ -12,19 +12,8 @@ Use the shell helper when you want the same checked-in deploy path from a local 
 
 ## Naming note
 
-This repo now treats `primary ACA app` as the canonical role name.
-
-Some existing Azure resource names, image tags, parameter files, and historical notes still use `staging`, for example:
-
-- `ca-signalforge-staging`
-- `infra/aca/staging.parameters.example.json`
-- `infra/aca/primary.parameters.example.json` is the target-state replacement file for the rename cutover
-- image tags such as `staging-68fa777`
-- the dedicated ACA app database currently named `signalforge_staging`
-
-Keep those names when referring to existing artifacts. Do not treat the word `staging` in those identifiers as the canonical environment taxonomy.
-
-The example parameter file keeps its legacy filename for continuity with deployed artifact history, but the role-defining values inside it should use the current primary-app vocabulary and release-specific placeholders.
+Use `ca-signalforge` as the durable app name for new operator instances.
+If your own Azure estate still carries an older legacy app name, treat that as migration history rather than product taxonomy and use [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) to leave it behind.
 
 ## Preconditions
 
@@ -36,28 +25,27 @@ Before starting:
 4. the dedicated ACA app Postgres URL is ready
 5. the checked-in Postgres migrations have been applied to that database
 
-Do not point the primary ACA app at an unrelated shared app database.
-Use the dedicated ACA app database currently named `signalforge_staging` unless and until that legacy database identifier is intentionally renamed.
+Do not point the ACA app at an unrelated shared app database.
 
 ## Files to use
 
 - template: [`../infra/aca/main.bicep`](../infra/aca/main.bicep)
-- target-state example parameters: [`../infra/aca/primary.parameters.example.json`](../infra/aca/primary.parameters.example.json)
-- legacy current-app example parameters: [`../infra/aca/staging.parameters.example.json`](../infra/aca/staging.parameters.example.json)
+- target-state example parameters: [`../infra/aca/app.parameters.example.json`](../infra/aca/app.parameters.example.json)
+- legacy-name migration example parameters: [`../infra/aca/staging.parameters.example.json`](../infra/aca/staging.parameters.example.json)
 - release and deploy contract: [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md)
-- cutover runbook: [`aca-cutover-runbook.md`](./aca-cutover-runbook.md)
+- legacy-name migration guide: [`aca-cutover-runbook.md`](./aca-cutover-runbook.md)
 - app/runtime contract: [`app-container-runtime.md`](./app-container-runtime.md)
 - env contract: [`aca-env-contract.md`](./aca-env-contract.md)
 - deployment contract: [`aca-app-deployment.md`](./aca-app-deployment.md)
 
-## Recommended primary-app choices
+## Recommended app choices
 
 - one ACA app for SignalForge web and API
 - public ingress enabled
 - `minReplicas=0`
 - `maxReplicas=3`
 - `DATABASE_DRIVER=postgres`
-- Neon Postgres retained
+- Postgres retained as the durable app backend
 - deterministic fallback allowed if no LLM keys are supplied
 
 ## Prepare the parameter file
@@ -65,7 +53,7 @@ Use the dedicated ACA app database currently named `signalforge_staging` unless 
 Copy the example parameter file and fill in real values:
 
 ```bash
-cp infra/aca/primary.parameters.example.json infra/aca/primary.parameters.json
+cp infra/aca/app.parameters.example.json infra/aca/app.parameters.json
 ```
 
 Required values to replace:
@@ -78,7 +66,7 @@ Required values to replace:
 Optional values to replace:
 
 - `registryServer`
-- `registryIdentityResourceId` if using the legacy shared ACR pull identity
+- `registryIdentityResourceId`
 - `llmProvider`
 - `openAiApiKey`
 - `openAiModel`
@@ -88,6 +76,12 @@ Optional values to replace:
 - `azureOpenAiApiVersion`
 - `revisionSuffix`
 
+For the normal app path, the preferred image is public GHCR:
+
+- `ghcr.io/canepro/signalforge:<release-tag>`
+
+That means `registryServer` and `registryIdentityResourceId` can stay empty unless your operator instance intentionally uses a private registry pull path.
+
 ## Validate the template locally
 
 Compile the Bicep file before touching Azure:
@@ -96,41 +90,16 @@ Compile the Bicep file before touching Azure:
 az bicep build --file infra/aca/main.bicep
 ```
 
-For the current verified primary-app target, the preferred app image is public GHCR:
-
-`ghcr.io/canepro/signalforge:<release-tag>`
-
-That means `registryServer` and `registryIdentityResourceId` can stay empty for the normal primary deploy path.
-
-The older shared ACR pull identity remains a legacy fallback only:
-
-`/subscriptions/d3b51a0d-cdf1-445e-bac3-28e65892afbc/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-canepro-ph-acrpull`
-
 If you want a non-destructive Azure-side validation later, use `what-if` before any create or update:
 
 ```bash
 az deployment group what-if \
   --resource-group <resource-group> \
   --template-file infra/aca/main.bicep \
-  --parameters @infra/aca/primary.parameters.json
+  --parameters @infra/aca/app.parameters.json
 ```
 
-If you are driving the Windows Azure CLI from WSL on this machine, point the Azure temp directories at a Windows-accessible path first and pass the parameters file as a Windows path:
-
-```bash
-export TMP=/mnt/c/Users/i/AppData/Local/Temp/codex-aca
-export TEMP=/mnt/c/Users/i/AppData/Local/Temp/codex-aca
-export DOTNET_BUNDLE_EXTRACT_BASE_DIR=/mnt/c/Users/i/AppData/Local/Temp/codex-aca
-
-mkdir -p "$TMP"
-
-az deployment group what-if \
-  --resource-group <resource-group> \
-  --template-file infra/aca/main.bicep \
-  --parameters @"$(wslpath -w infra/aca/primary.parameters.json)"
-```
-
-## Deploy the primary ACA app
+## Deploy the ACA app
 
 ### Preferred path: GitHub Actions
 
@@ -155,7 +124,7 @@ bash scripts/deploy-aca-app.sh \
 
 Then rerun without `--what-if` for the real deploy.
 
-If you need to mirror the current Azure OpenAI live shape, add:
+If you need Azure OpenAI:
 
 ```bash
 ACA_AZURE_OPENAI_API_KEY='<azure-openai-key>' \
@@ -164,8 +133,8 @@ bash scripts/deploy-aca-app.sh \
   --environment-id <aca-environment-id> \
   --image ghcr.io/canepro/signalforge:<release-tag> \
   --llm-provider azure \
-  --azure-openai-endpoint https://Signalforge-resource.openai.azure.com/openai/v1/ \
-  --azure-openai-deployment gpt-5.4-mini \
+  --azure-openai-endpoint https://<resource-name>.openai.azure.com/openai/v1/ \
+  --azure-openai-deployment <deployment-name> \
   --what-if
 ```
 
@@ -177,12 +146,12 @@ When you explicitly want to bypass the helper and call Azure yourself:
 az deployment group create \
   --resource-group <resource-group> \
   --template-file infra/aca/main.bicep \
-  --parameters @infra/aca/primary.parameters.json
+  --parameters @infra/aca/app.parameters.json
 ```
 
 ## Post-deploy verification
 
-Run these checks against the primary ACA app hostname:
+Run these checks against the ACA app hostname:
 
 1. `GET /api/health` returns `200`
 2. dashboard loads
@@ -210,4 +179,4 @@ If the ACA deploy is bad:
 
 - The current `GET /api/health` endpoint is config-focused. It is suitable for ACA probes and initial rollout checks, but it does not prove every dependency path by itself.
 - Keep secrets in the parameter file only long enough to pass them to Azure, and prefer secret injection through secure operator workflows in the real environment.
-- If the primary ACA app database already contains older agent-submitted runs from before `collected_at` inference shipped, repair them in place with `DATABASE_DRIVER=postgres DATABASE_URL=<database-url> bun run db:backfill:collected-at`.
+- If the ACA app database already contains older agent-submitted runs from before `collected_at` inference shipped, repair them in place with `DATABASE_DRIVER=postgres DATABASE_URL=<database-url> bun run db:backfill:collected-at`.

@@ -5,7 +5,7 @@
 Historical note:
 
 - this file started as the migration plan from Vercel to ACA
-- current repo reality is stronger: ACA is now the primary app-hosting path and Vercel remains the preview/review surface
+- current repo reality is stronger: ACA is now the app-hosting path and Vercel remains the preview/review surface
 - keep the migration wording below as historical planning context unless a section explicitly states the current operating role
 
 SignalForge now has a real execution-plane story:
@@ -272,7 +272,7 @@ Acceptance criteria:
 
 ### Slice 5: ACA as Primary App Endpoint
 
-After ACA acceptance, treat ACA as the primary app endpoint and keep Vercel in the preview/review role.
+After ACA acceptance, treat ACA as the app endpoint and keep Vercel in the preview/review role.
 
 Cutover tasks:
 

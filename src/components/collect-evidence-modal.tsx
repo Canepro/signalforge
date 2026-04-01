@@ -62,7 +62,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
   if (!open) return null;
 
   const agentEnvFile = [
-    `SIGNALFORGE_URL=${origin}`,
+    `SIGNALFORGE_BASE_URL=${origin}`,
     `SIGNALFORGE_AGENT_TOKEN=<token from enrollment or reissue>`,
     `SIGNALFORGE_AGENT_INSTANCE_ID=$(hostname)-agent-1`,
     `SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
@@ -90,7 +90,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
   const agentServiceCheck = [`systemctl status signalforge-agent`, `journalctl -u signalforge-agent -f`].join("\n");
 
   const agentRun = [
-    `export SIGNALFORGE_URL=${origin}`,
+    `export SIGNALFORGE_BASE_URL=${origin}`,
     `export SIGNALFORGE_AGENT_TOKEN='<token from enrollment>'`,
     `export SIGNALFORGE_AGENT_INSTANCE_ID="$(hostname)-agent-1"`,
     `export SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
@@ -99,7 +99,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
   ].join("\n");
 
   const agentOnce = [
-    `export SIGNALFORGE_URL=${origin}`,
+    `export SIGNALFORGE_BASE_URL=${origin}`,
     `export SIGNALFORGE_AGENT_TOKEN='<token from enrollment>'`,
     `export SIGNALFORGE_AGENT_INSTANCE_ID="$(hostname)-agent-1"`,
     `export SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
@@ -107,23 +107,23 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `bun run src/cli.ts once`,
   ].join("\n");
 
-  const cliSubmit = `SIGNALFORGE_URL=${origin} ./scripts/analyze.sh /path/to/your-artifact.log`;
+  const cliSubmit = `SIGNALFORGE_BASE_URL=${origin} ./scripts/analyze.sh /path/to/your-artifact.log`;
 
   const collectorPushLinux = [
     `cd /path/to/signalforge-collectors`,
-    `SIGNALFORGE_URL=${origin} ./submit-to-signalforge.sh --file examples/sample_audit.log`,
+    `SIGNALFORGE_BASE_URL=${origin} ./submit-to-signalforge.sh --file examples/sample_audit.log`,
   ].join("\n");
 
   const collectorPushContainer = [
     `cd /path/to/signalforge-collectors`,
     `./collect-container-diagnostics.sh --runtime podman --container payments-api --output ./payments-container.txt`,
-    `SIGNALFORGE_URL=${origin} ./submit-to-signalforge.sh --file ./payments-container.txt --artifact-type container-diagnostics --target-id 'container-workload:host-a:podman:payments-api' --source-label 'signalforge-collectors:collect-container-diagnostics.sh'`,
+    `SIGNALFORGE_BASE_URL=${origin} ./submit-to-signalforge.sh --file ./payments-container.txt --artifact-type container-diagnostics --target-id 'container-workload:host-a:podman:payments-api' --source-label 'signalforge-collectors:collect-container-diagnostics.sh'`,
   ].join("\n");
 
   const collectorPushKubernetes = [
     `cd /path/to/signalforge-collectors`,
     `./collect-kubernetes-bundle.sh --namespace payments --output ./payments-bundle.json`,
-    `SIGNALFORGE_URL=${origin} ./submit-to-signalforge.sh --file ./payments-bundle.json --artifact-type kubernetes-bundle --target-id 'cluster:prod-eu-1:namespace:payments' --source-label 'signalforge-collectors:collect-kubernetes-bundle.sh'`,
+    `SIGNALFORGE_BASE_URL=${origin} ./submit-to-signalforge.sh --file ./payments-bundle.json --artifact-type kubernetes-bundle --target-id 'cluster:prod-eu-1:namespace:payments' --source-label 'signalforge-collectors:collect-kubernetes-bundle.sh'`,
   ].join("\n");
 
   return (

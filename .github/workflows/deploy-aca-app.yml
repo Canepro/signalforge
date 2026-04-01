@@ -6,8 +6,12 @@ on:
       image_tag:
         description: GHCR tag to deploy. Prefer the immutable full commit SHA tag.
         required: true
+      github_environment:
+        description: GitHub environment that holds ACA deploy secrets and vars.
+        required: false
+        default: aca-app
       container_app_name:
-        description: ACA app name to deploy. Default is the primary app target.
+        description: ACA app name to deploy. Default is the durable app target.
         required: false
         default: ca-signalforge
       revision_suffix:
@@ -31,7 +35,7 @@ jobs:
   deploy:
     name: Deploy ACA app
     runs-on: ubuntu-latest
-    environment: aca-primary
+    environment: ${{ inputs.github_environment }}
 
     steps:
       - name: Checkout
@@ -46,22 +50,22 @@ jobs:
 
       - name: Deploy with checked-in ACA template
         env:
-          ACA_RESOURCE_GROUP: ${{ vars.ACA_PRIMARY_RESOURCE_GROUP }}
-          ACA_ENVIRONMENT_ID: ${{ vars.ACA_PRIMARY_ENVIRONMENT_ID }}
-          ACA_CPU: ${{ vars.ACA_PRIMARY_CPU }}
-          ACA_MEMORY: ${{ vars.ACA_PRIMARY_MEMORY }}
-          ACA_MIN_REPLICAS: ${{ vars.ACA_PRIMARY_MIN_REPLICAS }}
-          ACA_MAX_REPLICAS: ${{ vars.ACA_PRIMARY_MAX_REPLICAS }}
-          ACA_TARGET_PORT: ${{ vars.ACA_PRIMARY_TARGET_PORT }}
-          ACA_LLM_PROVIDER: ${{ vars.ACA_PRIMARY_LLM_PROVIDER }}
-          ACA_OPENAI_MODEL: ${{ vars.ACA_PRIMARY_OPENAI_MODEL }}
-          ACA_AZURE_OPENAI_ENDPOINT: ${{ vars.ACA_PRIMARY_AZURE_OPENAI_ENDPOINT }}
-          ACA_AZURE_OPENAI_DEPLOYMENT: ${{ vars.ACA_PRIMARY_AZURE_OPENAI_DEPLOYMENT }}
-          ACA_AZURE_OPENAI_API_VERSION: ${{ vars.ACA_PRIMARY_AZURE_OPENAI_API_VERSION }}
-          ACA_DATABASE_URL: ${{ secrets.ACA_PRIMARY_DATABASE_URL }}
-          ACA_ADMIN_TOKEN: ${{ secrets.ACA_PRIMARY_ADMIN_TOKEN }}
-          ACA_OPENAI_API_KEY: ${{ secrets.ACA_PRIMARY_OPENAI_API_KEY }}
-          ACA_AZURE_OPENAI_API_KEY: ${{ secrets.ACA_PRIMARY_AZURE_OPENAI_API_KEY }}
+          ACA_RESOURCE_GROUP: ${{ vars.ACA_APP_RESOURCE_GROUP || vars.ACA_PRIMARY_RESOURCE_GROUP }}
+          ACA_ENVIRONMENT_ID: ${{ vars.ACA_APP_ENVIRONMENT_ID || vars.ACA_PRIMARY_ENVIRONMENT_ID }}
+          ACA_CPU: ${{ vars.ACA_APP_CPU || vars.ACA_PRIMARY_CPU }}
+          ACA_MEMORY: ${{ vars.ACA_APP_MEMORY || vars.ACA_PRIMARY_MEMORY }}
+          ACA_MIN_REPLICAS: ${{ vars.ACA_APP_MIN_REPLICAS || vars.ACA_PRIMARY_MIN_REPLICAS }}
+          ACA_MAX_REPLICAS: ${{ vars.ACA_APP_MAX_REPLICAS || vars.ACA_PRIMARY_MAX_REPLICAS }}
+          ACA_TARGET_PORT: ${{ vars.ACA_APP_TARGET_PORT || vars.ACA_PRIMARY_TARGET_PORT }}
+          ACA_LLM_PROVIDER: ${{ vars.ACA_APP_LLM_PROVIDER || vars.ACA_PRIMARY_LLM_PROVIDER }}
+          ACA_OPENAI_MODEL: ${{ vars.ACA_APP_OPENAI_MODEL || vars.ACA_PRIMARY_OPENAI_MODEL }}
+          ACA_AZURE_OPENAI_ENDPOINT: ${{ vars.ACA_APP_AZURE_OPENAI_ENDPOINT || vars.ACA_PRIMARY_AZURE_OPENAI_ENDPOINT }}
+          ACA_AZURE_OPENAI_DEPLOYMENT: ${{ vars.ACA_APP_AZURE_OPENAI_DEPLOYMENT || vars.ACA_PRIMARY_AZURE_OPENAI_DEPLOYMENT }}
+          ACA_AZURE_OPENAI_API_VERSION: ${{ vars.ACA_APP_AZURE_OPENAI_API_VERSION || vars.ACA_PRIMARY_AZURE_OPENAI_API_VERSION }}
+          ACA_DATABASE_URL: ${{ secrets.ACA_APP_DATABASE_URL || secrets.ACA_PRIMARY_DATABASE_URL }}
+          ACA_ADMIN_TOKEN: ${{ secrets.ACA_APP_ADMIN_TOKEN || secrets.ACA_PRIMARY_ADMIN_TOKEN }}
+          ACA_OPENAI_API_KEY: ${{ secrets.ACA_APP_OPENAI_API_KEY || secrets.ACA_PRIMARY_OPENAI_API_KEY }}
+          ACA_AZURE_OPENAI_API_KEY: ${{ secrets.ACA_APP_AZURE_OPENAI_API_KEY || secrets.ACA_PRIMARY_AZURE_OPENAI_API_KEY }}
         shell: bash
         run: |
           set -euo pipefail
@@ -117,7 +121,7 @@ jobs:
         id: app
         if: ${{ !inputs.what_if }}
         env:
-          ACA_RESOURCE_GROUP: ${{ vars.ACA_PRIMARY_RESOURCE_GROUP }}
+          ACA_RESOURCE_GROUP: ${{ vars.ACA_APP_RESOURCE_GROUP || vars.ACA_PRIMARY_RESOURCE_GROUP }}
         shell: bash
         run: |
           set -euo pipefail
@@ -133,7 +137,7 @@ jobs:
       - name: Run API smoke checks
         if: ${{ !inputs.what_if }}
         env:
-          SIGNALFORGE_ADMIN_TOKEN: ${{ secrets.ACA_PRIMARY_ADMIN_TOKEN }}
+          SIGNALFORGE_ADMIN_TOKEN: ${{ secrets.ACA_APP_ADMIN_TOKEN || secrets.ACA_PRIMARY_ADMIN_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -145,6 +149,7 @@ jobs:
           {
             echo "## ACA deploy request"
             echo
+            echo "- GitHub environment: \`${{ inputs.github_environment }}\`"
             echo "- app: \`${{ inputs.container_app_name }}\`"
             echo "- image: \`${IMAGE_REPOSITORY}:${{ inputs.image_tag }}\`"
             echo "- what-if: \`${{ inputs.what_if }}\`"

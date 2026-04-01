@@ -1,27 +1,12 @@
 # ACA Cutover Runbook
 
-This runbook is the exact operator path for replacing the legacy ACA resource name:
+Use this guide only if your operator instance still carries a legacy ACA app name and you need to move to the durable app name:
 
-- from `ca-signalforge-staging`
+- from `<legacy-app-name>`
 - to `ca-signalforge`
 
-without changing the product contract, database posture, or agent API shape.
-
-## Verified starting state
-
-Verified on April 1, 2026 with `az` read-only commands from this machine:
-
-- subscription: `d3b51a0d-cdf1-445e-bac3-28e65892afbc`
-- resource group: `rg-canepro-ph-dev-eus`
-- ACA environment: `cae-canepro-ph-dev-eus`
-- live app: `ca-signalforge-staging`
-- live hostname: `https://ca-signalforge-staging.kinddune-53ac219d.eastus2.azurecontainerapps.io`
-- live revision: `ca-signalforge-staging--stg68fa777`
-- live image: `caneprophacr01.azurecr.io/signalforge:staging-68fa777`
-- live ingress: public
-- live target port: `3000`
-- live replicas policy: `minReplicas=0`, `maxReplicas=3`
-- there is no live `ca-signalforge` app yet
+The reference instance has already completed this migration.
+This document keeps the additive migration pattern available for other operators without treating one older resource name as product taxonomy.
 
 ## Preconditions
 
@@ -29,7 +14,7 @@ Before cutover:
 
 1. `Publish App Image` has published the target image to `ghcr.io/canepro/signalforge`
 2. the GHCR package is public
-3. the `aca-primary` GitHub environment is configured
+3. a GitHub deploy environment is configured for the ACA app workflow
 4. the deploy workflow can complete a `what-if`
 5. the legacy app remains untouched and healthy
 
@@ -46,7 +31,7 @@ Preferred deploy tag shape:
 
 - `ghcr.io/canepro/signalforge:<full-commit-sha>`
 
-## Step 2: run the primary-app deployment as a dry run
+## Step 2: run the app deployment as a dry run
 
 Run `Deploy ACA App` with:
 
@@ -61,13 +46,13 @@ ACA_DATABASE_URL='postgres://<user>:<password>@<host>/<db>?sslmode=require' \
 ACA_ADMIN_TOKEN='<long-random-secret>' \
 ACA_AZURE_OPENAI_API_KEY='<azure-openai-key>' \
 bash scripts/deploy-aca-app.sh \
-  --resource-group rg-canepro-ph-dev-eus \
-  --environment-id /subscriptions/d3b51a0d-cdf1-445e-bac3-28e65892afbc/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.App/managedEnvironments/cae-canepro-ph-dev-eus \
+  --resource-group <resource-group> \
+  --environment-id /subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.App/managedEnvironments/<managed-environment-name> \
   --app-name ca-signalforge \
   --image ghcr.io/canepro/signalforge:<full-commit-sha> \
   --llm-provider azure \
-  --azure-openai-endpoint https://Signalforge-resource.openai.azure.com/openai/v1/ \
-  --azure-openai-deployment gpt-5.4-mini \
+  --azure-openai-endpoint https://<resource-name>.openai.azure.com/openai/v1/ \
+  --azure-openai-deployment <deployment-name> \
   --what-if
 ```
 
@@ -77,13 +62,13 @@ Do not continue until the dry-run output matches the expected additive create.
 
 Run the same deploy again with `what_if=false`.
 
-That creates the new app in parallel while leaving `ca-signalforge-staging` untouched.
+That creates the new app in parallel while leaving `<legacy-app-name>` untouched.
 
 The intended steady state for the new app is:
 
 - app name: `ca-signalforge`
 - image: `ghcr.io/canepro/signalforge:<full-commit-sha>`
-- tags: `app=signalforge`, `environment=primary`, `slice=aca-primary`
+- tags: `app=signalforge`, `surface=aca`, `role=app`
 - same ACA environment
 - same Postgres backend
 - same operator token behavior
@@ -111,13 +96,7 @@ Then run the deeper product checks:
 
 ## Step 5: move one agent first
 
-Change one low-risk agent from:
-
-- `SIGNALFORGE_URL=https://ca-signalforge-staging...`
-
-to:
-
-- `SIGNALFORGE_URL=https://ca-signalforge...`
+Change one low-risk agent from the legacy app origin to the new `ca-signalforge` origin.
 
 Then verify:
 
@@ -135,7 +114,7 @@ After the first moved agent is healthy:
 
 ## Step 7: hold the old app as rollback target
 
-Do not delete `ca-signalforge-staging` immediately.
+Do not delete the legacy app immediately.
 
 Keep it until all of these are true:
 
@@ -147,10 +126,10 @@ Keep it until all of these are true:
 
 Only after the soak period:
 
-1. confirm no agents or scripts still point at `ca-signalforge-staging`
+1. confirm no agents or scripts still point at the legacy hostname
 2. confirm the new app is the only canonical operator URL
-3. disable or delete `ca-signalforge-staging`
-4. remove legacy ACR-specific app config if it is no longer used anywhere
+3. disable or delete the legacy ACA app
+4. remove old registry or identity wiring that is no longer used anywhere
 
 This final step is intentionally not automated in this repo because it is destructive.
 
@@ -158,7 +137,7 @@ This final step is intentionally not automated in this repo because it is destru
 
 If `ca-signalforge` is unhealthy:
 
-1. leave `ca-signalforge-staging` running
+1. leave the legacy app running
 2. point agents back to the legacy hostname
 3. keep the shared database unchanged
 4. fix the new app and retry the additive cutover

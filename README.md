@@ -57,19 +57,13 @@ The repo currently documents three deployment surfaces that should not be confla
 
 - **Local development:** SQLite by default
 - **Preview/review:** Vercel-compatible branch and PR previews
-- **Primary app-hosting path:** Azure Container Apps with `DATABASE_DRIVER=postgres`
-
-Important naming note:
-
-- the live ACA resource still uses the legacy Azure name `ca-signalforge-staging`
-- that is a historical resource identifier, not the canonical product vocabulary
-- the target steady-state resource name is `ca-signalforge`
+- **App-hosting path:** Azure Container Apps with `DATABASE_DRIVER=postgres`
 
 Current deployment docs:
 
 - [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
 - [docs/aca-env-contract.md](docs/aca-env-contract.md)
-- [docs/aca-primary-app-runbook.md](docs/aca-primary-app-runbook.md)
+- [docs/aca-app-runbook.md](docs/aca-app-runbook.md)
 - [plans/phase-10b-aca-resource-rename-cutover.md](plans/phase-10b-aca-resource-rename-cutover.md)
 - [plans/phase-10c-public-image-and-release-pipeline.md](plans/phase-10c-public-image-and-release-pipeline.md)
 
@@ -215,9 +209,10 @@ See:
 
 The highest-signal current infrastructure and release work is now:
 
-- run the live additive cutover from `ca-signalforge-staging` to `ca-signalforge`
-- switch the primary ACA app from the legacy ACR tag path to the repo-owned GHCR release path
-- keep the deploy path explicit and operator-controlled while the new app soaks
+- keep the repo-owned GHCR publish and ACA deploy path healthy
+- keep Vercel strictly in the preview or review role
+- keep the cross-repo operator contract portable across app, agent, and collectors
+- avoid turning one operator's machine, registry, or cluster into the canonical product model
 
 Source-of-truth plans:
 
@@ -235,7 +230,7 @@ Source-of-truth plans:
 - [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
 - [docs/aca-env-contract.md](docs/aca-env-contract.md)
 - [docs/app-release-and-aca-deploy.md](docs/app-release-and-aca-deploy.md)
-- [docs/aca-primary-app-runbook.md](docs/aca-primary-app-runbook.md)
+- [docs/aca-app-runbook.md](docs/aca-app-runbook.md)
 - [docs/aca-cutover-runbook.md](docs/aca-cutover-runbook.md)
 - [docs/history.md](docs/history.md)
 - [plans/roadmap.md](plans/roadmap.md)
