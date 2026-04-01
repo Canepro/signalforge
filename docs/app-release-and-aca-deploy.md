@@ -93,10 +93,9 @@ Optional GitHub environment secrets when `secret_source=github-environment`:
 - `ACA_APP_OPENAI_API_KEY`
 - `ACA_APP_AZURE_OPENAI_API_KEY`
 
-Backward compatibility note:
+Canonical GitHub environment:
 
-- the checked-in workflow still accepts legacy `ACA_PRIMARY_*` variable and secret names
-- operators can keep a legacy GitHub environment name such as `aca-primary` during migration, or use a cleaner name such as `aca-app` for new setups
+- `aca-app`
 
 The checked-in workflow expects those values to come from GitHub environment configuration, not from repo edits.
 
@@ -127,6 +126,8 @@ Recommended secret names inside Infisical:
 The workflow maps those into the checked-in deploy helper contract so the app and infra path do not need a separate runtime secret redesign.
 
 Setup guide: [`infisical-secrets.md`](./infisical-secrets.md)
+
+Use `secret_source=github-environment` only for short-lived debugging. The steady-state deploy contract is `aca-app` plus Infisical over OIDC.
 
 ### 3. The deploy workflow calls the checked-in shell helper
 

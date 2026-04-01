@@ -56,13 +56,9 @@ The deploy workflow still needs the non-secret ACA and Azure variables already d
 
 Use an Infisical machine identity with OIDC authentication for GitHub Actions.
 
-Recommended subject shape for a clean new setup:
+Recommended subject shape:
 
 - `repo:Canepro/signalforge:environment:aca-app`
-
-If you keep the legacy GitHub environment name:
-
-- `repo:Canepro/signalforge:environment:aca-primary`
 
 Recommended audience:
 
@@ -94,10 +90,10 @@ After the GitHub environment variables and Infisical machine identity are in pla
 
 1. run `Deploy ACA App`
 2. leave `secret_source=infisical`
-3. choose the GitHub environment that matches the machine-identity subject
+3. choose `aca-app` as the GitHub environment
 4. start with `what_if=true`
 
-Use `secret_source=github-environment` only when migrating or debugging.
+Use `secret_source=github-environment` only for short-lived debugging.
 
 ## Local development
 

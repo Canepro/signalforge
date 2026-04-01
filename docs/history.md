@@ -190,7 +190,7 @@ Naming note for the entries below:
 - `staging` refers to the historical resource names and terminology in use at the time, such as `ca-signalforge-staging`
 - the entries below also use the older `validation` framing because that was the rollout language in use at the time
 - treat both as historical identifiers and rollout vocabulary, not the current canonical environment taxonomy
-- the current canonical role name is the `primary ACA app` path
+- the current canonical role name is the `ACA app` path
 
 ### Vercel upload failure that justified Phase 10
 

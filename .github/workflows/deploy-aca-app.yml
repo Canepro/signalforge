@@ -15,7 +15,7 @@ on:
           - infisical
           - github-environment
       github_environment:
-        description: GitHub environment that holds ACA deploy secrets and vars.
+        description: GitHub environment that holds ACA deploy vars and optional fallback secrets.
         required: false
         default: aca-app
       container_app_name:
@@ -85,10 +85,10 @@ jobs:
       - name: Resolve deploy secrets
         env:
           SECRET_SOURCE: ${{ inputs.secret_source }}
-          GH_DATABASE_URL: ${{ secrets.ACA_APP_DATABASE_URL || secrets.ACA_PRIMARY_DATABASE_URL }}
-          GH_ADMIN_TOKEN: ${{ secrets.ACA_APP_ADMIN_TOKEN || secrets.ACA_PRIMARY_ADMIN_TOKEN }}
-          GH_OPENAI_API_KEY: ${{ secrets.ACA_APP_OPENAI_API_KEY || secrets.ACA_PRIMARY_OPENAI_API_KEY }}
-          GH_AZURE_OPENAI_API_KEY: ${{ secrets.ACA_APP_AZURE_OPENAI_API_KEY || secrets.ACA_PRIMARY_AZURE_OPENAI_API_KEY }}
+          GH_DATABASE_URL: ${{ secrets.ACA_APP_DATABASE_URL }}
+          GH_ADMIN_TOKEN: ${{ secrets.ACA_APP_ADMIN_TOKEN }}
+          GH_OPENAI_API_KEY: ${{ secrets.ACA_APP_OPENAI_API_KEY }}
+          GH_AZURE_OPENAI_API_KEY: ${{ secrets.ACA_APP_AZURE_OPENAI_API_KEY }}
         shell: bash
         run: |
           set -euo pipefail
@@ -132,18 +132,18 @@ jobs:
 
       - name: Deploy with checked-in ACA template
         env:
-          ACA_RESOURCE_GROUP: ${{ vars.ACA_APP_RESOURCE_GROUP || vars.ACA_PRIMARY_RESOURCE_GROUP }}
-          ACA_ENVIRONMENT_ID: ${{ vars.ACA_APP_ENVIRONMENT_ID || vars.ACA_PRIMARY_ENVIRONMENT_ID }}
-          ACA_CPU: ${{ vars.ACA_APP_CPU || vars.ACA_PRIMARY_CPU }}
-          ACA_MEMORY: ${{ vars.ACA_APP_MEMORY || vars.ACA_PRIMARY_MEMORY }}
-          ACA_MIN_REPLICAS: ${{ vars.ACA_APP_MIN_REPLICAS || vars.ACA_PRIMARY_MIN_REPLICAS }}
-          ACA_MAX_REPLICAS: ${{ vars.ACA_APP_MAX_REPLICAS || vars.ACA_PRIMARY_MAX_REPLICAS }}
-          ACA_TARGET_PORT: ${{ vars.ACA_APP_TARGET_PORT || vars.ACA_PRIMARY_TARGET_PORT }}
-          ACA_LLM_PROVIDER: ${{ vars.ACA_APP_LLM_PROVIDER || vars.ACA_PRIMARY_LLM_PROVIDER }}
-          ACA_OPENAI_MODEL: ${{ vars.ACA_APP_OPENAI_MODEL || vars.ACA_PRIMARY_OPENAI_MODEL }}
-          ACA_AZURE_OPENAI_ENDPOINT: ${{ vars.ACA_APP_AZURE_OPENAI_ENDPOINT || vars.ACA_PRIMARY_AZURE_OPENAI_ENDPOINT }}
-          ACA_AZURE_OPENAI_DEPLOYMENT: ${{ vars.ACA_APP_AZURE_OPENAI_DEPLOYMENT || vars.ACA_PRIMARY_AZURE_OPENAI_DEPLOYMENT }}
-          ACA_AZURE_OPENAI_API_VERSION: ${{ vars.ACA_APP_AZURE_OPENAI_API_VERSION || vars.ACA_PRIMARY_AZURE_OPENAI_API_VERSION }}
+          ACA_RESOURCE_GROUP: ${{ vars.ACA_APP_RESOURCE_GROUP }}
+          ACA_ENVIRONMENT_ID: ${{ vars.ACA_APP_ENVIRONMENT_ID }}
+          ACA_CPU: ${{ vars.ACA_APP_CPU }}
+          ACA_MEMORY: ${{ vars.ACA_APP_MEMORY }}
+          ACA_MIN_REPLICAS: ${{ vars.ACA_APP_MIN_REPLICAS }}
+          ACA_MAX_REPLICAS: ${{ vars.ACA_APP_MAX_REPLICAS }}
+          ACA_TARGET_PORT: ${{ vars.ACA_APP_TARGET_PORT }}
+          ACA_LLM_PROVIDER: ${{ vars.ACA_APP_LLM_PROVIDER }}
+          ACA_OPENAI_MODEL: ${{ vars.ACA_APP_OPENAI_MODEL }}
+          ACA_AZURE_OPENAI_ENDPOINT: ${{ vars.ACA_APP_AZURE_OPENAI_ENDPOINT }}
+          ACA_AZURE_OPENAI_DEPLOYMENT: ${{ vars.ACA_APP_AZURE_OPENAI_DEPLOYMENT }}
+          ACA_AZURE_OPENAI_API_VERSION: ${{ vars.ACA_APP_AZURE_OPENAI_API_VERSION }}
         shell: bash
         run: |
           set -euo pipefail
@@ -199,7 +199,7 @@ jobs:
         id: app
         if: ${{ !inputs.what_if }}
         env:
-          ACA_RESOURCE_GROUP: ${{ vars.ACA_APP_RESOURCE_GROUP || vars.ACA_PRIMARY_RESOURCE_GROUP }}
+          ACA_RESOURCE_GROUP: ${{ vars.ACA_APP_RESOURCE_GROUP }}
         shell: bash
         run: |
           set -euo pipefail
