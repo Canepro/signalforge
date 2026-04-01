@@ -183,7 +183,14 @@ Why it matters:
 - this locked the more realistic operating model that Phase 10 now needs to host properly
 - it raised the bar from feature completeness toward real operator usability and deployment credibility
 
-## 2026-03-28: ACA migration evidence and staging validation
+## 2026-03-28: ACA migration evidence and early ACA rollout
+
+Naming note for the entries below:
+
+- `staging` refers to the historical resource names and terminology in use at the time, such as `ca-signalforge-staging`
+- the entries below also use the older `validation` framing because that was the rollout language in use at the time
+- treat both as historical identifiers and rollout vocabulary, not the current canonical environment taxonomy
+- the current canonical role name is the `primary ACA app` path
 
 ### Vercel upload failure that justified Phase 10
 

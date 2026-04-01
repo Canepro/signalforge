@@ -1,33 +1,50 @@
-# ACA Staging Runbook
+# ACA Primary App Runbook
 
-This runbook turns the Slice 1 image and Slice 2 ACA contract into a first staging deployment without changing production traffic.
+This runbook turns the checked-in ACA contract into the deploy or refresh path for the primary SignalForge ACA app.
 
-This document still does **not** create Azure resources by itself. It defines the exact repo assets and commands an operator should use when they are ready to stand up staging.
+This document still does **not** create Azure resources by itself. It defines the exact repo assets and commands an operator should use when they are ready to create, rebuild, or refresh the primary ACA app path.
+
+## Naming note
+
+This repo now treats `primary ACA app` as the canonical role name.
+
+Some existing Azure resource names, image tags, parameter files, and historical notes still use `staging`, for example:
+
+- `ca-signalforge-staging`
+- `infra/aca/staging.parameters.example.json`
+- `infra/aca/primary.parameters.example.json` is the target-state replacement file for the rename cutover
+- image tags such as `staging-68fa777`
+- the dedicated ACA app database currently named `signalforge_staging`
+
+Keep those names when referring to existing artifacts. Do not treat the word `staging` in those identifiers as the canonical environment taxonomy.
+
+The example parameter file keeps its legacy filename for continuity with deployed artifact history, but the role-defining values inside it should use the current primary-app vocabulary and release-specific placeholders.
 
 ## Preconditions
 
 Before starting:
 
-1. the Slice 1 app container image builds cleanly
+1. the app container image builds cleanly
 2. the target ACA environment already exists
 3. the target image is published to a registry ACA can pull from
-4. the Neon staging or safe validation database URL is ready
+4. the dedicated ACA app Postgres URL is ready
 5. the checked-in Postgres migrations have been applied to that database
 
-Do not point staging at a shared app database such as the existing production-style `neondb`.
-Use a dedicated staging database for the ACA app, for example `signalforge_staging`, so validation does not mix runs, sources, or collection jobs with another environment.
+Do not point the primary ACA app at an unrelated shared app database.
+Use the dedicated ACA app database currently named `signalforge_staging` unless and until that legacy database identifier is intentionally renamed.
 
 ## Files to use
 
 - template: [`../infra/aca/main.bicep`](../infra/aca/main.bicep)
-- example parameters: [`../infra/aca/staging.parameters.example.json`](../infra/aca/staging.parameters.example.json)
+- target-state example parameters: [`../infra/aca/primary.parameters.example.json`](../infra/aca/primary.parameters.example.json)
+- legacy current-app example parameters: [`../infra/aca/staging.parameters.example.json`](../infra/aca/staging.parameters.example.json)
 - app/runtime contract: [`app-container-runtime.md`](./app-container-runtime.md)
 - env contract: [`aca-env-contract.md`](./aca-env-contract.md)
 - deployment contract: [`aca-app-deployment.md`](./aca-app-deployment.md)
 
-## Recommended staging choices
+## Recommended primary-app choices
 
-- one staging ACA app for SignalForge web and API
+- one ACA app for SignalForge web and API
 - public ingress enabled
 - `minReplicas=0`
 - `maxReplicas=3`
@@ -40,7 +57,7 @@ Use a dedicated staging database for the ACA app, for example `signalforge_stagi
 Copy the example parameter file and fill in real values:
 
 ```bash
-cp infra/aca/staging.parameters.example.json infra/aca/staging.parameters.json
+cp infra/aca/primary.parameters.example.json infra/aca/primary.parameters.json
 ```
 
 Required values to replace:
@@ -85,7 +102,7 @@ If you want a non-destructive Azure-side validation later, use `what-if` before 
 az deployment group what-if \
   --resource-group <resource-group> \
   --template-file infra/aca/main.bicep \
-  --parameters @infra/aca/staging.parameters.json
+  --parameters @infra/aca/primary.parameters.json
 ```
 
 If you are driving the Windows Azure CLI from WSL on this machine, point the Azure temp directories at a Windows-accessible path first and pass the parameters file as a Windows path:
@@ -100,28 +117,28 @@ mkdir -p "$TMP"
 az deployment group what-if \
   --resource-group <resource-group> \
   --template-file infra/aca/main.bicep \
-  --parameters @"$(wslpath -w infra/aca/staging.parameters.json)"
+  --parameters @"$(wslpath -w infra/aca/primary.parameters.json)"
 ```
 
-## Deploy staging
+## Deploy the primary ACA app
 
-When ready to create or update the staging app:
+When ready to create or update the ACA app:
 
 ```bash
 az deployment group create \
   --resource-group <resource-group> \
   --template-file infra/aca/main.bicep \
-  --parameters @infra/aca/staging.parameters.json
+  --parameters @infra/aca/primary.parameters.json
 ```
 
 ## Post-deploy verification
 
-Run these checks against the staging ACA hostname:
+Run these checks against the primary ACA app hostname:
 
 1. `GET /api/health` returns `200`
 2. dashboard loads
 3. `GET /api/runs` responds
-4. on a fresh staging database, `GET /api/runs` is empty before validation uploads
+4. on a fresh ACA app database, `GET /api/runs` is empty before new uploads
 5. create or view a Source in `/sources` or `POST /api/sources`
 6. enroll an agent
 7. queue one host job
@@ -132,15 +149,15 @@ Run these checks against the staging ACA hostname:
 
 ## Rollback stance
 
-If the staging deploy is bad:
+If the ACA deploy is bad:
 
-1. keep production unchanged
-2. revert to the previous ACA revision
-3. rotate the ACA `database-url` secret back to the last known-good staging database if the issue was isolated to staging DB selection
+1. keep traffic on the previous known-good ACA revision
+2. reactivate the previous revision if a new one was promoted
+3. rotate the ACA `database-url` secret back only if the issue was isolated to DB selection
 4. fix the template, parameters, or image and redeploy
 
 ## Notes
 
 - The current `GET /api/health` endpoint is config-focused. It is suitable for ACA probes and initial rollout checks, but it does not prove every dependency path by itself.
 - Keep secrets in the parameter file only long enough to pass them to Azure, and prefer secret injection through secure operator workflows in the real environment.
-- If staging already contains older agent-submitted runs from before `collected_at` inference shipped, repair them in place with `DATABASE_DRIVER=postgres DATABASE_URL=<staging-url> bun run db:backfill:collected-at`.
+- If the primary ACA app database already contains older agent-submitted runs from before `collected_at` inference shipped, repair them in place with `DATABASE_DRIVER=postgres DATABASE_URL=<database-url> bun run db:backfill:collected-at`.

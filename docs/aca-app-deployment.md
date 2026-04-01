@@ -47,10 +47,10 @@ Rationale: Slice 2 needs predictable rollback more than traffic splitting.
 
 ### Replica policy
 
-- staging: `minReplicas=0`
-- production: `minReplicas=1`
+- current primary ACA app: `minReplicas=0`
+- increase to `minReplicas=1` only if cold-start cost becomes unacceptable for the live agent path
 
-Rationale: staging can tolerate cold starts to save idle cost. Production should prefer faster agent poll and artifact upload responsiveness over absolute zero-idle cost. Revisit only after staging proves the cold-start profile is acceptable for the agent path.
+Rationale: as of April 1, 2026, the live ACA app `ca-signalforge-staging` is running with `minReplicas=0`. The docs should reflect that current operating posture instead of preserving an older validation-only framing. Revisit only when the team explicitly decides to trade idle cost for faster poll and upload responsiveness.
 
 ## Required ACA configuration
 
@@ -66,17 +66,17 @@ An operator should not have to guess these values:
 | health check | `GET /api/health` |
 | operator API secret | `SIGNALFORGE_ADMIN_TOKEN` |
 | revision mode | single active revision |
-| staging minimum replicas | `0` |
-| production minimum replicas | `1` |
+| current minimum replicas | `0` |
+| optional always-warm minimum replicas | `1` |
 
 For exact app variables and secret classification, use [`aca-env-contract.md`](./aca-env-contract.md).
 
-## Staging rollout contract
+## Primary ACA app rollout contract
 
-Before any production cutover:
+For any create, refresh, or rebuild of the primary ACA app:
 
-1. deploy a staging ACA app with the Slice 1 image
-2. wire staging to a safe Postgres target that follows the same `postgres` app path
+1. deploy or update the ACA app with the current SignalForge image
+2. wire it to the dedicated Postgres target that follows the same `postgres` app path
 3. confirm `GET /api/health` returns `200`
 4. confirm the dashboard opens
 5. confirm `/api/runs` responds
@@ -85,11 +85,11 @@ Before any production cutover:
 
 ## Rollback contract
 
-If the ACA staging or production rollout regresses:
+If the primary ACA app rollout regresses:
 
 1. stop new traffic from moving to the bad ACA revision
 2. reactivate the previous known-good ACA revision
-3. if production cutover had already started, point agents back at the previous production origin
+3. if agents had already moved, point them back at the previous known-good ACA revision or fallback origin
 4. leave Neon unchanged during rollback
 
 Do not combine rollback with a database move.

@@ -48,7 +48,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
-| [`aca-staging-runbook.md`](./aca-staging-runbook.md) | Slice 3 staging deployment runbook using the checked-in ACA template and parameter contract |
+| [`aca-primary-app-runbook.md`](./aca-primary-app-runbook.md) | Primary ACA app runbook using the checked-in ACA template and parameter contract |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
 | [`postgres-validation.md`](./postgres-validation.md) | Reproducible live validation notes for the Postgres backend |
 | [`schemas/README.md`](./schemas/README.md) | Lightweight JSON Schemas for the published API contract |
@@ -56,6 +56,8 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`../plans/roadmap.md`](../plans/roadmap.md) | Long-lived product roadmap and future direction |
 | [`../plans/current-plan.md`](../plans/current-plan.md) | Current shipped state and recommended next work |
 | [`../plans/phase-10-aca-migration.md`](../plans/phase-10-aca-migration.md) | Production hosting migration plan from Vercel to Azure Container Apps |
+| [`../plans/phase-10b-aca-resource-rename-cutover.md`](../plans/phase-10b-aca-resource-rename-cutover.md) | Concrete cutover plan from `ca-signalforge-staging` to `ca-signalforge` |
+| [`../plans/phase-10c-public-image-and-release-pipeline.md`](../plans/phase-10c-public-image-and-release-pipeline.md) | Public GHCR image and repo-owned release-pipeline plan |
 | [`../plans/phase-9c-frontend-operator-workstation-polish.md`](../plans/phase-9c-frontend-operator-workstation-polish.md) | Frontend redesign and interaction-polish source of truth for the operator workstation pass |
 | [`../plans/phase-9c-stabilization-checklist.md`](../plans/phase-9c-stabilization-checklist.md) | Post-implementation gate for preview QA, browser validation, and final Phase 9c signoff |
 | [`../plans/phase-7-storage-abstraction.md`](../plans/phase-7-storage-abstraction.md) | Planned storage abstraction and multi-backend persistence direction |
@@ -104,9 +106,25 @@ Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` an
 
 ## Deployment
 
-The live SignalForge instance runs on Vercel with a Neon Postgres backend. Local development defaults to SQLite.
+The repo currently documents and ships three deployment surfaces:
 
-Vercel preview deployments are also available for branches and pull requests, so product and UI changes can be reviewed on a live preview before merging to remote `main`.
+- local development with SQLite by default
+- Vercel-compatible preview hosting for branch and PR review
+- a committed container + ACA deployment path for the app itself
+
+Code and infra sources of truth:
+
+- container runtime: [`../Dockerfile`](../Dockerfile), [`app-container-runtime.md`](./app-container-runtime.md)
+- ACA contract: [`aca-env-contract.md`](./aca-env-contract.md), [`aca-app-deployment.md`](./aca-app-deployment.md), [`aca-primary-app-runbook.md`](./aca-primary-app-runbook.md)
+- migration plan: [`../plans/phase-10-aca-migration.md`](../plans/phase-10-aca-migration.md)
+- ACA operating history: [`history.md`](./history.md)
+
+Keep the wording precise:
+
+- do not describe Vercel as the only deployment environment
+- do not describe Vercel as the primary app-hosting path
+- do describe ACA as the primary app-hosting path when that distinction matters
+- do treat legacy `staging` names as historical resource identifiers rather than the canonical environment taxonomy
 
 ## CI
 

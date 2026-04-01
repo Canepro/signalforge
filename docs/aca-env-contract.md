@@ -87,4 +87,4 @@ This contract does not introduce:
 - private ingress
 - queueing, auth, or background job redesign
 
-Those can be evaluated after staging validation proves the app-hosting move works.
+Those can be evaluated after the primary ACA app contract is stable and no longer changing under the initial hosting move.

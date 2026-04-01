@@ -2,92 +2,97 @@
 
 **Infrastructure Diagnostics** for evidence artifacts.
 
-SignalForge ingests infrastructure evidence, turns it into findings, stores runs, and helps operators answer three practical questions:
+SignalForge ingests infrastructure evidence, turns it into findings, stores immutable artifacts and runs, and helps operators answer three practical questions:
 
 - what did this artifact show?
 - what changed since the last run?
 - what should I do now?
 
-Today, the current branch supports three artifact families:
+SignalForge currently supports three artifact families:
 
 - `linux-audit-log`
 - `container-diagnostics`
 - `kubernetes-bundle`
 
-That currently means Linux and WSL audit logs in the `signalforge-collectors` style, plus text-based container diagnostic artifacts for a single container or workload, and UTF-8 JSON Kubernetes evidence bundles.
+That means Linux and WSL audit logs in the `signalforge-collectors` style, text-based container diagnostics for a single container or workload, and UTF-8 JSON Kubernetes evidence bundles.
 
 ## What SignalForge Is
 
-SignalForge is an **analysis platform**, not a collection engine.
+SignalForge is an **analysis and control-plane product**, not a collector.
 
-It does these things well today:
+It currently does these things well:
 
-- ingests evidence artifacts
+- ingests external evidence artifacts
 - extracts deterministic findings
 - uses one LLM call for explanation and prioritization
 - stores immutable artifacts and per-analysis runs
 - exposes results through UI, APIs, and CLI helpers
+- supports job-driven collection through external agents and collectors
 
 It does **not** currently:
 
 - SSH into servers
-- run `kubectl` against clusters
+- run `kubectl` from inside the app
 - execute collectors inside the app
 - perform remediation from the current product
 
-Collection stays external by design. Remediation remains deferred, and any future remediation path would need to be a separate higher-trust capability with explicit approvals and auditability.
+Collection stays external by design. Remediation remains deferred and would require a separate higher-trust model if introduced later.
 
 ## Tech Stack
 
-- **Framework:** [Next.js](https://nextjs.org/) (App Router)
-- **Runtime:** [Bun](https://bun.sh/)
+- **Framework:** Next.js (App Router)
+- **Runtime:** Bun
 - **Language:** TypeScript
 - **UI:** React, Tailwind CSS
-- **Local DB:** SQLite via [sql.js](https://github.com/sql-js/sql.js)
-- **Production DB:** Postgres ([Neon](https://neon.tech/) in the current deployment)
-- **Testing:** [Vitest](https://vitest.dev/)
-- **Deployment:** [Vercel](https://vercel.com/)
-- **CI:** GitHub Actions (typecheck, test, build, Postgres parity)
+- **Local DB:** SQLite via `sql.js`
+- **Durable DB:** Postgres / Neon
+- **Testing:** Vitest
+- **CI:** GitHub Actions
+- **App-hosting path:** Dockerized app with Azure Container Apps
+- **Preview/review path:** Vercel previews
 
-## Live Deployment
+## Deployment Surfaces
 
-SignalForge is deployed on Vercel with a Neon Postgres backend.
+The repo currently documents three deployment surfaces that should not be conflated:
 
-The live site uses:
+- **Local development:** SQLite by default
+- **Preview/review:** Vercel-compatible branch and PR previews
+- **Primary app-hosting path:** Azure Container Apps with `DATABASE_DRIVER=postgres`
 
-- `DATABASE_DRIVER=postgres`
-- Neon-hosted Postgres: set `DATABASE_URL` to the connection string from Neon (direct or pooled hostname). The app uses the [`pg`](https://node-postgres.com/) driver with a connection pool (`src/lib/storage/postgres.ts`); there is no Neon-specific JavaScript driver in this repo.
-- Vercel serverless functions for all API routes
-- Vercel preview deployments for branches and pull requests, so feature work can be reviewed live before anything is pushed or merged to remote `main`
+Important naming note:
 
-Local development defaults to SQLite. The production deployment uses Postgres exclusively.
+- the live ACA resource still uses the legacy Azure name `ca-signalforge-staging`
+- that is a historical resource identifier, not the canonical product vocabulary
+- the target steady-state resource name is `ca-signalforge`
+
+Current deployment docs:
+
+- [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
+- [docs/aca-env-contract.md](docs/aca-env-contract.md)
+- [docs/aca-primary-app-runbook.md](docs/aca-primary-app-runbook.md)
+- [plans/phase-10b-aca-resource-rename-cutover.md](plans/phase-10b-aca-resource-rename-cutover.md)
+- [plans/phase-10c-public-image-and-release-pipeline.md](plans/phase-10c-public-image-and-release-pipeline.md)
 
 ## Start Here
 
 If you are new to the repo:
 
-1. [`docs/getting-started.md`](docs/getting-started.md)  
-   Beginner-friendly setup and first successful run.
-2. [`docs/README.md`](docs/README.md)  
-   Documentation map and reading paths.
-3. [`AGENTS.md`](AGENTS.md)  
-   Repo-local working rules and agent handoff notes.
-4. [`plans/roadmap.md`](plans/roadmap.md)  
-   Canonical long-lived roadmap.
-5. [`plans/current-plan.md`](plans/current-plan.md)  
-   Current shipped state and near-term priorities.
+1. [docs/getting-started.md](docs/getting-started.md)
+2. [docs/README.md](docs/README.md)
+3. [AGENTS.md](AGENTS.md)
+4. [plans/roadmap.md](plans/roadmap.md)
+5. [plans/current-plan.md](plans/current-plan.md)
 
 If you are integrating with SignalForge:
 
-- [`docs/api-contract.md`](docs/api-contract.md)
-- [`docs/external-submit.md`](docs/external-submit.md)
-- [`docs/history.md`](docs/history.md) for the running repo history log
-- [`docs/schemas/README.md`](docs/schemas/README.md)
+- [docs/api-contract.md](docs/api-contract.md)
+- [docs/external-submit.md](docs/external-submit.md)
+- [docs/schemas/README.md](docs/schemas/README.md)
 
 If you are operating Sources, agents, or collection jobs:
 
-- [`docs/operators/README.md`](docs/operators/README.md)
-- [`docs/agent-deployment.md`](docs/agent-deployment.md)
+- [docs/operators/README.md](docs/operators/README.md)
+- [docs/agent-deployment.md](docs/agent-deployment.md)
 
 ## 5-Minute First Run
 
@@ -123,241 +128,113 @@ Read the run back:
 ./scripts/signalforge-read.sh compare <run-id>
 ```
 
-For the fuller step-by-step version, use [`docs/getting-started.md`](docs/getting-started.md).
+For the step-by-step version, use [docs/getting-started.md](docs/getting-started.md).
 
-## How People Use SignalForge Today
+## Current Product Shape
 
-- **Upload and review**: submit an artifact, inspect run detail, reanalyze if needed, and compare runs.
-- **API and CLI consumption**: push evidence to `POST /api/runs` or use the helper scripts for submit and read flows.
-- **Operator-managed collection**: register Sources, queue collection jobs, and run `signalforge-agent` near the target while collectors stay external.
+SignalForge currently supports:
 
-Operator detail lives in the docs, not this README:
+- artifact upload and review
+- run detail, compare, and reanalyze
+- CLI and HTTP consumption
+- Sources, collection jobs, and agent enrollment
+- external job-driven collection via `signalforge-agent`
 
-- collection paths by environment: [`docs/operators/collection-paths.md`](docs/operators/collection-paths.md)
-- Sources, enrollment, and job lifecycle: [`docs/operators/sources-and-agents.md`](docs/operators/sources-and-agents.md)
-- typed collection scope and current non-Linux limits: [`docs/operators/job-scoped-collection.md`](docs/operators/job-scoped-collection.md)
-- deployment and security posture: [`docs/agent-deployment.md`](docs/agent-deployment.md)
+Related operator docs:
 
-## Compare, Reanalyze, and Fresh Evidence
-
-SignalForge keeps these concepts separate:
-
-- **Reanalyze**: analyze the same stored artifact again
-- **Compare**: diff two runs
-- **Collect fresh evidence**: register a Source, create a collection job, and run [signalforge-agent](https://github.com/Canepro/signalforge-agent) on the host — collection stays external to SignalForge
-
-Important:
-
-- implicit compare uses the latest older run for the same logical target
-- that is **not always** the same as the reanalyze parent
-- if you want an exact baseline, use explicit `against`
-
-Examples:
-
-```bash
-./scripts/signalforge-read.sh compare <run-id>
-./scripts/signalforge-read.sh compare <run-id> --against <other-run-id>
-```
-
-The run-detail UI also exposes a **vs parent** path when lineage exists.
-
-## Current Status
-
-Canonical roadmap:
-
-- [`plans/roadmap.md`](plans/roadmap.md)
-
-Current shipped snapshot:
-
-- [`plans/current-plan.md`](plans/current-plan.md)
-
-Completed at a high level:
-
-- analyzer core
-- persistence and APIs
-- dashboard UI
-- reanalyze flow
-- compare UI + compare JSON API
-- CLI submit + read helpers
-- ingestion metadata contract
-- target-aware compare and baseline logic
-- external submit contract docs
-- published API contract and schemas
-- Sources UI + collection jobs + agent enrollment
-- storage abstraction (SQLite + Postgres)
-- Vercel deployment with Neon Postgres
-- CI workflow (GitHub Actions: typecheck, test, build, Postgres parity)
-- Postgres migration policy with checksum enforcement
-
-Historical background only:
-
-- [`plans/mvp.md`](plans/mvp.md)
-- [`plans/phase-2-ui.md`](plans/phase-2-ui.md)
-- [`docs/history.md`](docs/history.md)
-
-## Current Scope
-
-Current shipped artifact families in this checkout:
-
-- `linux-audit-log`
-- `container-diagnostics`
-- `kubernetes-bundle`
-
-Current strengths:
-
-- disk pressure
-- pending upgrades
-- SSH posture
-- listener exposure
-- incomplete or truncated log detection
-- WSL and non-root noise suppression
-
-Current limitations:
-
-- Kubernetes support is still a first slice built around the `kubernetes-bundle.v1` JSON manifest, not raw support-bundle archive ingestion
-- recommendations are bounded by captured evidence
-- findings quality will continue to improve as more real logs are reviewed
-
-Longer-term direction remains broader:
-
-- Linux / WSL
-- servers / VMs
-- containers
-- Kubernetes bundles
-- Windows
-- macOS
-
-That broader support will come from new artifact families and external collectors over time, not from turning SignalForge into a privileged execution engine.
+- [docs/operators/collection-paths.md](docs/operators/collection-paths.md)
+- [docs/operators/sources-and-agents.md](docs/operators/sources-and-agents.md)
+- [docs/operators/job-scoped-collection.md](docs/operators/job-scoped-collection.md)
+- [docs/agent-deployment.md](docs/agent-deployment.md)
 
 ## LLM Provider Support
 
 SignalForge supports:
 
 - OpenAI direct
-- Azure OpenAI **Responses** (`client.responses.create`) with **two endpoint styles** (see below)
+- Azure OpenAI Responses API
 
 If provider configuration is missing or invalid, SignalForge uses a deterministic fallback.
 
-## Environment Variables
-
-### LLM provider
+### LLM variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `LLM_PROVIDER` | No | `openai` | `openai` (platform API) or `azure` (Azure OpenAI). Invalid values fall back to deterministic analysis. |
+| `LLM_PROVIDER` | No | `openai` | `openai` or `azure` |
 | `OPENAI_API_KEY` | If `openai` | — | OpenAI API key |
-| `OPENAI_MODEL` | No | `gpt-5-mini` | Model name for OpenAI direct |
-| `AZURE_OPENAI_ENDPOINT` | If `azure` | — | See **Azure endpoint styles** below |
+| `OPENAI_MODEL` | No | `gpt-5-mini` | OpenAI model override |
+| `AZURE_OPENAI_ENDPOINT` | If `azure` | — | Azure endpoint |
 | `AZURE_OPENAI_API_KEY` | If `azure` | — | Azure API key |
-| `AZURE_OPENAI_API_VERSION` | Legacy Azure only | — | Required for resource-root URLs; **omit** for `/openai/v1` bases (ignored if set) |
-| `AZURE_OPENAI_DEPLOYMENT` | If `azure` | — | Deployment name passed as the Responses API `model` parameter (e.g. `gpt-5.4-mini`) |
+| `AZURE_OPENAI_API_VERSION` | Legacy Azure only | — | Required for resource-root URLs, omit for `/openai/v1` |
+| `AZURE_OPENAI_DEPLOYMENT` | If `azure` | — | Deployment name passed as Responses `model` |
 
-**Azure endpoint styles**
-
-1. **Legacy (resource root)** — e.g. `https://your-name.cognitiveservices.azure.com` or `https://your-name.openai.azure.com` **without** `/openai/v1` in the path. SignalForge appends `/openai` and sends `api-version` on every request. **`AZURE_OPENAI_API_VERSION` is required** (e.g. `2025-04-01-preview`).
-2. **OpenAI v1 base URL** — e.g. `https://your-name.openai.azure.com/openai/v1/` (trailing slash optional). Use the URL **as provided**; SignalForge does **not** append `/openai`. **Do not set `AZURE_OPENAI_API_VERSION`** for this style — Azure returns *400 API version not supported* if `api-version` is sent on v1 bases; any value in env is ignored for v1 clients.
-
-If `LLM_PROVIDER=azure` and required variables for the chosen style are missing, SignalForge does **not** call the cloud API and uses deterministic fallback.
-
-### App
+## App Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DATABASE_DRIVER` | No | `sqlite` | Storage backend selector: `sqlite` or `postgres` |
-| `DATABASE_PATH` | If `DATABASE_DRIVER=sqlite` | `./signalforge.db` | SQLite file path for local/self-hosted persistence |
-| `DATABASE_URL` | If `DATABASE_DRIVER=postgres` | — | Postgres connection string for durable remote persistence |
-| `SIGNALFORGE_ADMIN_TOKEN` | **Yes** for Phase 6 operator APIs + `/sources` UI | — | Bootstrap secret: `Authorization: Bearer …` on `/api/sources`, `/api/collection-jobs/*`, `/api/agent/registrations`. If unset, those routes return **503**. The dashboard **Sources** area (`/sources`) signs in via `/sources/login` (httpOnly cookie); the token is not embedded in the client bundle. |
-| `PORT` | No | `3000` | Container/server listen port |
-| `HOSTNAME` | No | runtime default | Host bind value for container/server entrypoints |
+| `DATABASE_DRIVER` | No | `sqlite` | `sqlite` or `postgres` |
+| `DATABASE_PATH` | If `sqlite` | `./signalforge.db` | Local SQLite path |
+| `DATABASE_URL` | If `postgres` | — | Postgres connection string |
+| `SIGNALFORGE_ADMIN_TOKEN` | Yes for Sources and agent/operator APIs | — | Admin bootstrap token |
+| `PORT` | No | `3000` | Listen port |
+| `HOSTNAME` | No | runtime default | Bind host |
 
-Copy `.env.example` to `.env.local` for Next, or export vars in your shell for direct analyzer and helper usage.
-
-### Storage backends
-
-Local development defaults to SQLite:
-
-```env
-DATABASE_DRIVER=sqlite
-DATABASE_PATH=./signalforge.db
-```
-
-For durable serverless or multi-instance deployment, use Postgres:
-
-```env
-DATABASE_DRIVER=postgres
-DATABASE_URL=postgres://user:password@host:5432/signalforge
-```
-
-Before starting the app on Postgres, apply the checked-in SQL migrations:
+For Postgres:
 
 ```bash
 bun run db:migrate:postgres
 ```
 
-If you need to repair older agent-created runs that were stored before `collected_at`
-was inferred on upload, run the one-time backfill:
+For older agent-created rows missing inferred `collected_at`:
 
 ```bash
 bun run db:backfill:collected-at
 ```
 
-For local Postgres parity validation, prefer:
+For local Postgres parity:
 
 ```bash
 bash scripts/run-postgres-parity-local.sh
 ```
 
-That helper will use `--url` if provided, otherwise `DATABASE_URL_TEST` / `DATABASE_URL`, otherwise it will try to detect a local Podman container such as `signalforge-pg`.
-
-SQLite remains the easiest local quickstart path. Postgres is the recommended production backend. The live Vercel deployment uses Neon Postgres.
-
-For the Phase 10 containerization slice, keep production containers on `DATABASE_DRIVER=postgres` with Neon or another managed Postgres target. Do not switch the first ACA cut to SQLite. Container build and runtime details: [`docs/app-container-runtime.md`](docs/app-container-runtime.md).
-
 ## CI
 
 GitHub Actions runs on every push to `main` and on pull requests:
 
-- **Checks job:** `bun run typecheck`, `bun run test`, `bun run build`
-- **Postgres parity job:** starts `postgres:16-alpine`, applies migrations, runs `bun run test:parity`
-- **Bun version:** pinned in the workflow (currently `1.3.11`) so CI does not depend on `latest`
+- typecheck
+- test
+- build
+- Postgres parity
 
-See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-Postgres schema changes must follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
+## Current Priorities
+
+The highest-signal current infrastructure and release work is now:
+
+- rename the ACA app identity from `ca-signalforge-staging` to `ca-signalforge`
+- replace the manual ACA image shipping path with a repo-owned release pipeline
+- make the app image publicly pullable as an open-source image while keeping ACA deployment personal
+
+Source-of-truth plans:
+
+- [plans/phase-10b-aca-resource-rename-cutover.md](plans/phase-10b-aca-resource-rename-cutover.md)
+- [plans/phase-10c-public-image-and-release-pipeline.md](plans/phase-10c-public-image-and-release-pipeline.md)
+- [plans/current-plan.md](plans/current-plan.md)
 
 ## More Documentation
 
-- beginner setup and usage: [`docs/getting-started.md`](docs/getting-started.md)
-- docs index: [`docs/README.md`](docs/README.md)
-- operator docs: [`docs/operators/README.md`](docs/operators/README.md)
-- HTTP routes and response shapes: [`docs/api-contract.md`](docs/api-contract.md)
-- ACA app contract: [`docs/aca-app-deployment.md`](docs/aca-app-deployment.md)
-- ACA env contract: [`docs/aca-env-contract.md`](docs/aca-env-contract.md)
-- ACA staging runbook: [`docs/aca-staging-runbook.md`](docs/aca-staging-runbook.md)
-- Postgres migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md)
-- Postgres validation runbook: [`docs/postgres-validation.md`](docs/postgres-validation.md)
-- external collector and CI submission: [`docs/external-submit.md`](docs/external-submit.md)
-- JSON schemas: [`docs/schemas/README.md`](docs/schemas/README.md)
-- roadmap: [`plans/roadmap.md`](plans/roadmap.md)
-- current state: [`plans/current-plan.md`](plans/current-plan.md)
-
-## Technical Notes
-
-### sql.js / deployment
-
-The DB client uses `initSqlJs({ locateFile: ... })` so the WASM can be resolved from the normal `node_modules/sql.js/dist/` path or from traced standalone output.
-
-For serverless or edge-style deployments, ensure the `.wasm` asset is included in the output or copied to a path that `locateFile` can resolve.
-
-For the current ACA migration slice, the committed production container uses a Bun build stage and a Node runtime stage with Next standalone output.
-
-### Fixture logs
-
-Test fixtures in `tests/fixtures/` are copied from `signalforge-collectors`.
-
-See:
-
-- [`tests/fixtures/README.md`](tests/fixtures/README.md)
+- [docs/README.md](docs/README.md)
+- [docs/api-contract.md](docs/api-contract.md)
+- [docs/external-submit.md](docs/external-submit.md)
+- [docs/postgres-migrations.md](docs/postgres-migrations.md)
+- [docs/postgres-validation.md](docs/postgres-validation.md)
+- [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
+- [docs/aca-env-contract.md](docs/aca-env-contract.md)
+- [docs/aca-primary-app-runbook.md](docs/aca-primary-app-runbook.md)
+- [docs/history.md](docs/history.md)
+- [plans/roadmap.md](plans/roadmap.md)
+- [plans/current-plan.md](plans/current-plan.md)
 
 ## License
 

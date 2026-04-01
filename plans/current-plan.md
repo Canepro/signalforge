@@ -45,11 +45,14 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - **Artifacts:** `linux-audit-log` (`first-audit.sh`-style host audit output), `container-diagnostics` (text-based container diagnostics for a single container or workload), and `kubernetes-bundle` (UTF-8 JSON manifest for cluster- or namespace-scoped Kubernetes evidence).
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
-- **Persistence:** `sqlite` remains the default local backend; `postgres` is now available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations. The live Vercel deployment uses Neon Postgres.
-- **Deployment workflow:** Vercel preview deployments are available for branches and PRs, so live review does not need to wait for a push or merge to remote `main`.
-- **Production hosting gap:** Vercel remains the current production host, but real host and cluster artifacts can exceed its request-body limits. Migration planning to Azure Container Apps is now tracked explicitly before broader operator rollout.
+- **Persistence:** `sqlite` remains the default local backend; `postgres` is available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations, and the committed ACA contract keeps Neon Postgres as the durable app backend.
+- **Deployment surfaces:** the repo supports local Next.js development, a Vercel-compatible preview/review path, and a committed containerized ACA app path (`Dockerfile` + `infra/aca/main.bicep`).
+- **Primary ACA hosting:** the live ACA app is now the repo-documented primary app-hosting path for real host, container, and Kubernetes agent traffic; existing resource names may still contain `staging`; see `docs/history.md`.
+- **Preview hosting:** Vercel remains in the preview/review role; source of truth for the ACA transition and remaining cleanup is `phase-10-aca-migration.md`.
+- **ACA identity cleanup:** the next naming and infra hygiene slice is the explicit `ca-signalforge-staging` to `ca-signalforge` cutover; source of truth: `phase-10b-aca-resource-rename-cutover.md`.
+- **Release pipeline gap:** the app still lacks a repo-owned public-image publishing path; source of truth: `phase-10c-public-image-and-release-pipeline.md`.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
-- **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, Vercel.
+- **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon, Vitest, GitHub Actions, and a committed Docker/ACA deployment path.
 - **Beginner docs:** `README.md`, `docs/getting-started.md`, and `docs/README.md` now provide the preferred onboarding path before deeper plan or API docs.
 
 ## Multi-artifact snapshot
@@ -71,6 +74,8 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 ## Recommended next work (high level)
 
 - Production hosting migration now needs to move ahead of broader operator rollout. Real `linux-audit-log` artifacts have already exceeded the Vercel upload boundary, and larger Kubernetes artifacts can do the same. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
+- Replace the legacy ACA app identity `ca-signalforge-staging` with `ca-signalforge` using an additive parallel-app cutover instead of living with rollout-phase naming forever. Source of truth: [`phase-10b-aca-resource-rename-cutover.md`](./phase-10b-aca-resource-rename-cutover.md).
+- Replace the manual ACR-based app shipping path with a repo-owned public GHCR image and explicit release workflow. Source of truth: [`phase-10c-public-image-and-release-pipeline.md`](./phase-10c-public-image-and-release-pipeline.md).
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.

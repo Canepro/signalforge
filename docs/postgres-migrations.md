@@ -87,7 +87,7 @@ That helper prefers an explicit `--url`, otherwise it detects a local Podman Pos
 
 CI already enforces fresh-install migration application and the storage parity suite against `postgres:16-alpine` on every push and PR. An upgrade-path test scaffold compares fresh-install vs stepwise-upgrade schema snapshots; it activates automatically once a second migration file (`002_*`) exists.
 
-The live deployment runs on Vercel with Neon Postgres.
+The repo-supported durable remote Postgres path uses Neon Postgres. Local development, Vercel previews, and the primary ACA app path may use different app hosts while keeping the same Postgres posture.
 
 ## Current Limitations
 

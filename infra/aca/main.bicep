@@ -87,7 +87,7 @@ param revisionSuffix string = ''
 @description('Tags applied to the Container App.')
 param tags object = {
   app: 'signalforge'
-  slice: 'aca-staging'
+  slice: 'aca-primary'
 }
 
 var containerEnv = concat(

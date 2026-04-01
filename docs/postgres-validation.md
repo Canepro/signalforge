@@ -108,7 +108,7 @@ The Postgres adapter has passed:
 - backend parity tests exercising both SQLite and Postgres against the same behavioral suite
 - upgrade-path migration test scaffold (activates automatically once `002_*` exists)
 
-The live Vercel deployment runs against Neon Postgres.
+The repo-supported durable remote Postgres path runs against Neon Postgres, and the committed ACA contract keeps Neon as the system of record for the app-hosting migration slice.
 
 ## Remaining Hardening Work
 

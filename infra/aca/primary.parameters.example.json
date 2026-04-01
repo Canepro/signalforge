@@ -3,10 +3,10 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "location": {
-      "value": "uksouth"
+      "value": "eastus2"
     },
     "containerAppName": {
-      "value": "ca-signalforge-staging"
+      "value": "ca-signalforge"
     },
     "containerAppsEnvironmentId": {
       "value": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.App/managedEnvironments/<aca-environment>"
@@ -15,10 +15,10 @@
       "value": "ghcr.io/canepro/signalforge:<release-tag>"
     },
     "registryServer": {
-      "value": "caneprophacr01.azurecr.io"
+      "value": ""
     },
     "registryIdentityResourceId": {
-      "value": "/subscriptions/<subscription-id>/resourceGroups/rg-canepro-ph-dev-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-canepro-ph-acrpull"
+      "value": ""
     },
     "cpu": {
       "value": "0.5"

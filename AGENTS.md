@@ -56,7 +56,7 @@ Current branch work has moved into **Phase 8**:
 
 **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js (SQLite local), Postgres/Neon (production), Vitest, GitHub Actions CI.
 
-**Deployment:** Vercel with Neon Postgres. The live site uses `DATABASE_DRIVER=postgres`. Branches and PRs can also use Vercel preview deployments, which is often the safest way to review live behavior before merging to remote `main`.
+**Deployment:** The repo now documents three deployment surfaces that agents should keep separate. Local development defaults to SQLite. Vercel remains the preview/review surface for branches and PRs. The app also has a committed containerized Azure Container Apps path (`Dockerfile`, `infra/aca/main.bicep`) that keeps `DATABASE_DRIVER=postgres` with Neon Postgres. The current primary app-hosting path is the ACA app documented in repo history and infra; some resource names still use `staging`, but treat those as legacy identifiers rather than the canonical environment vocabulary.
 
 **CI:** GitHub Actions (`.github/workflows/ci.yml`): typecheck, test, build on every push to `main` and on PRs; a separate Postgres parity job starts `postgres:16-alpine`, applies migrations, and runs `bun run test:parity`. Postgres schema changes follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
 
@@ -148,6 +148,7 @@ Core directories:
 - Use richer platform examples when they help widen coverage, but keep the product model rooted in plain Kubernetes primitives. Rules, docs, labels, and fixtures should still make sense to operators who do not run Argo CD, Grafana, external-secrets, or any other optional platform layer.
 - Prefer detections that map back to broadly available Kubernetes surfaces such as workload specs, Services, RBAC, probes, volumes, securityContext, and NetworkPolicy. Platform-specific examples are evidence sources, not the product boundary.
 - Be careful with live infrastructure: inspect first, prefer read-only commands by default, avoid changing cluster state unless explicitly requested, and report clearly which environment was used.
+- For deployment and environment docs, keep three states separate: local development, Vercel preview/review, and the primary ACA app path. Treat legacy `staging` names as resource identifiers, not the canonical environment taxonomy, and prefer current role-based wording such as `primary ACA app` when describing the live app-hosting path.
 - After non-trivial changes, run targeted validation by default.
 - In `--yolo` or other high-autonomy workflows, do not skip relevant verification unless the user explicitly says to.
 - Prefer the smallest validation that meaningfully covers the change.

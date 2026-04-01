@@ -2,6 +2,12 @@
 
 ## Why This Exists
 
+Historical note:
+
+- this file started as the migration plan from Vercel to ACA
+- current repo reality is stronger: ACA is now the primary app-hosting path and Vercel remains the preview/review surface
+- keep the migration wording below as historical planning context unless a section explicitly states the current operating role
+
 SignalForge now has a real execution-plane story:
 
 - host `systemd` services for `linux-audit-log`
@@ -10,7 +16,7 @@ SignalForge now has a real execution-plane story:
 
 That operator model no longer fits the current production deployment boundary.
 
-The current live deployment runs on Vercel with Neon Postgres. That has been fine for UI, API, and preview work, but it is now a real product limitation for agent-driven artifact ingestion because Vercel Functions enforce a small request-body limit. Real `linux-audit-log` artifacts can exceed that ceiling, and larger `kubernetes-bundle` artifacts can do the same.
+At the start of Phase 10, the live deployment path ran on Vercel with Neon Postgres. That was fine for UI, API, and preview work, but it became a real product limitation for agent-driven artifact ingestion because Vercel Functions enforce a small request-body limit. Real `linux-audit-log` artifacts can exceed that ceiling, and larger `kubernetes-bundle` artifacts can do the same.
 
 This phase exists to migrate SignalForge production from Vercel to Azure Container Apps (ACA) so the control plane can support the product we actually built.
 
@@ -62,9 +68,9 @@ Cloudflare remains a possible later option, but it should not be the first migra
 - moving off Neon in the same phase unless cost or platform constraints force it
 - introducing auth, tenancy, or scheduler work
 
-## Current State
+## Phase-10 Starting State
 
-Production today:
+Starting point for this migration plan:
 
 - app hosting: Vercel
 - database: Neon Postgres
@@ -264,9 +270,9 @@ Acceptance criteria:
 - agent jobs no longer fail with `HTTP 413`
 - dashboard, Sources, and run-detail flows remain stable after cutover
 
-### Slice 5: Production Cutover
+### Slice 5: ACA as Primary App Endpoint
 
-After staging validation, promote ACA to the primary production endpoint.
+After ACA acceptance, treat ACA as the primary app endpoint and keep Vercel in the preview/review role.
 
 Cutover tasks:
 
