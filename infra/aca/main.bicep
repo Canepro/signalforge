@@ -84,6 +84,9 @@ param azureOpenAiApiVersion string = ''
 @description('Optional revision suffix for the new deployment.')
 param revisionSuffix string = ''
 
+@description('Optional ACA ingress custom-domain bindings to apply or preserve.')
+param customDomains array = []
+
 @description('Tags applied to the Container App.')
 param tags object = {
   app: 'signalforge'
@@ -260,6 +263,7 @@ resource signalforgeApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: targetPort
         transport: 'auto'
         allowInsecure: false
+        customDomains: customDomains
       }
       secrets: containerSecrets
       registries: !empty(registryServer) && !empty(registryIdentityResourceId)

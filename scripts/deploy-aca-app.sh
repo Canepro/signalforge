@@ -20,6 +20,7 @@ MIN_REPLICAS="${ACA_MIN_REPLICAS:-0}"
 MAX_REPLICAS="${ACA_MAX_REPLICAS:-3}"
 TARGET_PORT="${ACA_TARGET_PORT:-3000}"
 REVISION_SUFFIX="${ACA_REVISION_SUFFIX:-}"
+CUSTOM_DOMAINS_JSON="${ACA_CUSTOM_DOMAINS_JSON:-}"
 TAGS_JSON="${ACA_TAGS_JSON:-{\"app\":\"signalforge\",\"surface\":\"aca\",\"role\":\"app\"}}"
 LLM_PROVIDER="${ACA_LLM_PROVIDER:-}"
 OPENAI_MODEL="${ACA_OPENAI_MODEL:-gpt-5-mini}"
@@ -56,6 +57,8 @@ Optional options:
   --max-replicas VALUE       Maximum replicas (default: 3)
   --target-port VALUE        Container port (default: 3000)
   --revision-suffix VALUE    Explicit ACA revision suffix
+  --custom-domains-json VALUE
+                             JSON array of ACA ingress custom-domain bindings
   --tags-json VALUE          JSON object for ACA tags
   --llm-provider VALUE       '', openai, or azure
   --openai-model VALUE       OpenAI model override
@@ -80,6 +83,7 @@ Examples:
     --resource-group rg-canepro-ph-dev-eus \
     --environment-id /subscriptions/.../managedEnvironments/cae-canepro-ph-dev-eus \
     --image ghcr.io/canepro/signalforge:0123456789abcdef \
+    --custom-domains-json '[{"name":"signalforge.example.com","bindingType":"SniEnabled","certificateId":"/subscriptions/.../managedCertificates/signalforge-example-cert"}]' \
     --llm-provider azure \
     --azure-openai-endpoint https://example.openai.azure.com/openai/v1/ \
     --azure-openai-deployment gpt-5.4-mini \
@@ -152,6 +156,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --revision-suffix)
       REVISION_SUFFIX="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --custom-domains-json)
+      CUSTOM_DOMAINS_JSON="${2:?missing value after $1}"
       shift 2
       ;;
     --tags-json)
@@ -259,6 +267,22 @@ if [[ -z "$REVISION_SUFFIX" ]]; then
   REVISION_SUFFIX="$(derive_revision_suffix "$IMAGE" || true)"
 fi
 
+if [[ -z "$CUSTOM_DOMAINS_JSON" ]]; then
+  if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+    CUSTOM_DOMAINS_JSON="$(az containerapp show \
+      --name "$APP_NAME" \
+      --resource-group "$RESOURCE_GROUP" \
+      --query 'properties.configuration.ingress.customDomains' \
+      --output json | tr -d '\r\n')"
+
+    if [[ "$CUSTOM_DOMAINS_JSON" == "null" || -z "$CUSTOM_DOMAINS_JSON" ]]; then
+      CUSTOM_DOMAINS_JSON='[]'
+    fi
+  else
+    CUSTOM_DOMAINS_JSON='[]'
+  fi
+fi
+
 echo "Template: ${TEMPLATE_FILE}"
 echo "Mode: ${MODE}"
 echo "Resource group: ${RESOURCE_GROUP}"
@@ -267,6 +291,9 @@ echo "App name: ${APP_NAME}"
 echo "Image: ${IMAGE}"
 if [[ -n "$REVISION_SUFFIX" ]]; then
   echo "Revision suffix: ${REVISION_SUFFIX}"
+fi
+if [[ "$CUSTOM_DOMAINS_JSON" != "[]" ]]; then
+  echo "Custom domains: ${CUSTOM_DOMAINS_JSON}"
 fi
 
 AZ_ARGS=(
@@ -294,6 +321,7 @@ AZ_ARGS=(
   --parameters "azureOpenAiDeployment=${AZURE_OPENAI_DEPLOYMENT}"
   --parameters "azureOpenAiApiVersion=${AZURE_OPENAI_API_VERSION}"
   --parameters "revisionSuffix=${REVISION_SUFFIX}"
+  --parameters "customDomains=${CUSTOM_DOMAINS_JSON}"
   --parameters "tags=${TAGS_JSON}"
 )
 

@@ -32,6 +32,9 @@
     "maxReplicas": {
       "value": 3
     },
+    "customDomains": {
+      "value": []
+    },
     "databaseUrl": {
       "value": "postgres://<user>:<password>@<neon-host>/<database>?sslmode=require"
     },

@@ -65,6 +65,7 @@ An operator should not have to guess these values:
 | storage backend | Neon Postgres via `DATABASE_DRIVER=postgres` |
 | health check | `GET /api/health` |
 | operator API secret | `SIGNALFORGE_ADMIN_TOKEN` |
+| custom domains | preserve existing live bindings unless the operator supplies an explicit `customDomains` contract |
 | revision mode | single active revision |
 | current minimum replicas | `0` |
 | optional always-warm minimum replicas | `1` |

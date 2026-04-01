@@ -139,6 +139,7 @@ jobs:
           ACA_MIN_REPLICAS: ${{ vars.ACA_APP_MIN_REPLICAS }}
           ACA_MAX_REPLICAS: ${{ vars.ACA_APP_MAX_REPLICAS }}
           ACA_TARGET_PORT: ${{ vars.ACA_APP_TARGET_PORT }}
+          ACA_CUSTOM_DOMAINS_JSON: ${{ vars.ACA_APP_CUSTOM_DOMAINS_JSON }}
           ACA_LLM_PROVIDER: ${{ vars.ACA_APP_LLM_PROVIDER }}
           ACA_OPENAI_MODEL: ${{ vars.ACA_APP_OPENAI_MODEL }}
           ACA_AZURE_OPENAI_ENDPOINT: ${{ vars.ACA_APP_AZURE_OPENAI_ENDPOINT }}
@@ -170,6 +171,9 @@ jobs:
           fi
           if [[ -n "${ACA_TARGET_PORT}" ]]; then
             args+=(--target-port "${ACA_TARGET_PORT}")
+          fi
+          if [[ -n "${ACA_CUSTOM_DOMAINS_JSON}" ]]; then
+            args+=(--custom-domains-json "${ACA_CUSTOM_DOMAINS_JSON}")
           fi
           if [[ -n "${ACA_LLM_PROVIDER}" ]]; then
             args+=(--llm-provider "${ACA_LLM_PROVIDER}")

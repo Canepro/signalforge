@@ -59,6 +59,15 @@ The committed image already sets:
 
 Do not add these as ACA app secrets. Override them only if the image contract changes later.
 
+## Ingress custom-domain behavior
+
+Custom domains are part of the ACA ingress contract, not an out-of-band portal note.
+
+- the checked-in ACA template accepts a `customDomains` array in the native ACA ingress shape
+- GitHub Actions can provide that via `ACA_APP_CUSTOM_DOMAINS_JSON`
+- the local helper can provide that via `ACA_CUSTOM_DOMAINS_JSON` or `--custom-domains-json`
+- when no explicit domain JSON is supplied and the app already exists, the helper preserves the current live `customDomains` block to avoid stripping bound hostnames during a normal deploy
+
 ## ACA secret classification
 
 Store these as ACA secrets rather than plain environment values:

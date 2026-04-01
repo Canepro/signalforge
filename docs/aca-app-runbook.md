@@ -67,6 +67,7 @@ Optional values to replace:
 
 - `registryServer`
 - `registryIdentityResourceId`
+- `customDomains`
 - `llmProvider`
 - `openAiApiKey`
 - `openAiModel`
@@ -124,6 +125,8 @@ bash scripts/deploy-aca-app.sh \
 
 Then rerun without `--what-if` for the real deploy.
 
+If the app already exists and has custom domains bound in ACA, the helper preserves those live bindings automatically unless you pass `--custom-domains-json` to replace them explicitly.
+
 If you need Azure OpenAI:
 
 ```bash
@@ -177,6 +180,20 @@ For a subdomain such as `signalforge.example.com`:
 3. add the hostname under `Custom domains` on the ACA app
 4. prefer an ACA-managed certificate for the first binding
 5. keep Cloudflare or other DNS providers in `DNS only` mode until validation and certificate issuance succeed
+
+If the operator wants the hostname binding under checked-in deploy control rather than portal-only state, set `ACA_APP_CUSTOM_DOMAINS_JSON` in the GitHub deploy environment or pass `--custom-domains-json` to the helper. Use the ACA ingress shape directly, for example:
+
+```json
+[
+  {
+    "name": "signalforge.example.com",
+    "bindingType": "SniEnabled",
+    "certificateId": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.App/managedEnvironments/<managed-environment>/managedCertificates/<certificate-name>"
+  }
+]
+```
+
+Without that explicit JSON, the checked-in helper preserves the current live bindings on update so a normal app deploy does not remove a working hostname.
 
 Reference deployment:
 

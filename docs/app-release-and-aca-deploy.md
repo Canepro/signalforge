@@ -79,6 +79,7 @@ Optional GitHub environment vars:
 - `ACA_APP_MIN_REPLICAS`
 - `ACA_APP_MAX_REPLICAS`
 - `ACA_APP_TARGET_PORT`
+- `ACA_APP_CUSTOM_DOMAINS_JSON`
 - `ACA_APP_LLM_PROVIDER`
 - `ACA_APP_OPENAI_MODEL`
 - `ACA_APP_AZURE_OPENAI_ENDPOINT`
@@ -150,6 +151,11 @@ The script defaults to the app-role contract:
 - `role=app`
 - `DATABASE_DRIVER=postgres`
 - public ingress on port `3000`
+
+For custom domains, the deploy helper now behaves in two safe modes:
+
+- if `ACA_APP_CUSTOM_DOMAINS_JSON` or `--custom-domains-json` is provided, that JSON array becomes the desired ingress-domain state
+- if no domain JSON is provided and the app already exists, the helper preserves the current live `customDomains` block so a normal app deploy does not silently drop bound hostnames
 
 ### 4. Post-deploy checks are built in
 
