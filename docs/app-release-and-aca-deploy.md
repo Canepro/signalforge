@@ -59,25 +59,18 @@ That keeps release and deploy separate and makes the first deployment action non
 
 The deploy workflow uses `azure/login` with GitHub OIDC.
 
-Preferred GitHub environment secrets in the deploy environment:
+Required GitHub environment vars in the deploy environment:
 
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
-- `ACA_APP_DATABASE_URL`
-- `ACA_APP_ADMIN_TOKEN`
 
-Optional GitHub environment secrets:
-
-- `ACA_APP_OPENAI_API_KEY`
-- `ACA_APP_AZURE_OPENAI_API_KEY`
-
-Required GitHub environment variables in the deploy environment:
+Required GitHub environment vars for ACA deployment:
 
 - `ACA_APP_RESOURCE_GROUP`
 - `ACA_APP_ENVIRONMENT_ID`
 
-Optional GitHub environment variables:
+Optional GitHub environment vars:
 
 - `ACA_APP_CPU`
 - `ACA_APP_MEMORY`
@@ -90,12 +83,50 @@ Optional GitHub environment variables:
 - `ACA_APP_AZURE_OPENAI_DEPLOYMENT`
 - `ACA_APP_AZURE_OPENAI_API_VERSION`
 
+Required GitHub environment secrets when `secret_source=github-environment`:
+
+- `ACA_APP_DATABASE_URL`
+- `ACA_APP_ADMIN_TOKEN`
+
+Optional GitHub environment secrets when `secret_source=github-environment`:
+
+- `ACA_APP_OPENAI_API_KEY`
+- `ACA_APP_AZURE_OPENAI_API_KEY`
+
 Backward compatibility note:
 
 - the checked-in workflow still accepts legacy `ACA_PRIMARY_*` variable and secret names
 - operators can keep a legacy GitHub environment name such as `aca-primary` during migration, or use a cleaner name such as `aca-app` for new setups
 
 The checked-in workflow expects those values to come from GitHub environment configuration, not from repo edits.
+
+### 2a. Recommended secret source: Infisical over OIDC
+
+The repo now supports Infisical as the recommended deploy-secret source.
+
+When `secret_source=infisical`, the workflow fetches secrets at runtime using `Infisical/secrets-action` with GitHub OIDC and a machine identity.
+
+Required GitHub environment vars for that path:
+
+- `INFISICAL_IDENTITY_ID`
+- `INFISICAL_PROJECT_SLUG`
+- `INFISICAL_ENV_SLUG`
+
+Optional:
+
+- `INFISICAL_DOMAIN`
+- `INFISICAL_SECRET_PATH`
+
+Recommended secret names inside Infisical:
+
+- `DATABASE_URL`
+- `SIGNALFORGE_ADMIN_TOKEN`
+- optional `OPENAI_API_KEY`
+- optional `AZURE_OPENAI_API_KEY`
+
+The workflow maps those into the checked-in deploy helper contract so the app and infra path do not need a separate runtime secret redesign.
+
+Setup guide: [`infisical-secrets.md`](./infisical-secrets.md)
 
 ### 3. The deploy workflow calls the checked-in shell helper
 

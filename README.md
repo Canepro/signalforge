@@ -230,6 +230,7 @@ Source-of-truth plans:
 - [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
 - [docs/aca-env-contract.md](docs/aca-env-contract.md)
 - [docs/app-release-and-aca-deploy.md](docs/app-release-and-aca-deploy.md)
+- [docs/infisical-secrets.md](docs/infisical-secrets.md)
 - [docs/aca-app-runbook.md](docs/aca-app-runbook.md)
 - [docs/aca-cutover-runbook.md](docs/aca-cutover-runbook.md)
 - [docs/history.md](docs/history.md)

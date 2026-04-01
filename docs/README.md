@@ -49,6 +49,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
 | [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md) | Repo-owned GHCR image publication, GitHub Actions deploy flow, and the portable ACA release contract |
+| [`infisical-secrets.md`](./infisical-secrets.md) | Infisical OIDC setup for GitHub Actions deploys and local SignalForge secret workflows |
 | [`aca-app-runbook.md`](./aca-app-runbook.md) | ACA app runbook using the checked-in ACA template without assuming one operator's Azure layout |
 | [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) | Legacy-name migration guide for operators still replacing an older ACA app name with `ca-signalforge` |
 | [`postgres-migrations.md`](./postgres-migrations.md) | Postgres migration policy, rollback stance, and release discipline |
