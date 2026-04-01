@@ -25,36 +25,45 @@ export function ModalShell({
   children: React.ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
 
+    const dialog = dialogRef.current;
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    if (dialog) {
+      dialog.scrollTop = 0;
+    }
 
     const focusables = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
+      dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
     ).filter((element) => !element.hasAttribute("disabled"));
 
-    (focusables[0] ?? dialogRef.current)?.focus();
+    (focusables[0] ?? dialog)?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
       if (event.key !== "Tab") return;
 
       const activeFocusables = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
+        dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
       ).filter((element) => !element.hasAttribute("disabled"));
 
       if (activeFocusables.length === 0) {
         event.preventDefault();
-        dialogRef.current?.focus();
+        dialog?.focus();
         return;
       }
 
@@ -83,7 +92,7 @@ export function ModalShell({
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

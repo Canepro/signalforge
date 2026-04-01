@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   COLLECTION_STACK_ROLES,
   listArtifactFamilyPresentations,
@@ -51,6 +51,8 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
 
 export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProps) {
   const [origin, setOrigin] = useState("http://localhost:3000");
+  const agentSectionRef = useRef<HTMLDivElement>(null);
+  const directPushSectionRef = useRef<HTMLDivElement>(null);
   const artifactFamilies = listArtifactFamilyPresentations();
 
   useEffect(() => {
@@ -60,6 +62,13 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
   }, [open]);
 
   if (!open) return null;
+
+  const scrollToSection = (sectionRef: React.RefObject<HTMLDivElement | null>) => {
+    sectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   const agentEnvFile = [
     `SIGNALFORGE_BASE_URL=${origin}`,
@@ -184,18 +193,36 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               Choose a collection path
             </h3>
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-md border border-primary/20 bg-primary/[0.03] px-3 py-3">
-                <div className="text-xs font-semibold text-on-surface">Use an agent service</div>
+              <button
+                type="button"
+                onClick={() => scrollToSection(agentSectionRef)}
+                className="rounded-md border border-primary/20 bg-primary/[0.03] px-3 py-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold text-on-surface">Use an agent service</div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                    Jump to setup
+                  </span>
+                </div>
                 <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
                   Best for recurring collection from a host or another prepared execution surface. SignalForge queues jobs, and the running agent claims them automatically.
                 </p>
-              </div>
-              <div className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-3">
-                <div className="text-xs font-semibold text-on-surface">Push an artifact directly</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection(directPushSectionRef)}
+                className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-3 text-left transition-colors hover:border-outline-variant/30 hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold text-on-surface">Push an artifact directly</div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                    Jump to commands
+                  </span>
+                </div>
                 <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
                   Best for one-off uploads, CI, workstation-driven collection, and container or Kubernetes evidence when you already have the artifact or local access.
                 </p>
-              </div>
+              </button>
             </div>
           </div>
 
@@ -253,7 +280,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           </div>
 
           {/* Job-driven path — lead with this */}
-          <div className="rounded-xl border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
+          <div ref={agentSectionRef} className="rounded-xl border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
               Recommended: installed agent service
             </h3>
@@ -307,7 +334,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
           <CopyBlock label="Agent one-shot (debug or cron)" text={agentOnce} />
 
-          <div className="border-t border-outline-variant/20 pt-4 space-y-1">
+          <div ref={directPushSectionRef} className="border-t border-outline-variant/20 pt-4 space-y-1">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Alternative: direct push</h3>
             <p className="text-xs leading-relaxed text-on-surface-variant">
               If you already have a compatible diagnostic artifact and do not need job tracking, push it directly.
