@@ -63,19 +63,18 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
   const agentEnvFile = [
     `SIGNALFORGE_BASE_URL=${origin}`,
-    `SIGNALFORGE_AGENT_TOKEN=<token from enrollment or reissue>`,
     `SIGNALFORGE_AGENT_INSTANCE_ID=$(hostname)-agent-1`,
     `SIGNALFORGE_COLLECTORS_DIR=/path/to/signalforge-collectors`,
+    `# Preferred service path: keep the bearer token in a separate token file`,
+    `# Optional for Kubernetes-capable runners: pin a managed kubeconfig path`,
+    `# SIGNALFORGE_KUBECONFIG=/path/to/kubeconfig`,
     `# Optional: narrow capabilities explicitly instead of relying on auto-detection`,
     `# SIGNALFORGE_AGENT_CAPABILITIES=collect:linux-audit-log,upload:multipart`,
-    `# Preferred: set target scope in SignalForge source defaults or per-job request fields`,
-    `# Legacy fallback only when collector-side job scope mapping is not available yet:`,
-    `# SIGNALFORGE_CONTAINER_REF=payments-api`,
-    `# SIGNALFORGE_KUBERNETES_SCOPE=namespace`,
-    `# SIGNALFORGE_KUBERNETES_NAMESPACE=payments`,
     `SIGNALFORGE_POLL_INTERVAL_MS=30000`,
     `SIGNALFORGE_JOBS_WAIT_SECONDS=20`,
   ].join("\n");
+
+  const agentTokenFile = [`<token from agent enrollment or reissue>`].join("\n");
 
   const agentServiceSetup = [
     `cd /path/to/signalforge-agent`,
@@ -83,11 +82,32 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `bun install`,
     ``,
     `cp contrib/systemd/signalforge-agent.env.example contrib/systemd/signalforge-agent.env`,
-    `# edit contrib/systemd/signalforge-agent.env`,
-    `sudo ./scripts/install-systemd-service.sh`,
+    `cp contrib/systemd/signalforge-agent.token.example contrib/systemd/signalforge-agent.token`,
+    `# edit both files before install`,
+    `./scripts/install-systemd-service.sh --scope system --dry-run`,
+    `sudo ./scripts/install-systemd-service.sh --scope system`,
   ].join("\n");
 
-  const agentServiceCheck = [`systemctl status signalforge-agent`, `journalctl -u signalforge-agent -f`].join("\n");
+  const agentUserServiceSetup = [
+    `cd /path/to/signalforge-agent`,
+    `git pull origin main`,
+    `bun install`,
+    ``,
+    `cp contrib/systemd/signalforge-agent.env.example contrib/systemd/signalforge-agent.env`,
+    `cp contrib/systemd/signalforge-agent.token.example contrib/systemd/signalforge-agent.token`,
+    `# edit both files before install`,
+    `./scripts/install-systemd-service.sh --scope user --dry-run`,
+    `./scripts/install-systemd-service.sh --scope user`,
+  ].join("\n");
+
+  const agentServiceCheck = [
+    `systemctl status signalforge-agent`,
+    `journalctl -u signalforge-agent -f`,
+    ``,
+    `# user service variant`,
+    `systemctl --user status signalforge-agent`,
+    `journalctl --user -u signalforge-agent -f`,
+  ].join("\n");
 
   const agentRun = [
     `export SIGNALFORGE_BASE_URL=${origin}`,
@@ -139,7 +159,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               Collect evidence
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
-              SignalForge analyzes evidence, but collection runs outside the app. Use a <strong>push-first</strong> path when you already have an artifact, or a <strong>job-driven</strong> path when you want a running agent to poll and collect on demand.
+              SignalForge analyzes evidence, but collection runs outside the app. Use a <strong>job-driven</strong> path when you have a long-running execution surface near the target, or a <strong>push-first</strong> path when you already have an artifact or want the simplest operator flow.
             </p>
           </div>
           <button
@@ -157,7 +177,27 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
         <div className="px-5 py-4 space-y-5">
           <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-              How the repos fit together
+              Choose a collection path
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-md border border-primary/20 bg-primary/[0.03] px-3 py-3">
+                <div className="text-xs font-semibold text-on-surface">Use an agent service</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                  Best for recurring collection from a host or another prepared execution surface. SignalForge queues jobs, and the running agent claims them automatically.
+                </p>
+              </div>
+              <div className="rounded-md border border-outline-variant/15 bg-surface-container-lowest px-3 py-3">
+                <div className="text-xs font-semibold text-on-surface">Push an artifact directly</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                  Best for one-off uploads, CI, workstation-driven collection, and container or Kubernetes evidence when you already have the artifact or local access.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              What each repo does
             </h3>
             <div className="space-y-2">
               {COLLECTION_STACK_ROLES.map((entry) => (
@@ -181,7 +221,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
           <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-              Supported artifact families
+              What you can collect
             </h3>
             <div className="space-y-2">
               {artifactFamilies.map((family) => (
@@ -197,11 +237,11 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                     {family.description}
                   </p>
                   <div className="mt-2 space-y-1 text-[11px] leading-snug text-outline-variant">
-                    <div>Upload shape: {family.uploadShape}</div>
+                    <div>Artifact shape: {family.uploadShape}</div>
                     <div>Compare hint: {family.targetIdentifierHint}</div>
                     <div>Target id example: <code className="font-mono">{family.targetIdentifierExample}</code></div>
-                    <div>Normal path: {family.recommendedCollection}</div>
-                    <div>Job-driven status: {family.jobDrivenStatus}</div>
+                    <div>Recommended path: {family.recommendedCollection}</div>
+                    <div>Job-driven support: {family.jobDrivenStatus}</div>
                   </div>
                 </div>
               ))}
@@ -236,13 +276,17 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               <span className="font-semibold text-on-surface">once</span> is only for smoke tests, debugging, or cron-style schedules.
             </p>
             <p className="text-xs leading-relaxed text-on-surface-variant">
-              Linux host sources are the cleanest fit for this model. Container and Kubernetes sources should now prefer typed source defaults and per-job scope in SignalForge. Host-local target env remains a fallback until the agent and collectors finish the Phase 9 scope mapping.
+              Linux and WSL host audits are the cleanest fit for this model. Container and Kubernetes job-driven collection are also supported, but only when the execution surface already has the intended runtime access, kubeconfig, and RBAC. If you do not already have that posture in place, direct push is usually the faster and safer starting point.
             </p>
           </div>
 
-          <CopyBlock label="Agent env file" text={agentEnvFile} />
+          <CopyBlock label="Service env file" text={agentEnvFile} />
 
-          <CopyBlock label="Install agent service (recommended)" text={agentServiceSetup} />
+          <CopyBlock label="Service token file" text={agentTokenFile} />
+
+          <CopyBlock label="Install system service (recommended)" text={agentServiceSetup} />
+
+          <CopyBlock label="Install user service (operator-owned)" text={agentUserServiceSetup} />
 
           <CopyBlock label="Check service status" text={agentServiceCheck} />
 
@@ -251,7 +295,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               Fallback: manual agent commands
             </h3>
             <p className="text-xs leading-relaxed text-on-surface-variant">
-              Use these only when you are testing or debugging agent behavior directly from a shell. They are not the preferred long-running production setup, and shell-exported tokens should not be your durable secret-handling path.
+              Use these only when you are testing or debugging agent behavior directly from a shell. They are not the preferred long-running setup, and shell-exported tokens should not be your durable secret-handling path.
             </p>
           </div>
 
@@ -262,12 +306,12 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <div className="border-t border-outline-variant/20 pt-4 space-y-1">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Alternative: direct push</h3>
             <p className="text-xs leading-relaxed text-on-surface-variant">
-              If you already have a compatible diagnostic artifact and don&apos;t need job tracking, push it directly.
-              This is the most flexible path for container and Kubernetes because you can choose target scope explicitly.
+              If you already have a compatible diagnostic artifact and do not need job tracking, push it directly.
+              This is the broadest and lowest-friction path for container and Kubernetes evidence because you can choose target scope explicitly without standing up a long-running execution surface first.
             </p>
           </div>
 
-          <CopyBlock label="Submit from this repo (CLI)" text={cliSubmit} />
+          <CopyBlock label="Submit from the SignalForge repo" text={cliSubmit} />
 
           <CopyBlock label="Reference push: Linux audit" text={collectorPushLinux} />
 
@@ -278,7 +322,8 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <p className="text-xs leading-snug text-outline-variant">
             Docs: <span className="font-mono">docs/external-submit.md</span>,{" "}
             <span className="font-mono">docs/getting-started.md</span>,{" "}
-            <span className="font-mono">docs/agent-deployment.md</span>
+            <span className="font-mono">docs/agent-deployment.md</span>,{" "}
+            <span className="font-mono">docs/operators/collection-paths.md</span>
           </p>
         </div>
     </ModalShell>
