@@ -36,14 +36,14 @@ permissions:
   contents: read
   id-token: write
 
-env:
-  IMAGE_REPOSITORY: ghcr.io/canepro/signalforge
-
 jobs:
   deploy:
     name: Deploy ACA app
     runs-on: ubuntu-latest
     environment: ${{ inputs.github_environment }}
+    env:
+      IMAGE_REPOSITORY: ghcr.io/canepro/signalforge
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
       - name: Checkout
@@ -124,7 +124,7 @@ jobs:
           echo "ACA_SECRET_SOURCE=$SECRET_SOURCE" >> "$GITHUB_ENV"
 
       - name: Log in to Azure
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}

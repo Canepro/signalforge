@@ -24,6 +24,8 @@ Workflow:
 3. the workflow maps those secrets into the existing ACA deploy helper contract
 4. the helper writes them into ACA secrets and deploys or updates the app
 
+The deploy workflow now forces JavaScript actions onto Node 24 so the Infisical action path is validated ahead of the hosted-runner Node 20 removal window.
+
 The app still reads normal ACA environment variables such as `DATABASE_URL` and `SIGNALFORGE_ADMIN_TOKEN`.
 
 ## GitHub Actions setup

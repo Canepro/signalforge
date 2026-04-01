@@ -79,6 +79,11 @@ Current deployment docs:
 - [plans/phase-10b-aca-resource-rename-cutover.md](plans/phase-10b-aca-resource-rename-cutover.md)
 - [plans/phase-10c-public-image-and-release-pipeline.md](plans/phase-10c-public-image-and-release-pipeline.md)
 
+Reference operator deployment:
+
+- app URL: `https://signalforge.canepro.me`
+- preview or review: Vercel remains separate from the live ACA app path
+
 ## Start Here
 
 If you are new to the repo:

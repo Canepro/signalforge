@@ -166,6 +166,25 @@ Run these checks against the ACA app hostname:
 11. verify the host job reaches `submitted` with `result_analysis_status=complete`
 12. verify the Kubernetes job reaches `submitted` with `result_analysis_status=complete`
 
+## Optional public custom domain
+
+If the operator wants a stable public hostname, bind it directly to the ACA app after the default ACA hostname is healthy.
+
+For a subdomain such as `signalforge.example.com`:
+
+1. create a `CNAME` from the chosen hostname to the ACA default hostname
+2. create the matching `TXT` verification record using the ACA custom-domain verification id
+3. add the hostname under `Custom domains` on the ACA app
+4. prefer an ACA-managed certificate for the first binding
+5. keep Cloudflare or other DNS providers in `DNS only` mode until validation and certificate issuance succeed
+
+Reference deployment:
+
+- public app URL: `https://signalforge.canepro.me`
+- ACA default hostname: `https://ca-signalforge.kinddune-53ac219d.eastus2.azurecontainerapps.io`
+
+Do not point the GitHub repository homepage or operator bookmarks at a preview URL once the custom ACA domain is live.
+
 ## Rollback stance
 
 If the ACA deploy is bad:

@@ -13,9 +13,9 @@ Neither path turns SignalForge itself into a privileged execution engine.
 
 | Environment | Recommended path | Why |
 |---|---|---|
-| Linux / WSL host | Job-driven or push-first | The agent and collector path is cleanest here and maps directly to host audit collection |
-| Container runtime host | Push-first for broad use; job-driven only when the runtime host is explicitly prepared | The typed scope contract is implemented, but collection still depends on deliberate local runtime access on the execution host |
-| Kubernetes | Push-first for broad use; job-driven only when the execution environment has the intended kubeconfig and RBAC | The typed scope contract is implemented, but collection still depends on explicit kubeconfig or future in-cluster identity |
+| Linux / WSL host | Preferred: job-driven host service. Easiest: push-first. | Host audit is the cleanest end-to-end job-driven slice, but direct push remains a low-friction fallback. |
+| Container runtime host | Preferred: runtime-host agent service or containerized runner. Easiest: push-first. | The best long-running form keeps the agent near the real Docker or Podman socket, but direct push is still the fastest way to start. |
+| Kubernetes | Preferred: cluster-side agent deployment. Easiest: push-first. | The durable job-driven form is a dedicated cluster-side deployment; workstation or CI push stays the simplest entry path when kubeconfig and RBAC already exist. |
 
 ## Push-First
 
@@ -68,15 +68,17 @@ Detailed deployment guidance: [`../agent-deployment.md`](../agent-deployment.md)
 
 ### Container diagnostics
 
-- push-first is still the broadest honest default
-- job-driven can work when the runtime host exposes the intended Docker or Podman access to the agent
+- preferred long-running path: runtime-host `systemd` service or a containerized runner on the runtime host
+- easiest start: push-first with `signalforge-collectors`
+- job-driven requires deliberate Docker or Podman access on the execution host
 - treat runtime-socket access as a higher-trust deployment form
 
 ### Kubernetes bundle
 
-- push-first is still the broadest honest default
+- preferred long-running path: cluster-side Kubernetes Deployment
+- easiest start: push-first from a workstation, bastion, or CI runner with the intended kubeconfig and RBAC
 - job-driven can work when the execution environment has the intended kubeconfig and RBAC
-- preferred long-running form is cluster-adjacent or cluster-side, not a human workstation session
+- prefer cluster-side or cluster-adjacent execution over a human workstation session
 
 ## Related Docs
 

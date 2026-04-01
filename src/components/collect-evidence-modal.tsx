@@ -118,6 +118,29 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
     `journalctl --user -u signalforge-agent -f`,
   ].join("\n");
 
+  const containerAgentServiceSetup = [
+    `cd /path/to/signalforge-agent`,
+    `git pull origin main`,
+    `bun install`,
+    ``,
+    `cp contrib/systemd/signalforge-agent.env.example contrib/systemd/signalforge-agent-container.env`,
+    `cp contrib/systemd/signalforge-agent.token.example contrib/systemd/signalforge-agent-container.token`,
+    `# edit the env file before install`,
+    `# SIGNALFORGE_BASE_URL=${origin}`,
+    `# SIGNALFORGE_AGENT_CAPABILITIES=collect:container-diagnostics,upload:multipart`,
+    `# SIGNALFORGE_CONTAINER_RUNTIME=podman`,
+    `sudo ./scripts/install-systemd-service.sh --scope system --service-name signalforge-agent-container --service-profile runtime-host --env-source contrib/systemd/signalforge-agent-container.env --token-source contrib/systemd/signalforge-agent-container.token`,
+  ].join("\n");
+
+  const kubernetesAgentDeploy = [
+    `cd /path/to/signalforge-agent`,
+    `./scripts/deploy-kubernetes-agent.sh \\`,
+    `  --image ghcr.io/<owner>/signalforge-agent:kubernetes-arm64-YYYYMMDD \\`,
+    `  --signalforge-base-url ${origin} \\`,
+    `  --agent-token-file /secure/path/signalforge-kubernetes-agent.token \\`,
+    `  --kube-context-alias prod-cluster`,
+  ].join("\n");
+
   const agentRun = [
     `export SIGNALFORGE_BASE_URL=${origin}`,
     `export SIGNALFORGE_AGENT_TOKEN='<token from enrollment>'`,
@@ -279,10 +302,54 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             </div>
           </div>
 
+          <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              Best path by source type
+            </h3>
+            <div className="space-y-2">
+              <div className="rounded-md border border-primary/15 bg-surface-container-lowest px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-on-surface">Linux and WSL host audit</div>
+                  <code className="text-[10px] text-outline-variant">linux-audit-log</code>
+                </div>
+                <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
+                  <span className="font-semibold text-on-surface">Preferred long-running path:</span> installed host agent service.
+                </div>
+                <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                  <span className="font-semibold text-on-surface">Easiest start:</span> direct push from a host or workstation when you already have the audit artifact.
+                </div>
+              </div>
+              <div className="rounded-md border border-primary/15 bg-surface-container-lowest px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-on-surface">Container diagnostics</div>
+                  <code className="text-[10px] text-outline-variant">container-diagnostics</code>
+                </div>
+                <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
+                  <span className="font-semibold text-on-surface">Preferred long-running path:</span> runtime-host agent service or containerized runner on the runtime host, with explicit runtime access.
+                </div>
+                <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                  <span className="font-semibold text-on-surface">Easiest start:</span> direct push from <code className="font-mono">signalforge-collectors</code> after collecting the artifact locally.
+                </div>
+              </div>
+              <div className="rounded-md border border-primary/15 bg-surface-container-lowest px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-on-surface">Kubernetes bundle</div>
+                  <code className="text-[10px] text-outline-variant">kubernetes-bundle</code>
+                </div>
+                <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
+                  <span className="font-semibold text-on-surface">Preferred long-running path:</span> cluster-side Kubernetes deployment of <code className="font-mono">signalforge-agent</code>.
+                </div>
+                <div className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
+                  <span className="font-semibold text-on-surface">Easiest start:</span> direct push from a workstation, bastion, or CI runner that already has the intended kubeconfig and RBAC.
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Job-driven path — lead with this */}
           <div ref={agentSectionRef} className="rounded-xl border border-primary/20 bg-primary/[0.03] p-4 space-y-2">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-              Recommended: installed agent service
+              Preferred long-running path: installed agent service
             </h3>
             <ol className="list-inside list-decimal space-y-1 text-xs leading-relaxed text-on-surface-variant">
               <li>
@@ -321,6 +388,28 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
           <CopyBlock label="Check service status" text={agentServiceCheck} />
 
+          <div className="space-y-1">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              Preferred container agent deployment
+            </h3>
+            <p className="text-xs leading-relaxed text-on-surface-variant">
+              For <code className="font-mono">container-diagnostics</code>, keep the agent on the runtime host and pin it to container capabilities instead of using the generic hardened host profile.
+            </p>
+          </div>
+
+          <CopyBlock label="Container runtime-host agent service" text={containerAgentServiceSetup} />
+
+          <div className="space-y-1">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+              Preferred Kubernetes agent deployment
+            </h3>
+            <p className="text-xs leading-relaxed text-on-surface-variant">
+              For <code className="font-mono">kubernetes-bundle</code>, prefer a cluster-side deployment over a workstation session. Use the checked-in deploy script and a dedicated agent token.
+            </p>
+          </div>
+
+          <CopyBlock label="Cluster-side Kubernetes agent deploy" text={kubernetesAgentDeploy} />
+
           <div className="border-t border-outline-variant/20 pt-4 space-y-1">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
               Fallback: manual agent commands
@@ -335,7 +424,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
           <CopyBlock label="Agent one-shot (debug or cron)" text={agentOnce} />
 
           <div ref={directPushSectionRef} className="border-t border-outline-variant/20 pt-4 space-y-1">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Alternative: direct push</h3>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Easiest start: direct push</h3>
             <p className="text-xs leading-relaxed text-on-surface-variant">
               If you already have a compatible diagnostic artifact and do not need job tracking, push it directly.
               This is the broadest and lowest-friction path for container and Kubernetes evidence because you can choose target scope explicitly without standing up a long-running execution surface first.
