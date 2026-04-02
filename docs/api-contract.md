@@ -255,6 +255,8 @@ All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>
 **`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics` and `kubernetes-bundle`), `default_collector_type`, optional typed `default_collection_scope` (`linux_host` / `container_target` / `kubernetes_scope`) validated against `expected_artifact_type`, `capabilities`, `labels`, `enabled`.
 **201:** source object. **400** validation, including `code: "unsupported_artifact_type"` when `expected_artifact_type` is not supported. **409** `duplicate_target_identifier`.
 
+`source_type` is the execution host kind in v1, not a full evidence-target taxonomy. For container and Kubernetes sources, operators should read `expected_artifact_type` plus `default_collection_scope` as the durable description of what evidence the agent will collect.
+
 **`GET /api/sources`** — **200:** `{ "sources": Source[] }`.
 
 **`GET /api/sources/[id]`** — **200** source. **404** if missing.

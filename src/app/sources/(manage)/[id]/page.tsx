@@ -15,7 +15,7 @@ import {
 } from "@/lib/collection-scope";
 import {
   getArtifactTypeLabel,
-  getSourceTypeLabel,
+  getSourceExecutionSurfaceLabel,
   type ArtifactType,
 } from "@/lib/source-catalog";
 import { getStorage } from "@/lib/storage";
@@ -105,6 +105,14 @@ export default async function SourceDetailPage({
   });
   const registration = await storage.agents.getRegistrationBySourceId(id);
   const blockingDeleteJobs = jobs.filter((job) => ["claimed", "running"].includes(job.status));
+  const executionSurfaceLabel = getSourceExecutionSurfaceLabel({
+    sourceType: source.source_type,
+    artifactType: source.expected_artifact_type,
+    defaultCollectionScope: source.default_collection_scope,
+  });
+  const isNonLinuxFamily =
+    source.expected_artifact_type === "container-diagnostics" ||
+    source.expected_artifact_type === "kubernetes-bundle";
 
   return (
     <div className="space-y-8">
@@ -131,7 +139,7 @@ export default async function SourceDetailPage({
       {/* Properties grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Type", value: getSourceTypeLabel(source.source_type) },
+          { label: "Execution", value: executionSurfaceLabel },
           { label: "Artifact", value: getArtifactTypeLabel(source.expected_artifact_type) },
           {
             label: "Collector",
@@ -146,6 +154,12 @@ export default async function SourceDetailPage({
           </div>
         ))}
       </div>
+      {isNonLinuxFamily ? (
+        <p className="text-sm text-on-surface-variant">
+          <span className="font-semibold text-on-surface">Execution</span> describes where the long-lived agent runs.{" "}
+          <span className="font-semibold text-on-surface">Artifact</span> and collection scope describe what evidence it collects.
+        </p>
+      ) : null}
 
       {/* Alerts */}
       {sp.error === "disabled" && (
@@ -208,6 +222,12 @@ export default async function SourceDetailPage({
           <p className="sf-kicker">Execution plane</p>
           <h2 className="font-headline text-lg font-bold tracking-tight text-on-surface">Agent enrollment</h2>
         </div>
+        {source.expected_artifact_type === "kubernetes-bundle" ? (
+          <p className="text-sm text-on-surface-variant">
+            Preferred deployment for this source is a long-lived cluster-side agent, typically via the Helm chart in{" "}
+            <code className="sf-inline-code">signalforge-agent</code>.
+          </p>
+        ) : null}
         {registration ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

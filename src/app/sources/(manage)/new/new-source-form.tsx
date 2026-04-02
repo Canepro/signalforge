@@ -83,7 +83,7 @@ export function NewSourceForm({
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="sf-field-label">Source type</span>
+              <span className="sf-field-label">Execution host kind</span>
               <select
                 name="source_type"
                 required
@@ -98,7 +98,10 @@ export function NewSourceForm({
                 ))}
               </select>
               {selectedSourceType ? (
-                <span className="sf-field-help">{selectedSourceType.description}</span>
+                <span className="sf-field-help">
+                  {selectedSourceType.description} For container and Kubernetes families, this describes where the
+                  execution-plane agent runs, not the evidence target by itself.
+                </span>
               ) : null}
             </label>
             <label className="block">
@@ -117,7 +120,8 @@ export function NewSourceForm({
                 ))}
               </select>
               <span className="sf-field-help">
-                This controls which collector capability the source expects and which artifact family collection jobs may upload.
+                This controls which collector capability the source expects. Artifact family plus collection scope define
+                what evidence queued jobs will collect.
               </span>
             </label>
           </div>
@@ -167,6 +171,7 @@ export function NewSourceForm({
           <ul className="mt-3 space-y-2 text-sm leading-relaxed text-on-surface-variant">
             <li>Pick a display name operators will recognize quickly in queues and run history.</li>
             <li>Use a stable target identifier that will still make sense after reanalyze or future uploads.</li>
+            <li>Execution host kind describes where the agent runs. Artifact family and collection scope describe the evidence target.</li>
             <li>Set a default collection scope when the source should consistently target one workload, namespace, or cluster shape.</li>
           </ul>
         </div>

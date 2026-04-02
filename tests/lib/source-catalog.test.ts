@@ -5,6 +5,7 @@ import {
   defaultCapabilitiesForArtifactType,
   getArtifactTypeLabel,
   getArtifactFamilyPresentation,
+  getSourceExecutionSurfaceLabel,
   getSourceTypeLabel,
   isSourceType,
   listArtifactFamilyPresentations,
@@ -37,6 +38,46 @@ describe("source-catalog", () => {
     expect(getArtifactTypeLabel("linux-audit-log")).toBe("Linux audit log");
     expect(getArtifactTypeLabel("container-diagnostics")).toBe("Container diagnostics");
     expect(getArtifactTypeLabel("kubernetes-bundle")).toBe("Kubernetes bundle");
+  });
+
+  it("describes execution surfaces separately from artifact family labels", () => {
+    expect(
+      getSourceExecutionSurfaceLabel({
+        sourceType: "linux_host",
+        artifactType: "linux-audit-log",
+      })
+    ).toBe("Linux host");
+
+    expect(
+      getSourceExecutionSurfaceLabel({
+        sourceType: "linux_host",
+        artifactType: "container-diagnostics",
+        defaultCollectionScope: {
+          kind: "container_target",
+          runtime: "podman",
+          container_ref: "payments-api",
+        },
+      })
+    ).toBe("Podman runtime host");
+
+    expect(
+      getSourceExecutionSurfaceLabel({
+        sourceType: "linux_host",
+        artifactType: "kubernetes-bundle",
+      })
+    ).toBe("Cluster-side Kubernetes runner");
+
+    expect(
+      getSourceExecutionSurfaceLabel({
+        sourceType: "linux_host",
+        artifactType: "kubernetes-bundle",
+        defaultCollectionScope: {
+          kind: "kubernetes_scope",
+          scope_level: "namespace",
+          namespace: "payments",
+        },
+      })
+    ).toBe("Namespace-scoped Kubernetes runner");
   });
 
   it("exposes shared artifact-family presentation metadata for UI flows", () => {

@@ -4,7 +4,7 @@ import { SourceHealthDot } from "@/components/source-health-dot";
 import { getStorage } from "@/lib/storage";
 import {
   getArtifactTypeLabel,
-  getSourceTypeLabel,
+  getSourceExecutionSurfaceLabel,
 } from "@/lib/source-catalog";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export default async function SourcesListPage({
         <div>
           <h1 className="font-headline text-2xl font-bold text-on-surface tracking-tight">Evidence sources</h1>
           <p className="text-sm text-on-surface-variant mt-1 leading-relaxed">
-            Register a target, request collection jobs, and enroll a thin agent.
+            Register an evidence target, request collection jobs, and enroll a thin agent.
             Jobs stay <strong>queued</strong> until an external agent claims them.
           </p>
         </div>
@@ -71,7 +71,7 @@ export default async function SourcesListPage({
               No sources yet. Create one to use <span className="font-semibold text-on-surface">Collect Fresh Evidence</span>.
             </p>
             <p className="mt-1 text-xs text-outline-variant">
-              A source represents a target machine or environment you want to monitor.
+              A source represents an evidence target plus the execution surface that will collect it.
             </p>
           </div>
         </div>
@@ -111,7 +111,12 @@ export default async function SourcesListPage({
                       </span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
-                      <span>{getSourceTypeLabel(s.source_type)}</span>
+                      <span>
+                        {getSourceExecutionSurfaceLabel({
+                          sourceType: s.source_type,
+                          artifactType: s.expected_artifact_type,
+                        })}
+                      </span>
                       <span>{getArtifactTypeLabel(s.expected_artifact_type)}</span>
                       {s.last_seen_at && (
                         <span className="text-outline-variant/80">

@@ -95,7 +95,9 @@ SignalForge queues work and stores results. The agent still needs the local coll
 
 In the Sources UI, operators should be able to inspect:
 
-- the Source identity and expected artifact family
+- the Source identity
+- the execution surface, meaning where the long-lived agent runs
+- the expected artifact family and typed collection scope, meaning what evidence the agent will collect
 - the stored default collection scope
 - the resolved collection scope on queued jobs
 - the agent enrollment state

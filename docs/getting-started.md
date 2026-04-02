@@ -97,6 +97,13 @@ Before attempting job-driven collection, make sure the execution environment has
 
 Start with [`agent-deployment.md`](./agent-deployment.md), which now leads with the preferred Linux host service flow and the required prerequisites.
 
+In the Sources UI, read the fields this way:
+
+- **Execution**: where the long-lived agent runs
+- **Artifact** plus **collection scope**: what evidence the agent will collect
+
+That distinction matters most for container and Kubernetes sources, where the execution host and the evidence target are often not the same thing.
+
 Optional OpenAI direct setup:
 
 ```env

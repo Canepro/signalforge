@@ -9,6 +9,11 @@ SignalForge accepts evidence in two ways:
 
 Neither path turns SignalForge itself into a privileged execution engine.
 
+When reading the rest of this document, keep the split explicit:
+
+- execution surface = where the long-lived agent runs
+- evidence target = what the artifact family and collection scope describe
+
 ## Current Recommendation By Environment
 
 | Environment | Recommended path | Why |

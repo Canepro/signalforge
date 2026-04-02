@@ -4,6 +4,11 @@ Use this section when you are running SignalForge as an operator rather than jus
 
 This is where Sources, collection jobs, agent enrollment, environment-specific collection guidance, and the typed `collection_scope` model now live.
 
+One important vocabulary rule for operators:
+
+- execution surface = where the long-lived agent runs
+- artifact family + collection scope = what evidence that agent will collect
+
 ## Recommended Reading Path
 
 1. [`sources-and-agents.md`](./sources-and-agents.md)

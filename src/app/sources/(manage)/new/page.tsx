@@ -30,7 +30,7 @@ export default async function NewSourcePage({
         </Link>
         <h1 className="font-headline text-2xl font-bold text-on-surface mt-3 tracking-tight">New source</h1>
         <p className="text-sm text-on-surface-variant mt-1">
-          Register a target that an external agent will collect evidence from.
+          Register an evidence target and the execution surface that a long-lived external agent will collect it from.
         </p>
       </div>
 
@@ -41,7 +41,7 @@ export default async function NewSourcePage({
       )}
       {(sp.error === "missing" || sp.error === "type") && (
         <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-700 dark:text-red-300">
-          Please fill all required fields and pick a valid source type.
+          Please fill all required fields and pick a valid execution host kind.
         </p>
       )}
       {(sp.error === "artifact_type" || sp.error === "invalid_default_collection_scope") && (

@@ -105,6 +105,11 @@ If you are operating Sources, agents, or collection jobs:
 - [docs/operators/README.md](docs/operators/README.md)
 - [docs/agent-deployment.md](docs/agent-deployment.md)
 
+For Sources and job-driven collection, keep this split explicit:
+
+- execution surface = where the long-lived agent runs
+- artifact family + collection scope = what evidence the agent will collect
+
 ## 5-Minute First Run
 
 Install dependencies:

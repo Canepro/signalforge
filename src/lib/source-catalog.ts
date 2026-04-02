@@ -1,3 +1,5 @@
+import type { CollectionScope } from "@/lib/collection-scope";
+
 export const SOURCE_TYPE_OPTIONS = [
   {
     value: "linux_host",
@@ -162,6 +164,36 @@ export function getArtifactTypeLabel(artifactType: string): string {
     ARTIFACT_TYPE_OPTIONS.find((option) => option.value === artifactType)?.label ??
     humanizeCatalogValue(artifactType)
   );
+}
+
+export function getSourceExecutionSurfaceLabel({
+  sourceType,
+  artifactType,
+  defaultCollectionScope,
+}: {
+  sourceType: string;
+  artifactType: string;
+  defaultCollectionScope?: CollectionScope | null;
+}): string {
+  if (artifactType === "container-diagnostics") {
+    const runtime =
+      defaultCollectionScope?.kind === "container_target" ? defaultCollectionScope.runtime : undefined;
+    if (runtime === "docker") return "Docker runtime host";
+    if (runtime === "podman") return "Podman runtime host";
+    return "Container runtime host";
+  }
+
+  if (artifactType === "kubernetes-bundle") {
+    if (
+      defaultCollectionScope?.kind === "kubernetes_scope" &&
+      defaultCollectionScope.scope_level === "namespace"
+    ) {
+      return "Namespace-scoped Kubernetes runner";
+    }
+    return "Cluster-side Kubernetes runner";
+  }
+
+  return getSourceTypeLabel(sourceType);
 }
 
 /** e.g. `linux-audit-log` -> `collect:linux-audit-log` */

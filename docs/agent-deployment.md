@@ -19,6 +19,13 @@ The preferred long-running form is environment-specific:
 - container diagnostics: long-running runtime-host service or containerized runner on the runtime host
 - Kubernetes bundle collection: dedicated cluster-side Deployment with explicit kubeconfig or future in-cluster identity
 
+Operator mental model:
+
+- execution surface = where `signalforge-agent` runs
+- artifact family + collection scope = what evidence it collects
+
+Do not treat the execution surface as the full target description for container or Kubernetes collection.
+
 ## Linux Host Quickstart
 
 Use this path for the common operator workflow: create a Source in SignalForge, enroll the agent, install the service on the VM, and let SignalForge queue jobs to it.
