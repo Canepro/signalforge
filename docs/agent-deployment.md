@@ -1,12 +1,127 @@
 # SignalForge Agent Deployment Guidance
 
-This document records the preferred deployment model for the external execution-plane agent, `signalforge-agent`.
+This document is the operator-first setup guide for the external execution-plane agent, `signalforge-agent`.
 
-It exists to keep the product story, operator guidance, and Phase 9 work aligned.
+If you are deploying the agent for Linux host collection, the preferred path is a long-lived `systemd` service on the target host. Start there unless you have a specific reason not to.
+
+## Preferred Deployment
+
+The preferred deployment model is:
+
+- one `signalforge-agent` product
+- running as a long-lived service
+- deployed near the execution surface
+- managed by the local init or platform, not by an operator shell session
+
+The preferred long-running form is environment-specific:
+
+- Linux and WSL host audit: hardened `systemd` service on the target host
+- container diagnostics: long-running runtime-host service or containerized runner on the runtime host
+- Kubernetes bundle collection: dedicated cluster-side Deployment with explicit kubeconfig or future in-cluster identity
+
+## Linux Host Quickstart
+
+Use this path for the common operator workflow: create a Source in SignalForge, enroll the agent, install the service on the VM, and let SignalForge queue jobs to it.
+
+### Prerequisites
+
+On the target Linux VM, you need:
+
+- `git`
+- `bun`
+- `systemd`
+- `sudo`
+- network reachability to the SignalForge URL
+- a checkout of `signalforge-agent`
+- a checkout of `signalforge-collectors`
+- a Source already created in SignalForge
+- a source-bound agent token from **Enroll agent** in `/sources`
+
+Example repo layout:
+
+```bash
+cd ~
+git clone https://github.com/Canepro/signalforge-agent.git
+git clone https://github.com/Canepro/signalforge-collectors.git
+cd ~/signalforge-agent
+bun install
+```
+
+### Install The Service
+
+Create the local service config files:
+
+```bash
+cd ~/signalforge-agent
+cp contrib/systemd/signalforge-agent.env.example contrib/systemd/signalforge-agent.env
+cp contrib/systemd/signalforge-agent.token.example contrib/systemd/signalforge-agent.token
+chmod 600 contrib/systemd/signalforge-agent.token
+mkdir -p ~/signalforge-agent/work
+```
+
+Edit `contrib/systemd/signalforge-agent.env` and replace the placeholder values before running preflight:
+
+```dotenv
+SIGNALFORGE_BASE_URL=https://signalforge.example.com
+SIGNALFORGE_AGENT_INSTANCE_ID=linux-vm-01-agent-1
+SIGNALFORGE_COLLECTORS_DIR=/home/<user>/signalforge-collectors
+SIGNALFORGE_AGENT_WORKDIR=/home/<user>/signalforge-agent/work
+```
+
+Paste the enrolled source-bound token into `contrib/systemd/signalforge-agent.token`.
+
+### Run Manual Preflight
+
+The manual `preflight` command reads exported shell environment, not the env file by itself. Source the env file first, then point the agent at the token file:
+
+```bash
+cd ~/signalforge-agent
+set -a
+source contrib/systemd/signalforge-agent.env
+export SIGNALFORGE_AGENT_TOKEN_FILE="$PWD/contrib/systemd/signalforge-agent.token"
+set +a
+
+bun run src/cli.ts preflight
+```
+
+For a Linux host source, the important success signal is an effective capability set that includes:
+
+- `collect:linux-audit-log`
+- `upload:multipart`
+
+Warnings about missing Docker, Podman, or `kubectl` are expected if this VM is only intended to collect Linux host evidence.
+
+### Install And Start The Long-Lived Service
+
+Install the preferred system service:
+
+```bash
+sudo ./scripts/install-systemd-service.sh --scope system --bun /home/<user>/.bun/bin/bun
+```
+
+Then verify that it is running:
+
+```bash
+sudo systemctl status signalforge-agent
+sudo journalctl -u signalforge-agent -f
+```
+
+Expected behavior:
+
+- the service starts and enters the poll loop
+- the Source page stops showing `Unknown`
+- `Last seen` appears in the Source UI
+- after you queue a job, the logs show claim, start, collect, and upload
+
+### Runtime User Note
+
+The system installer runs the service as the invoking sudo user by default.
+
+That is often a reasonable default for a first host install, but it can limit Linux audit coverage because `first-audit.sh` collects less data when it is not running as root. If you need fuller host-level collection, choose the runtime user intentionally and validate the resulting access model instead of assuming the default is equivalent to root.
 
 ## Scope
 
-This is guidance for the external agent that:
+This guidance is for the external agent that:
 
 - heartbeats to SignalForge
 - polls `GET /api/agent/jobs/next`
@@ -20,29 +135,16 @@ It does not change the product boundary:
 - collectors remain external
 - this repo does not turn into a privileged remote execution service
 
-## Preferred deployment model
-
-The preferred deployment model is:
-
-- one `signalforge-agent` product
-- running as a long-lived service
-- deployed near the execution surface
-- managed by the local init or platform, not by an operator shell session
-
-The preferred long-running form is environment-specific, not one-size-fits-all:
-
-- Linux and WSL host audit: prefer a hardened `systemd` service on the target host
-- container diagnostics: prefer a containerized runner on the runtime host when that host already operates Docker or Podman and the socket-trust tradeoff is acceptable
-- Kubernetes bundle collection: prefer a dedicated cluster-side Deployment with explicit kubeconfig or future in-cluster identity over operator laptops or ambient `kubectl`
+## Current Implementation Status
 
 Current implementation status in the sibling `signalforge-agent` repo:
 
-- the preferred Linux / WSL host-service path now has a first-class hardened `systemd` unit
-- the service install flow now supports a separate root-controlled token file instead of keeping the bearer token in the installed env file
-- `signalforge-agent preflight` now validates config, token source, and locally runnable collector/runtime capabilities before enabling the unit
+- the preferred Linux / WSL host-service path has a first-class hardened `systemd` unit
+- the service install flow supports a separate root-controlled token file instead of keeping the bearer token in the installed env file
+- `signalforge-agent preflight` validates config, token source, and locally runnable collector or runtime capabilities before enabling the unit
 - the installer supports a dry-run render path so operators can inspect the unit, env file, and token target before touching `systemd`
-- the service install flow now supports an optional managed kubeconfig path for Kubernetes-capable runners, wired into the installed env file instead of relying on a mutable operator context
-- the agent now supports explicit `SIGNALFORGE_KUBECTL_BIN` and `SIGNALFORGE_KUBECONFIG` overrides so Kubernetes-capable services can pin both the binary and the kubeconfig path
+- the service install flow supports an optional managed kubeconfig path for Kubernetes-capable runners, wired into the installed env file instead of relying on a mutable operator context
+- the agent supports explicit `SIGNALFORGE_KUBECTL_BIN` and `SIGNALFORGE_KUBECONFIG` overrides so Kubernetes-capable services can pin both the binary and the kubeconfig path
 - this service path has been smoke-tested under a real user `systemd` execution context via `systemd-run --user`, not only through static unit rendering
 - container-capable readiness now requires actual Docker or Podman access during capability derivation and `preflight`, not only a runtime binary on `PATH`
 

@@ -83,16 +83,19 @@ SIGNALFORGE_ADMIN_TOKEN=choose-a-long-random-secret
 
 Restart the dev server, open **`/sources`**, and sign in at **`/sources/login`** with the same value (stored as an httpOnly cookie — not embedded in the JS bundle). For `curl`, send `Authorization: Bearer <same value>`.
 
-**External agent (Phase 6d):** after you create a source in **`/sources`**, use **Enroll agent** (or `POST /api/agent/registrations` with the admin Bearer) to get a **source-bound agent token**. That token is used as `Authorization: Bearer <agent_token>` on `POST /api/agent/heartbeat`, `GET /api/agent/jobs/next`, and the collection-job **claim / start / fail / artifact** routes documented in [`api-contract.md`](./api-contract.md). Collection still runs on the host outside SignalForge; the server queues the job, returns the resolved typed `collection_scope` in `jobs/next`, and accepts the artifact back into the same analysis path as `POST /api/runs`. Container and Kubernetes jobs now use the same typed scope contract across SignalForge, `signalforge-agent`, and `signalforge-collectors`; the remaining non-Linux limitation is execution-environment readiness, meaning the host or cluster-side runner still needs the intended runtime access, kubeconfig, and RBAC.
+**External agent (Phase 6d):** after you create a source in **`/sources`**, use **Enroll agent** (or `POST /api/agent/registrations` with the admin Bearer) to get a **source-bound agent token**. That token is used as `Authorization: Bearer <agent_token>` on `POST /api/agent/heartbeat`, `GET /api/agent/jobs/next`, and the collection-job **claim / start / fail / artifact** routes documented in [`api-contract.md`](./api-contract.md).
 
-Preferred deployment model for the external agent:
+For operators, the preferred deployment is a long-lived agent service near the execution surface. For Linux host collection, that means a `systemd` service on the target VM, not repeated manual `once` runs from a shell session.
 
-- run it as a long-running service on the execution host
-- keep the token in a root-controlled file or service credential, not on a shell command line
-- use a dedicated service identity with only the access that host needs
-- avoid treating an operator laptop or mutable `kubectl` current-context as the normal production path
+Before attempting job-driven collection, make sure the execution environment has:
 
-More detail: [`agent-deployment.md`](./agent-deployment.md)
+- a checkout of `signalforge-agent`
+- a checkout of `signalforge-collectors`
+- `bun` installed on the host if you are using the VM or host-service path
+- a source-bound token from **Enroll agent**
+- network reachability to this SignalForge app
+
+Start with [`agent-deployment.md`](./agent-deployment.md), which now leads with the preferred Linux host service flow and the required prerequisites.
 
 Optional OpenAI direct setup:
 
@@ -148,7 +151,7 @@ In the UI, use **How to collect** in the sidebar (or **Collect externally** on t
 - push-first, where `signalforge-collectors` produces the artifact and submits it directly
 - job-driven, where `signalforge-agent` runs a collector from `signalforge-collectors` and uploads the result
 
-Today, Linux host collection is the cleanest fully general job-driven path. Container and Kubernetes also have real collector support, but the honest environment-specific guidance now lives under [`docs/operators/collection-paths.md`](./operators/collection-paths.md) instead of this first-run guide.
+Today, Linux host collection is the cleanest fully general job-driven path and the preferred first operator workflow. Container and Kubernetes also have real collector support, but the honest environment-specific guidance lives under [`docs/operators/collection-paths.md`](./operators/collection-paths.md) instead of this first-run guide.
 
 The simplest first run is one of the repo fixtures:
 

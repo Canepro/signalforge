@@ -2,6 +2,15 @@
 
 This document is the operator-facing view of the Source and collection-job model in SignalForge.
 
+If you are deploying an agent for the first time, the preferred path is:
+
+1. create a Source in `/sources`
+2. enroll a source-bound agent token
+3. install `signalforge-agent` as a long-lived service near the target surface
+4. queue jobs from SignalForge
+
+For Linux host collection, that preferred service path is a `systemd` service on the target VM. The detailed install steps live in [`../agent-deployment.md`](../agent-deployment.md).
+
 ## What Lives In SignalForge
 
 SignalForge stores and exposes:
@@ -52,12 +61,35 @@ This keeps SignalForge from becoming a privileged SSH, `kubectl`, or runtime-exe
 ## Normal Lifecycle
 
 1. Create a Source in `/sources`.
-2. Enroll an agent for that Source.
-3. Run `signalforge-agent` near the target surface.
-4. Request collection from the Sources UI or `POST /api/sources/{id}/collection-jobs`.
-5. The agent heartbeats, polls `jobs/next`, and receives a queued job with resolved `collection_scope`.
-6. The agent claims and starts the job, runs the appropriate collector, and uploads the artifact.
-7. SignalForge analyzes the artifact and links the resulting run back to the job.
+2. Enroll an agent for that Source and save the source-bound token.
+3. Prepare the execution environment with the required local dependencies and repo checkouts.
+4. Run `signalforge-agent` as a long-lived service near the target surface.
+5. Verify that the Source shows a recent heartbeat before queuing work.
+6. Request collection from the Sources UI or `POST /api/sources/{id}/collection-jobs`.
+7. The agent heartbeats, polls `jobs/next`, and receives a queued job with resolved `collection_scope`.
+8. The agent claims and starts the job, runs the appropriate collector, and uploads the artifact.
+9. SignalForge analyzes the artifact and links the resulting run back to the job.
+
+## Minimum Operator Prerequisites
+
+For the normal long-lived service path, make sure the execution environment has:
+
+- network reachability to the SignalForge URL
+- a `signalforge-agent` checkout
+- a `signalforge-collectors` checkout
+- the local runtime needed for that environment
+- Linux host path: `bun`, `systemd`, and `sudo`
+- container path: Docker or Podman access for the runtime user
+- Kubernetes path: `kubectl`, kubeconfig or cluster identity, and the required RBAC
+
+If those prerequisites are missing, treat that as environment preparation work, not a SignalForge job bug.
+
+## Two Common Operator Mistakes
+
+- enrolling an agent token, but never actually starting the long-lived service
+- assuming the agent can collect evidence without the sibling `signalforge-collectors` repo on the same execution surface
+
+SignalForge queues work and stores results. The agent still needs the local collector scripts and local runtime access.
 
 ## What Operators Should Look At
 
