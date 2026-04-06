@@ -1276,8 +1276,31 @@ class PostgresAgentsStore implements AgentsStore {
     const registration = await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE source_id = $1", [input.sourceId]);
     if (!registration || registration.id !== input.registrationId) return { ok: false as const, code: "registration_not_found" };
 
-    let active_job_lease: ApplyAgentHeartbeatResult["active_job_lease"] = { requested: false };
     const now = new Date().toISOString();
+    let activeJob: PgCollectionJobRow | null = null;
+    if (input.activeJobId) {
+      activeJob = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.activeJobId]);
+      if (!activeJob) return { ok: false as const, code: "active_job_not_found" };
+      if (activeJob.source_id !== source.id) return { ok: false as const, code: "forbidden" };
+      if (activeJob.status === "expired" && activeJob.error_code === "lease_lost") {
+        return { ok: false as const, code: "lease_expired" };
+      }
+      if (activeJob.lease_owner_id !== registration.id) return { ok: false as const, code: "forbidden" };
+      if (activeJob.status !== "claimed" && activeJob.status !== "running") {
+        return { ok: false as const, code: "invalid_active_job_state" };
+      }
+      if (!activeJob.lease_owner_instance_id) {
+        return { ok: false as const, code: "invalid_state" };
+      }
+      if (activeJob.lease_owner_instance_id !== input.instanceId) {
+        return { ok: false as const, code: "instance_mismatch" };
+      }
+      if (!activeJob.lease_expires_at || activeJob.lease_expires_at <= now) {
+        return { ok: false as const, code: "lease_expired" };
+      }
+    }
+
+    let active_job_lease: ApplyAgentHeartbeatResult["active_job_lease"] = { requested: false };
     const prevHealth = source.health_status;
     await this.q.query(
       `UPDATE sources SET last_seen_at = $1, health_status = 'online', attributes_json = $2, updated_at = $3 WHERE id = $4`,
@@ -1297,39 +1320,27 @@ class PostgresAgentsStore implements AgentsStore {
         source_id: source.id, previous_health: prevHealth, health_status: "online", occurred_at: now,
       });
     }
-    if (input.activeJobId && input.instanceId) {
-      const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.activeJobId]);
-      if (
-        !job ||
-        job.source_id !== source.id ||
-        !["claimed", "running"].includes(job.status) ||
-        job.lease_owner_id !== registration.id ||
-        job.lease_owner_instance_id !== input.instanceId ||
-        !job.lease_expires_at ||
-        job.lease_expires_at <= now
-      ) {
-        active_job_lease = { requested: true, job_id: input.activeJobId, extended: false, code: "lease_not_extended" };
-      } else {
-        const extendMs = 120_000;
-        const leaseEnd = new Date(job.lease_expires_at).getTime();
-        const base = Math.max(Date.now(), leaseEnd);
-        let next = base + extendMs;
-        if (job.claimed_at) {
-          const cap = new Date(job.claimed_at).getTime() + 30 * 60_000;
-          next = Math.min(next, cap);
-        }
-        const newExp = new Date(next).toISOString();
-        const res = await this.q.query(
-          `UPDATE collection_jobs SET lease_expires_at = $1, last_heartbeat_at = $2, updated_at = $3
-           WHERE id = $4 AND source_id = $5 AND status IN ('claimed', 'running')
-             AND lease_owner_id = $6 AND lease_owner_instance_id = $7 AND lease_expires_at = $8`,
-          [newExp, now, now, job.id, source.id, registration.id, input.instanceId, job.lease_expires_at]
-        );
-        active_job_lease =
-          res.rowCount === 1 ?
-            { requested: true, job_id: job.id, extended: true, lease_expires_at: newExp }
-          : { requested: true, job_id: job.id, extended: false, code: "lease_not_extended" };
+    if (input.activeJobId && input.instanceId && activeJob) {
+      const extendMs = 120_000;
+      const previousLeaseExpiry = activeJob.lease_expires_at!;
+      const leaseEnd = new Date(previousLeaseExpiry).getTime();
+      const base = Math.max(Date.now(), leaseEnd);
+      let next = base + extendMs;
+      if (activeJob.claimed_at) {
+        const cap = new Date(activeJob.claimed_at).getTime() + 30 * 60_000;
+        next = Math.min(next, cap);
       }
+      const newExp = new Date(next).toISOString();
+      const res = await this.q.query(
+        `UPDATE collection_jobs SET lease_expires_at = $1, last_heartbeat_at = $2, updated_at = $3
+         WHERE id = $4 AND source_id = $5 AND status IN ('claimed', 'running')
+           AND lease_owner_id = $6 AND lease_owner_instance_id = $7 AND lease_expires_at = $8`,
+        [newExp, now, now, activeJob.id, source.id, registration.id, input.instanceId, previousLeaseExpiry]
+      );
+      active_job_lease =
+        res.rowCount === 1 ?
+          { requested: true, job_id: activeJob.id, extended: true, lease_expires_at: newExp }
+        : { requested: true, job_id: activeJob.id, extended: false, code: "lease_not_extended" };
     }
     const updatedSource = (await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [source.id]))!;
     const updatedReg = (await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE id = $1", [registration.id]))!;

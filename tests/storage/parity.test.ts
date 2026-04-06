@@ -2552,6 +2552,65 @@ for (const backend of backends) {
       }
     });
 
+    it("applyHeartbeatAfterLeaseReap returns lease_expired for a reaped running active job", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T16:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Heartbeat reaper host",
+            target_identifier: `parity-heartbeat-reaper-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "heartbeat reaper test" })
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "hb-reaper-inst", 120)
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.startForAgent(job.id, src.id, reg.id, "hb-reaper-inst")
+        );
+
+        vi.setSystemTime(new Date("2026-04-06T16:10:00.000Z"));
+
+        const heartbeat = await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeatAfterLeaseReap({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: job.id,
+            instanceId: "hb-reaper-inst",
+          })
+        );
+        expect(heartbeat).toEqual({ ok: false, code: "lease_expired" });
+
+        const persisted = await storage.jobs.getById(job.id);
+        expect(persisted?.status).toBe("expired");
+        expect(persisted?.error_code).toBe("lease_lost");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("claim → start → submit artifact lifecycle", async () => {
       const src = await storage.withTransaction((tx) =>
         tx.sources.create({
