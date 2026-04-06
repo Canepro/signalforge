@@ -451,6 +451,9 @@ class SqliteAgentsStore implements AgentsStore {
       const job = getCollectionJobById(this.db, input.activeJobId);
       if (!job) return { ok: false as const, code: "active_job_not_found" };
       if (job.source_id !== source.id) return { ok: false as const, code: "forbidden" };
+      if (job.status === "expired" && job.error_code === "lease_lost") {
+        return { ok: false as const, code: "lease_expired" };
+      }
       if (job.lease_owner_id !== registration.id) return { ok: false as const, code: "forbidden" };
       if (job.status !== "claimed" && job.status !== "running") {
         return { ok: false as const, code: "invalid_active_job_state" };
