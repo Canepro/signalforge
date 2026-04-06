@@ -80,8 +80,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const storage = await getStorage();
-    const heartbeat = await storage.withTransaction((tx) =>
-      tx.agents.applyHeartbeat({
+    const heartbeat = await storage.withTransaction(async (tx) => {
+      await tx.jobs.reapExpiredLeases();
+      return tx.agents.applyHeartbeat({
         sourceId: ctx.source.id,
         registrationId: ctx.registration.id,
         capabilities,
@@ -89,8 +90,8 @@ export async function POST(request: NextRequest) {
         agentVersion: agent_version,
         activeJobId: active_job_id,
         instanceId: instance_id,
-      })
-    );
+      });
+    });
     if (!heartbeat.ok) {
       if (heartbeat.code === "active_job_not_found") {
         return NextResponse.json(

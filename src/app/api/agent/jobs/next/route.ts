@@ -52,16 +52,18 @@ export async function GET(request: NextRequest) {
     const storage = await getStorage();
     const deadline = Date.now() + waitSeconds * 1000;
 
-    let result = await storage.withTransaction((tx) =>
-      tx.jobs.listNextForAgent(ctx.source.id, ctx.registration.id, limit)
-    );
+    const loadNext = () =>
+      storage.withTransaction(async (tx) => {
+        await tx.jobs.reapExpiredLeases();
+        return tx.jobs.listNextForAgent(ctx.source.id, ctx.registration.id, limit);
+      });
+
+    let result = await loadNext();
 
     while (waitSeconds > 0 && result.jobs.length === 0 && result.gate === null && Date.now() < deadline) {
       if (request.signal.aborted) break;
       await sleep(Math.min(WAIT_POLL_INTERVAL_MS, Math.max(0, deadline - Date.now())));
-      result = await storage.withTransaction((tx) =>
-        tx.jobs.listNextForAgent(ctx.source.id, ctx.registration.id, limit)
-      );
+      result = await loadNext();
     }
 
     const { jobs, gate } = result;

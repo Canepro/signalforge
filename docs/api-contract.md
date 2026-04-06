@@ -277,7 +277,7 @@ Errors are JSON `{ "error": string, "code"?: string }` unless noted.
 
 ### Phase 6d: agent execution (source-bound Bearer)
 
-All routes below require `Authorization: Bearer <agent_token>` (from registrations). A small **lease reaper** runs on these requests: expired **claimed** leases → job **queued** again; expired **running** → terminal **`expired`** (not requeued).
+All routes below require `Authorization: Bearer <agent_token>` (from registrations). The agent poll/heartbeat control-plane routes (`GET /api/agent/jobs/next`, `POST /api/agent/heartbeat`) run a small **lease reaper** first: expired **claimed** leases → job **queued** again; expired **running** → terminal **`expired`** (not requeued).
 
 **`POST /api/agent/heartbeat`** — JSON: `capabilities`, `attributes`, `agent_version`, optional `active_job_id`, optional `instance_id`. Updates registration caps, merges source `attributes`, sets source `last_seen_at` and `health_status=online`. **When `active_job_id` is set:** `instance_id` is **required** and must equal the job’s `lease_owner_instance_id`; job must be **claimed** or **running**, leased to this registration, lease not expired — otherwise **400** / **403** / **409** with explicit `code` (`instance_id_required`, `instance_mismatch`, `lease_expired`, etc.). Lease extension uses this **request** `instance_id` (not registration state alone). **401** if token invalid.
 

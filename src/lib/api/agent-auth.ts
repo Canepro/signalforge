@@ -31,10 +31,7 @@ export async function resolveAgentRequest(
   }
 
   const storage = await getStorage();
-  const resolved = await storage.withTransaction(async (tx) => {
-    await tx.jobs.reapExpiredLeases();
-    return tx.agents.resolveRequestContextByTokenHash(hashAgentToken(token));
-  });
+  const resolved = await storage.agents.resolveRequestContextByTokenHash(hashAgentToken(token));
   if (!resolved) {
     return {
       ok: false,
