@@ -486,6 +486,13 @@ class SqliteAgentsStore implements AgentsStore {
       }),
     };
   }
+
+  async applyHeartbeatAfterLeaseReap(
+    input: Parameters<AgentsStore["applyHeartbeatAfterLeaseReap"]>[0]
+  ): ReturnType<AgentsStore["applyHeartbeatAfterLeaseReap"]> {
+    reapExpiredCollectionJobLeases(this.db);
+    return this.applyHeartbeat(input);
+  }
 }
 
 class SqliteStorage implements Storage {

@@ -292,6 +292,33 @@ export interface AgentsStore {
           | "lease_expired";
       }
   >;
+  /**
+   * Agent heartbeat command boundary:
+   * reap expired leases and apply heartbeat in one storage call.
+   */
+  applyHeartbeatAfterLeaseReap(input: {
+    sourceId: string;
+    registrationId: string;
+    capabilities: string[];
+    attributes: Record<string, unknown>;
+    agentVersion: string;
+    activeJobId: string | null;
+    instanceId: string | null;
+  }): Promise<
+    | { ok: true; result: ApplyAgentHeartbeatResult }
+    | {
+        ok: false;
+        code:
+          | "source_not_found"
+          | "registration_not_found"
+          | "active_job_not_found"
+          | "forbidden"
+          | "invalid_active_job_state"
+          | "invalid_state"
+          | "instance_mismatch"
+          | "lease_expired";
+      }
+  >;
 }
 
 export interface StorageTx {

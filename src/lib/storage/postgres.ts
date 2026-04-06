@@ -1342,6 +1342,13 @@ class PostgresAgentsStore implements AgentsStore {
       },
     };
   }
+
+  async applyHeartbeatAfterLeaseReap(
+    input: Parameters<AgentsStore["applyHeartbeatAfterLeaseReap"]>[0]
+  ): ReturnType<AgentsStore["applyHeartbeatAfterLeaseReap"]> {
+    await new PostgresJobsStore(this.q).reapExpiredLeases();
+    return this.applyHeartbeat(input);
+  }
 }
 
 let pool: Pool | null = null;
