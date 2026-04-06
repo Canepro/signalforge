@@ -12,6 +12,18 @@ export type RunEvidenceSection = {
   }>;
 };
 
+export type RunEvidenceFamily =
+  | "container-diagnostics"
+  | "kubernetes-bundle"
+  | "linux-audit-log"
+  | "unknown";
+
+export interface RunEvidenceSummary {
+  family: RunEvidenceFamily;
+  sections: RunEvidenceSection[];
+  has_sections: boolean;
+}
+
 function parseFindingEvidenceJson(finding: Finding): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(finding.evidence) as unknown;
@@ -577,15 +589,33 @@ function buildKubernetesEvidence(findings: Finding[]): RunEvidenceSection[] {
   return sections;
 }
 
+function resolveEvidenceFamily(artifactType: string): RunEvidenceFamily {
+  if (artifactType === "container-diagnostics") return "container-diagnostics";
+  if (artifactType === "kubernetes-bundle") return "kubernetes-bundle";
+  if (artifactType === "linux-audit-log") return "linux-audit-log";
+  return "unknown";
+}
+
+export function buildRunEvidenceSummary(
+  artifactType: string,
+  findings: Finding[]
+): RunEvidenceSummary {
+  const family = resolveEvidenceFamily(artifactType);
+  const sections =
+    family === "container-diagnostics" ? buildContainerEvidence(findings)
+    : family === "kubernetes-bundle" ? buildKubernetesEvidence(findings)
+    : [];
+
+  return {
+    family,
+    sections,
+    has_sections: sections.length > 0,
+  };
+}
+
 export function buildRunEvidenceSections(
   artifactType: string,
   findings: Finding[]
 ): RunEvidenceSection[] {
-  if (artifactType === "container-diagnostics") {
-    return buildContainerEvidence(findings);
-  }
-  if (artifactType === "kubernetes-bundle") {
-    return buildKubernetesEvidence(findings);
-  }
-  return [];
+  return buildRunEvidenceSummary(artifactType, findings).sections;
 }

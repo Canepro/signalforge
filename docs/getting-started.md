@@ -32,9 +32,15 @@ That currently means Linux and WSL audit logs generated in the `signalforge-coll
 
 You need:
 
-- Bun installed
+- Bun installed (>= 1.3.11)
 - a local checkout of this repo
 - optionally, OpenAI or Azure OpenAI credentials for richer summaries
+
+Optional quick check from the repo root:
+
+```bash
+node scripts/check-bun-runtime.mjs
+```
 
 SignalForge still works without LLM credentials.
 If the provider is unavailable, it uses a deterministic fallback report.

@@ -10,7 +10,6 @@ import {
 import { buildRunDetail, toRunDetailJson } from "@/lib/api/run-detail-json";
 import {
   contentHash,
-  deriveSeverityCounts,
   parseEnvironmentHostname,
   submissionMetaFromRun,
   type RunRow,
@@ -31,6 +30,13 @@ import type {
   Storage,
   StorageTx,
 } from "./contract";
+import {
+  mapRunSummaryRow,
+  parseFindingsFromReportJson,
+  runAttentionScore,
+  toRunSubmissionMeta,
+  validateAgentSubmissionState,
+} from "./shared/run-shared";
 import {
   generateAgentToken,
   hashAgentToken,
@@ -311,8 +317,8 @@ async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string):
     `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON a.id = r.artifact_id
-     WHERE r.id != $1 AND r.created_at < $2 AND a.artifact_type = $3
-     ORDER BY r.created_at DESC`,
+     WHERE r.id != $1 AND r.created_at <= $2 AND a.artifact_type = $3
+     ORDER BY r.created_at DESC, r.id DESC`,
     [currentRunId, current.created_at, current.artifact_type]
   );
 
@@ -447,29 +453,43 @@ class PostgresRunsStore implements RunsStore {
        JOIN artifacts a ON a.id = r.artifact_id
        ORDER BY r.created_at DESC`
     );
-    return rows.map((row) => {
-      const hostname = parseEnvironmentHostname(row.environment_json);
-      const env = parseJson<Record<string, boolean>>(row.environment_json, {});
-      const env_tags: string[] = [];
-      if (env.is_wsl) env_tags.push("WSL");
-      if (env.is_container) env_tags.push("Container");
-      if (env.is_virtual_machine) env_tags.push("VM");
-      if (!env.is_wsl && !env.is_container && !env.is_virtual_machine && row.environment_json) env_tags.push("Linux");
-      return {
-        id: row.id,
-        artifact_id: row.artifact_id,
-        filename: row.filename,
-        artifact_type: row.artifact_type,
-        source_type: row.source_type,
-        created_at: row.created_at,
-        status: row.status,
-        severity_counts: deriveSeverityCounts(row.report_json),
-        hostname,
-        env_tags,
-        target_identifier: row.target_identifier,
-        collector_type: row.collector_type,
-      };
-    });
+    return rows.map(mapRunSummaryRow);
+  }
+
+  async listDashboardSignalRuns(limit: number) {
+    const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
+    const rows = await many<{
+      id: string;
+      artifact_id: string;
+      filename: string;
+      artifact_type: string;
+      source_type: string;
+      created_at: string;
+      status: string;
+      report_json: string | null;
+      environment_json: string | null;
+      target_identifier: string | null;
+      collector_type: string | null;
+    }>(
+      this.q,
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON a.id = r.artifact_id
+       ORDER BY r.created_at DESC`
+    );
+
+    const out: Awaited<ReturnType<RunsStore["listDashboardSignalRuns"]>> = [];
+    for (const row of rows) {
+      if (out.length >= cappedLimit) break;
+      const run = mapRunSummaryRow(row);
+      if (runAttentionScore(run) <= 0) continue;
+      const findings = parseFindingsFromReportJson(row.report_json);
+      if (findings.length === 0) continue;
+      out.push({ run, findings });
+    }
+    return out;
   }
 
   async countSuppressedNoise() {
@@ -578,11 +598,11 @@ class PostgresRunsStore implements RunsStore {
       this.q,
       artifact.id,
       input.analysis,
-      {
-        ...input.ingestion,
+      toRunSubmissionMeta({
         filename: input.filename,
-        source_type: input.sourceType,
-      },
+        sourceType: input.sourceType,
+        ingestion: input.ingestion,
+      }),
       input.parentRunId
     );
     return {
@@ -604,6 +624,35 @@ class PostgresSourcesStore implements SourcesStore {
       : "";
     const rows = await many<PgSourceRow>(this.q, `SELECT * FROM sources ${where} ORDER BY created_at DESC`);
     return rows.map(sourceToView);
+  }
+
+  async listDashboardCollectionSourceStates(opts?: { enabled?: boolean }) {
+    const where =
+      opts?.enabled === true ? "WHERE s.enabled = TRUE"
+      : opts?.enabled === false ? "WHERE s.enabled = FALSE"
+      : "";
+
+    const rows = await many<
+      PgSourceRow & {
+        has_registration: boolean;
+      }
+    >(
+      this.q,
+      `SELECT s.*,
+              EXISTS(
+                SELECT 1
+                FROM agent_registrations ar
+                WHERE ar.source_id = s.id
+              ) AS has_registration
+       FROM sources s
+       ${where}
+       ORDER BY s.created_at DESC`
+    );
+
+    return rows.map((row) => ({
+      source: sourceToView(row),
+      hasRegistration: Boolean(row.has_registration),
+    }));
   }
 
   async getById(id: string) {
@@ -1075,19 +1124,14 @@ class PostgresJobsStore implements JobsStore {
   async submitArtifactForAgent(input: Parameters<JobsStore["submitArtifactForAgent"]>[0]): ReturnType<JobsStore["submitArtifactForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.jobId]);
     if (!job) return { ok: false as const, code: "not_found" };
-    if (job.source_id !== input.sourceId) return { ok: false as const, code: "wrong_source" };
-    if (job.artifact_type !== input.artifactType) {
-      return { ok: false as const, code: "artifact_type_mismatch" };
-    }
-    if (job.status === "submitted" && job.result_run_id && job.result_artifact_id) {
-      return { ok: false as const, code: "job_already_submitted", run_id: job.result_run_id, artifact_id: job.result_artifact_id };
-    }
-    if (job.status !== "running" || job.lease_owner_id !== input.registrationId || !job.lease_owner_instance_id) {
-      return { ok: false as const, code: "invalid_state" };
-    }
-    if (job.lease_owner_instance_id !== input.instanceId) return { ok: false as const, code: "instance_mismatch" };
+    const validation = validateAgentSubmissionState(job, {
+      sourceId: input.sourceId,
+      registrationId: input.registrationId,
+      instanceId: input.instanceId,
+      artifactType: input.artifactType,
+    });
+    if (!validation.ok) return validation;
     const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) return { ok: false as const, code: "lease_expired" };
     const artifact = await insertArtifactPg(this.q, {
       artifact_type: input.artifactType,
       source_type: input.sourceType,
@@ -1098,7 +1142,11 @@ class PostgresJobsStore implements JobsStore {
       this.q,
       artifact.id,
       input.analysis,
-      { ...input.ingestion, filename: input.filename, source_type: input.sourceType }
+      toRunSubmissionMeta({
+        filename: input.filename,
+        sourceType: input.sourceType,
+        ingestion: input.ingestion,
+      })
     );
     const res = await this.q.query(
       `UPDATE collection_jobs SET

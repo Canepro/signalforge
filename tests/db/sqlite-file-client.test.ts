@@ -46,11 +46,22 @@ describe("sqlite file client", () => {
       console.log(JSON.stringify(rows[0]?.values ?? []));
     `;
 
-    const output = execFileSync("bun", ["-e", script], {
-      cwd: process.cwd(),
-      env: { ...process.env, DATABASE_PATH: dbPath },
-      encoding: "utf-8",
-    }).trim();
+    let output: string;
+    try {
+      output = execFileSync("bun", ["-e", script], {
+        cwd: process.cwd(),
+        env: { ...process.env, DATABASE_PATH: dbPath },
+        encoding: "utf-8",
+      }).trim();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (code === "ENOENT") {
+        throw new Error(
+          "This test shells out to Bun (`bun -e ...`) and requires Bun on PATH. Install Bun >= 1.3.11 (https://bun.sh/docs/installation) and rerun."
+        );
+      }
+      throw error;
+    }
 
     expect(JSON.parse(output)).toEqual([["first"], ["second"]]);
   });

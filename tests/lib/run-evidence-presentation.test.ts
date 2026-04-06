@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Finding, Severity } from "@/lib/analyzer/schema";
-import { buildRunEvidenceSections } from "@/lib/run-evidence-presentation";
+import {
+  buildRunEvidenceSections,
+  buildRunEvidenceSummary,
+} from "@/lib/run-evidence-presentation";
 
 function mkFinding(
   id: string,
@@ -21,6 +24,18 @@ function mkFinding(
 }
 
 describe("run-evidence-presentation", () => {
+  it("exposes a normalized evidence-summary boundary for each artifact family", () => {
+    const containerSummary = buildRunEvidenceSummary("container-diagnostics", []);
+    const kubeSummary = buildRunEvidenceSummary("kubernetes-bundle", []);
+    const linuxSummary = buildRunEvidenceSummary("linux-audit-log", []);
+    const unknownSummary = buildRunEvidenceSummary("custom-artifact", []);
+
+    expect(containerSummary).toMatchObject({ family: "container-diagnostics", has_sections: false });
+    expect(kubeSummary).toMatchObject({ family: "kubernetes-bundle", has_sections: false });
+    expect(linuxSummary).toMatchObject({ family: "linux-audit-log", has_sections: false });
+    expect(unknownSummary).toMatchObject({ family: "unknown", has_sections: false });
+  });
+
   it("builds container runtime-health evidence from persisted findings", () => {
     const sections = buildRunEvidenceSections("container-diagnostics", [
       mkFinding("1", "Container runtime state is restarting", "high", {

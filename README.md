@@ -112,6 +112,14 @@ For Sources and job-driven collection, keep this split explicit:
 
 ## 5-Minute First Run
 
+SignalForge is Bun-first. CI and Docker are pinned to **Bun 1.3.11**, and local development should use the same baseline.
+
+Quick runtime check:
+
+```bash
+node scripts/check-bun-runtime.mjs
+```
+
 Install dependencies:
 
 ```bash

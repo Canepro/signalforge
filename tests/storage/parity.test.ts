@@ -276,6 +276,19 @@ function fakeAnalysis(): import("@/lib/analyzer/schema").AnalysisResult {
   };
 }
 
+function fakeAnalysisWithoutFindings(): import("@/lib/analyzer/schema").AnalysisResult {
+  const base = fakeAnalysis();
+  if (!base.report) return base;
+  return {
+    ...base,
+    report: {
+      ...base.report,
+      findings: [],
+      top_actions_now: [],
+    },
+  };
+}
+
 function containerArtifact(fields: Record<string, string>): string {
   const orderedKeys = [
     "hostname",
@@ -380,6 +393,101 @@ for (const backend of backends) {
       expect(run!.severity_counts).toHaveProperty("medium");
     });
 
+    it("listDashboardSignalRuns returns read-optimized attention runs", async () => {
+      const actionable = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-actionable.log",
+          content: "dashboard-actionable-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-actionable",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-quiet.log",
+          content: "dashboard-quiet-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-actionable",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysisWithoutFindings(),
+        })
+      );
+
+      const rows = await storage.runs.listDashboardSignalRuns(50);
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      expect(rows.length).toBeLessThanOrEqual(50);
+      expect(rows.some((row) => row.run.id === actionable.run_id)).toBe(true);
+      for (const row of rows) {
+        const score =
+          (row.run.severity_counts.critical ?? 0) * 1000 +
+          (row.run.severity_counts.high ?? 0) * 100 +
+          (row.run.severity_counts.medium ?? 0) * 10 +
+          (row.run.severity_counts.low ?? 0);
+        expect(score).toBeGreaterThan(0);
+        expect(row.findings.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("listDashboardSignalRuns still returns older actionable runs after many newer quiet runs", async () => {
+      const actionable = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "sparse-actionable.log",
+          content: "sparse-actionable-content",
+          ingestion: {
+            target_identifier: "parity-sparse-signal",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      await storage.withTransaction(async (tx) => {
+        for (let idx = 0; idx < 130; idx++) {
+          await tx.runs.persistAnalyzedRun({
+            artifactType: "linux-audit-log",
+            sourceType: "api",
+            filename: `sparse-quiet-${idx}.log`,
+            content: `sparse-quiet-content-${idx}`,
+            ingestion: {
+              target_identifier: "parity-sparse-signal",
+              source_label: null,
+              collector_type: null,
+              collector_version: null,
+              collected_at: null,
+            },
+            analysis: fakeAnalysisWithoutFindings(),
+          });
+        }
+      });
+
+      const rows = await storage.runs.listDashboardSignalRuns(1);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.run.id).toBe(actionable.run_id);
+      expect(rows[0]!.findings.length).toBeGreaterThan(0);
+    });
+
     it("getApiDetail returns run detail with report", async () => {
       const runs = await storage.runs.listSummaries();
       const detail = await storage.runs.getApiDetail(runs[0]!.id);
@@ -390,7 +498,15 @@ for (const backend of backends) {
 
     it("getReport returns parsed report", async () => {
       const runs = await storage.runs.listSummaries();
-      const report = await storage.runs.getReport(runs[0]!.id);
+      const runWithFindings =
+        runs.find((run) =>
+          (run.severity_counts.critical ?? 0) +
+            (run.severity_counts.high ?? 0) +
+            (run.severity_counts.medium ?? 0) +
+            (run.severity_counts.low ?? 0) >
+          0
+        ) ?? runs[0]!;
+      const report = await storage.runs.getReport(runWithFindings.id);
       expect(report).not.toBeNull();
       expect((report as { findings: unknown[] }).findings.length).toBeGreaterThan(0);
     });
@@ -1930,6 +2046,49 @@ for (const backend of backends) {
 
       const list = await storage.sources.list();
       expect(list.some((s) => s.id === src.id)).toBe(true);
+    });
+
+    it("listDashboardCollectionSourceStates returns source registration state in one read model query", async () => {
+      const registered = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Dashboard Registered Host",
+          target_identifier: "parity-dashboard-registered",
+          source_type: "linux_host",
+        })
+      );
+      const unregistered = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Dashboard Unregistered Host",
+          target_identifier: "parity-dashboard-unregistered",
+          source_type: "linux_host",
+        })
+      );
+      const disabledRegistered = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Dashboard Disabled Registered Host",
+          target_identifier: "parity-dashboard-disabled-registered",
+          source_type: "linux_host",
+          enabled: false,
+        })
+      );
+
+      await storage.withTransaction((tx) => tx.agents.createRegistration(registered.id, "dashboard-agent"));
+      await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(disabledRegistered.id, "dashboard-disabled-agent")
+      );
+
+      const enabledStates = await storage.sources.listDashboardCollectionSourceStates({ enabled: true });
+      const registeredEnabled = enabledStates.find((entry) => entry.source.id === registered.id);
+      const unregisteredEnabled = enabledStates.find((entry) => entry.source.id === unregistered.id);
+      const disabledEnabled = enabledStates.find((entry) => entry.source.id === disabledRegistered.id);
+
+      expect(registeredEnabled?.hasRegistration).toBe(true);
+      expect(unregisteredEnabled?.hasRegistration).toBe(false);
+      expect(disabledEnabled).toBeUndefined();
+
+      const disabledStates = await storage.sources.listDashboardCollectionSourceStates({ enabled: false });
+      const disabledEntry = disabledStates.find((entry) => entry.source.id === disabledRegistered.id);
+      expect(disabledEntry?.hasRegistration).toBe(true);
     });
 
     it("duplicate target_identifier throws", async () => {
