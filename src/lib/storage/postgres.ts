@@ -46,6 +46,14 @@ import {
 } from "./shared/agent-lifecycle-shared";
 import { projectCollectionJobLeaseReadModel } from "./shared/job-read-model";
 import {
+  buildClaimLease,
+  buildStartLeaseExpiryIso,
+  normalizeAgentFailureInput,
+  validateClaimCommand,
+  validateFailCommand,
+  validateStartCommand,
+} from "./shared/job-command-shared";
+import {
   generateAgentToken,
   hashAgentToken,
   type AgentRegistrationCreated,
@@ -1036,12 +1044,9 @@ class PostgresJobsStore implements JobsStore {
   ): ReturnType<JobsStore["claimForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (!job) return { ok: false as const, code: "not_found" };
-    if (job.source_id !== sourceId) return { ok: false as const, code: "wrong_source" };
-    if (job.status !== "queued") return { ok: false as const, code: "not_queued" };
-    const ttl = Math.min(300, Math.max(60, Math.floor(leaseTtlSeconds)));
-    const now = new Date();
-    const nowIso = now.toISOString();
-    const expires = new Date(now.getTime() + ttl * 1000).toISOString();
+    const claimValidation = validateClaimCommand(job, { sourceId });
+    if (!claimValidation.ok) return { ok: false as const, code: claimValidation.code };
+    const { claimedAt, leaseExpiresAt } = buildClaimLease(leaseTtlSeconds);
     const res = await this.q.query(
       `UPDATE collection_jobs SET
         status = 'claimed',
@@ -1052,7 +1057,7 @@ class PostgresJobsStore implements JobsStore {
         updated_at = $5,
         last_heartbeat_at = NULL
        WHERE id = $6 AND source_id = $7 AND status = 'queued'`,
-      [registrationId, instanceId, expires, nowIso, nowIso, jobId, sourceId]
+      [registrationId, instanceId, leaseExpiresAt, claimedAt, claimedAt, jobId, sourceId]
     );
     const claimed = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (res.rowCount === 0 || !claimed || claimed.lease_owner_instance_id !== instanceId) {
@@ -1060,7 +1065,7 @@ class PostgresJobsStore implements JobsStore {
     }
     await this.q.query("UPDATE agent_registrations SET last_instance_id = $1 WHERE id = $2", [instanceId, registrationId]);
     emitDomainEvent("collection_job.claimed", {
-      job_id: jobId, lease_owner_id: registrationId, lease_expires_at: expires, occurred_at: nowIso,
+      job_id: jobId, lease_owner_id: registrationId, lease_expires_at: leaseExpiresAt, occurred_at: claimedAt,
     });
     return { ok: true as const, row: jobToView(claimed) };
   }
@@ -1073,13 +1078,18 @@ class PostgresJobsStore implements JobsStore {
   ): ReturnType<JobsStore["startForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (!job || job.source_id !== sourceId) return { ok: false as const, code: "wrong_job" };
-    if (job.status !== "claimed") return { ok: false as const, code: "not_claimed" };
-    if (job.lease_owner_id !== registrationId || job.lease_owner_instance_id !== instanceId) {
-      return { ok: false as const, code: "wrong_lease" };
-    }
     const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) return { ok: false as const, code: "lease_expired" };
-    const expires = new Date(Date.now() + 300_000).toISOString();
+    const startValidation = validateStartCommand(
+      job,
+      {
+        sourceId,
+        registrationId,
+        instanceId,
+      },
+      nowIso
+    );
+    if (!startValidation.ok) return { ok: false as const, code: startValidation.code };
+    const expires = buildStartLeaseExpiryIso(nowIso);
     const res = await this.q.query(
       `UPDATE collection_jobs SET
         status = 'running',
@@ -1107,12 +1117,21 @@ class PostgresJobsStore implements JobsStore {
   ): ReturnType<JobsStore["failForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (!job || job.source_id !== sourceId) return { ok: false as const, code: "wrong_job" };
-    if (job.status !== "claimed" && job.status !== "running") return { ok: false as const, code: "bad_state" };
-    if (job.lease_owner_id !== registrationId || job.lease_owner_instance_id !== instanceId) return { ok: false as const, code: "wrong_lease" };
     const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) return { ok: false as const, code: "lease_expired" };
-    const code = errorCode.trim().slice(0, 128) || "agent_failed";
-    const msg = errorMessage.trim().slice(0, 2048) || "failed";
+    const failValidation = validateFailCommand(
+      job,
+      {
+        sourceId,
+        registrationId,
+        instanceId,
+      },
+      nowIso
+    );
+    if (!failValidation.ok) return { ok: false as const, code: failValidation.code };
+    const { errorCode: code, errorMessage: msg } = normalizeAgentFailureInput(
+      errorCode,
+      errorMessage
+    );
     const res = await this.q.query(
       `UPDATE collection_jobs SET
         status = 'failed',

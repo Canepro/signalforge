@@ -20,6 +20,14 @@ import {
   mergeHeartbeatAttributesJson,
   normalizeHeartbeatAgentVersion,
 } from "../storage/shared/agent-lifecycle-shared";
+import {
+  buildClaimLease,
+  buildStartLeaseExpiryIso,
+  normalizeAgentFailureInput,
+  validateClaimCommand,
+  validateFailCommand,
+  validateStartCommand,
+} from "../storage/shared/job-command-shared";
 
 export type { SourceType } from "../source-catalog";
 export { collectCapabilityForArtifactType, defaultCapabilitiesForArtifactType } from "../source-catalog";
@@ -715,24 +723,19 @@ export function claimCollectionJobForAgent(
   agentRegistrationId: string,
   instanceId: string,
   leaseTtlSeconds: number
-):
+): 
   | { ok: true; row: CollectionJobRow }
   | { ok: false; code: "not_found" | "not_queued" | "wrong_source" } {
   const job = getCollectionJobById(db, jobId);
   if (!job) {
     return { ok: false, code: "not_found" };
   }
-  if (job.source_id !== sourceId) {
-    return { ok: false, code: "wrong_source" };
-  }
-  if (job.status !== "queued") {
-    return { ok: false, code: "not_queued" };
+  const claimValidation = validateClaimCommand(job, { sourceId });
+  if (!claimValidation.ok) {
+    return claimValidation;
   }
 
-  const ttl = Math.min(300, Math.max(60, Math.floor(leaseTtlSeconds)));
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const expires = new Date(now.getTime() + ttl * 1000).toISOString();
+  const { claimedAt, leaseExpiresAt } = buildClaimLease(leaseTtlSeconds);
 
   db.run(
     `UPDATE collection_jobs SET
@@ -744,7 +747,7 @@ export function claimCollectionJobForAgent(
       updated_at = ?,
       last_heartbeat_at = NULL
     WHERE id = ? AND source_id = ? AND status = 'queued'`,
-    [agentRegistrationId, instanceId, expires, nowIso, nowIso, jobId, sourceId]
+    [agentRegistrationId, instanceId, leaseExpiresAt, claimedAt, claimedAt, jobId, sourceId]
   );
 
   const claimed = getCollectionJobById(db, jobId);
@@ -766,8 +769,8 @@ export function claimCollectionJobForAgent(
   emitDomainEvent("collection_job.claimed", {
     job_id: jobId,
     lease_owner_id: agentRegistrationId,
-    lease_expires_at: expires,
-    occurred_at: nowIso,
+    lease_expires_at: leaseExpiresAt,
+    occurred_at: claimedAt,
   });
   return { ok: true, row };
 }
@@ -783,16 +786,21 @@ export function startCollectionJobForAgent(
   | { ok: false; code: "wrong_job" | "not_claimed" | "lease_expired" | "wrong_lease" } {
   const job = getCollectionJobById(db, jobId);
   if (!job || job.source_id !== sourceId) return { ok: false, code: "wrong_job" };
-  if (job.status !== "claimed") return { ok: false, code: "not_claimed" };
-  if (job.lease_owner_id !== agentRegistrationId || job.lease_owner_instance_id !== instanceId) {
-    return { ok: false, code: "wrong_lease" };
-  }
   const nowIso = new Date().toISOString();
-  if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-    return { ok: false, code: "lease_expired" };
+  const startValidation = validateStartCommand(
+    job,
+    {
+      sourceId,
+      registrationId: agentRegistrationId,
+      instanceId,
+    },
+    nowIso
+  );
+  if (!startValidation.ok) {
+    return startValidation;
   }
 
-  const expires = new Date(Date.now() + 300_000).toISOString();
+  const expires = buildStartLeaseExpiryIso(nowIso);
   db.run(
     `UPDATE collection_jobs SET
       status = 'running',
@@ -826,19 +834,24 @@ export function failCollectionJobForAgent(
   | { ok: false; code: "wrong_job" | "bad_state" | "lease_expired" | "wrong_lease" } {
   const job = getCollectionJobById(db, jobId);
   if (!job || job.source_id !== sourceId) return { ok: false, code: "wrong_job" };
-  if (job.status !== "claimed" && job.status !== "running") {
-    return { ok: false, code: "bad_state" };
-  }
-  if (job.lease_owner_id !== agentRegistrationId || job.lease_owner_instance_id !== instanceId) {
-    return { ok: false, code: "wrong_lease" };
-  }
   const nowIso = new Date().toISOString();
-  if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-    return { ok: false, code: "lease_expired" };
+  const failValidation = validateFailCommand(
+    job,
+    {
+      sourceId,
+      registrationId: agentRegistrationId,
+      instanceId,
+    },
+    nowIso
+  );
+  if (!failValidation.ok) {
+    return failValidation;
   }
 
-  const code = errorCode.trim().slice(0, 128) || "agent_failed";
-  const msg = errorMessage.trim().slice(0, 2048) || "failed";
+  const { errorCode: code, errorMessage: msg } = normalizeAgentFailureInput(
+    errorCode,
+    errorMessage
+  );
 
   db.run(
     `UPDATE collection_jobs SET
