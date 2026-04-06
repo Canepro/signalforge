@@ -11,7 +11,7 @@
  *   DATABASE_URL_TEST=postgres://signalforge:signalforge@127.0.0.1:5432/signalforge bun test tests/storage/parity
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -276,6 +276,19 @@ function fakeAnalysis(): import("@/lib/analyzer/schema").AnalysisResult {
   };
 }
 
+function fakeAnalysisWithoutFindings(): import("@/lib/analyzer/schema").AnalysisResult {
+  const base = fakeAnalysis();
+  if (!base.report) return base;
+  return {
+    ...base,
+    report: {
+      ...base.report,
+      findings: [],
+      top_actions_now: [],
+    },
+  };
+}
+
 function containerArtifact(fields: Record<string, string>): string {
   const orderedKeys = [
     "hostname",
@@ -380,6 +393,155 @@ for (const backend of backends) {
       expect(run!.severity_counts).toHaveProperty("medium");
     });
 
+    it("dashboard run helpers return bounded recent runs plus a time window", async () => {
+      const older = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-window-older.log",
+          content: "dashboard-window-older-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-window",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      const newer = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-window-newer.log",
+          content: "dashboard-window-newer-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-window",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const recentRuns = await storage.runs.listDashboardRecentRuns(1);
+      expect(recentRuns).toHaveLength(1);
+      expect(recentRuns[0]!.id).toBe(newer.run_id);
+
+      const recentWindowRuns = await storage.runs.listDashboardWindowRuns(
+        new Date(Date.now() - 60_000).toISOString()
+      );
+      expect(recentWindowRuns.some((run) => run.id === older.run_id)).toBe(true);
+      expect(recentWindowRuns.some((run) => run.id === newer.run_id)).toBe(true);
+
+      const futureWindowRuns = await storage.runs.listDashboardWindowRuns(
+        new Date(Date.now() + 60_000).toISOString()
+      );
+      expect(futureWindowRuns).toEqual([]);
+
+      const totalRuns = await storage.runs.countRuns();
+      expect(totalRuns).toBeGreaterThanOrEqual(2);
+    });
+
+    it("listDashboardSignalRuns returns read-optimized attention runs", async () => {
+      const actionable = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-actionable.log",
+          content: "dashboard-actionable-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-actionable",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-quiet.log",
+          content: "dashboard-quiet-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-actionable",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysisWithoutFindings(),
+        })
+      );
+
+      const rows = await storage.runs.listDashboardSignalRuns(50);
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      expect(rows.length).toBeLessThanOrEqual(50);
+      expect(rows.some((row) => row.run.id === actionable.run_id)).toBe(true);
+      for (const row of rows) {
+        const score =
+          (row.run.severity_counts.critical ?? 0) * 1000 +
+          (row.run.severity_counts.high ?? 0) * 100 +
+          (row.run.severity_counts.medium ?? 0) * 10 +
+          (row.run.severity_counts.low ?? 0);
+        expect(score).toBeGreaterThan(0);
+        expect(row.findings.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("listDashboardSignalRuns still returns older actionable runs after many newer quiet runs", async () => {
+      const actionable = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "sparse-actionable.log",
+          content: "sparse-actionable-content",
+          ingestion: {
+            target_identifier: "parity-sparse-signal",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+
+      await storage.withTransaction(async (tx) => {
+        for (let idx = 0; idx < 130; idx++) {
+          await tx.runs.persistAnalyzedRun({
+            artifactType: "linux-audit-log",
+            sourceType: "api",
+            filename: `sparse-quiet-${idx}.log`,
+            content: `sparse-quiet-content-${idx}`,
+            ingestion: {
+              target_identifier: "parity-sparse-signal",
+              source_label: null,
+              collector_type: null,
+              collector_version: null,
+              collected_at: null,
+            },
+            analysis: fakeAnalysisWithoutFindings(),
+          });
+        }
+      });
+
+      const rows = await storage.runs.listDashboardSignalRuns(1);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.run.id).toBe(actionable.run_id);
+      expect(rows[0]!.findings.length).toBeGreaterThan(0);
+    });
+
     it("getApiDetail returns run detail with report", async () => {
       const runs = await storage.runs.listSummaries();
       const detail = await storage.runs.getApiDetail(runs[0]!.id);
@@ -390,7 +552,15 @@ for (const backend of backends) {
 
     it("getReport returns parsed report", async () => {
       const runs = await storage.runs.listSummaries();
-      const report = await storage.runs.getReport(runs[0]!.id);
+      const runWithFindings =
+        runs.find((run) =>
+          (run.severity_counts.critical ?? 0) +
+            (run.severity_counts.high ?? 0) +
+            (run.severity_counts.medium ?? 0) +
+            (run.severity_counts.low ?? 0) >
+          0
+        ) ?? runs[0]!;
+      const report = await storage.runs.getReport(runWithFindings.id);
       expect(report).not.toBeNull();
       expect((report as { findings: unknown[] }).findings.length).toBeGreaterThan(0);
     });
@@ -1932,6 +2102,49 @@ for (const backend of backends) {
       expect(list.some((s) => s.id === src.id)).toBe(true);
     });
 
+    it("listDashboardCollectionSourceStates returns source registration state in one read model query", async () => {
+      const registered = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Dashboard Registered Host",
+          target_identifier: "parity-dashboard-registered",
+          source_type: "linux_host",
+        })
+      );
+      const unregistered = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Dashboard Unregistered Host",
+          target_identifier: "parity-dashboard-unregistered",
+          source_type: "linux_host",
+        })
+      );
+      const disabledRegistered = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Dashboard Disabled Registered Host",
+          target_identifier: "parity-dashboard-disabled-registered",
+          source_type: "linux_host",
+          enabled: false,
+        })
+      );
+
+      await storage.withTransaction((tx) => tx.agents.createRegistration(registered.id, "dashboard-agent"));
+      await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(disabledRegistered.id, "dashboard-disabled-agent")
+      );
+
+      const enabledStates = await storage.sources.listDashboardCollectionSourceStates({ enabled: true });
+      const registeredEnabled = enabledStates.find((entry) => entry.source.id === registered.id);
+      const unregisteredEnabled = enabledStates.find((entry) => entry.source.id === unregistered.id);
+      const disabledEnabled = enabledStates.find((entry) => entry.source.id === disabledRegistered.id);
+
+      expect(registeredEnabled?.hasRegistration).toBe(true);
+      expect(unregisteredEnabled?.hasRegistration).toBe(false);
+      expect(disabledEnabled).toBeUndefined();
+
+      const disabledStates = await storage.sources.listDashboardCollectionSourceStates({ enabled: false });
+      const disabledEntry = disabledStates.find((entry) => entry.source.id === disabledRegistered.id);
+      expect(disabledEntry?.hasRegistration).toBe(true);
+    });
+
     it("duplicate target_identifier throws", async () => {
       await expect(
         storage.withTransaction((tx) =>
@@ -2033,6 +2246,50 @@ for (const backend of backends) {
       expect(await storage.jobs.getById(job.id)).not.toBeNull();
     });
 
+    it("delete source reaps expired claimed leases before active job gating", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T11:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Expired delete host",
+            target_identifier: `parity-expired-delete-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "expired delete gate" })
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "inst-expired-delete", 120)
+        );
+
+        vi.setSystemTime(new Date("2026-04-06T11:10:00.000Z"));
+
+        const deleted = await storage.withTransaction((tx) => tx.sources.delete(src.id));
+        expect(deleted).toEqual({ ok: true });
+        expect(await storage.sources.getById(src.id)).toBeNull();
+        expect(await storage.jobs.getById(job.id)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     // --- JOBS ---
 
     it("queue and list collection jobs", async () => {
@@ -2052,6 +2309,88 @@ for (const backend of backends) {
       const jobs = await storage.jobs.listForSource(src.id);
       expect(jobs.some((j) => j.id === row.id)).toBe(true);
       expect(jobs.find((j) => j.id === row.id)?.collection_scope ?? null).toBeNull();
+    });
+
+    it("listForSource applies status filter after lease projection", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T12:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Projected status host",
+            target_identifier: `parity-projected-status-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: registration } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id, "status-projection-agent")
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "projection filter test" })
+        );
+        const claimed = await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, registration.id, "status-projection-instance", 120)
+        );
+        expect(claimed.ok).toBe(true);
+
+        const initiallyClaimed = await storage.jobs.listForSource(src.id, { status: "claimed" });
+        expect(initiallyClaimed.some((entry) => entry.id === job.id)).toBe(true);
+
+        vi.setSystemTime(new Date("2026-04-06T12:10:00.000Z"));
+        const projectedQueued = await storage.jobs.listForSource(src.id, { status: "queued" });
+        expect(projectedQueued.some((entry) => entry.id === job.id)).toBe(true);
+
+        vi.setSystemTime(new Date("2026-04-06T12:01:00.000Z"));
+        const claimedAgain = await storage.jobs.listForSource(src.id, { status: "claimed" });
+        expect(claimedAgain.some((entry) => entry.id === job.id)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("getById projects expired running leases without mutating persisted job state", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T13:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Projected getById host",
+            target_identifier: `parity-projected-getbyid-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: registration } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id, "getbyid-projection-agent")
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "projection getById test" })
+        );
+
+        const claimed = await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, registration.id, "getbyid-projection-instance", 300)
+        );
+        expect(claimed.ok).toBe(true);
+        const started = await storage.withTransaction((tx) =>
+          tx.jobs.startForAgent(job.id, src.id, registration.id, "getbyid-projection-instance")
+        );
+        expect(started.ok).toBe(true);
+
+        const beforeExpiry = await storage.jobs.getById(job.id);
+        expect(beforeExpiry?.status).toBe("running");
+
+        vi.setSystemTime(new Date("2026-04-06T13:10:00.000Z"));
+        const projectedExpired = await storage.jobs.getById(job.id);
+        expect(projectedExpired?.status).toBe("expired");
+        expect(projectedExpired?.error_code).toBe("lease_lost");
+
+        vi.setSystemTime(new Date("2026-04-06T13:01:00.000Z"));
+        const runningAgain = await storage.jobs.getById(job.id);
+        expect(runningAgain?.status).toBe("running");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("queueForSource stores typed collection_scope on the job", async () => {
@@ -2132,6 +2471,55 @@ for (const backend of backends) {
       const job = jobs.find((j) => j.status === "queued")!;
       const cancelled = await storage.withTransaction((tx) => tx.jobs.cancel(job.id));
       expect(cancelled!.status).toBe("cancelled");
+    });
+
+    it("cancel reaps expired running leases before state validation", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T14:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Expired cancel host",
+            target_identifier: `parity-expired-cancel-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "expired cancel gate" })
+        );
+        const claimed = await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "inst-expired-cancel", 120)
+        );
+        expect(claimed.ok).toBe(true);
+        const started = await storage.withTransaction((tx) =>
+          tx.jobs.startForAgent(job.id, src.id, reg.id, "inst-expired-cancel")
+        );
+        expect(started.ok).toBe(true);
+
+        vi.setSystemTime(new Date("2026-04-06T14:10:00.000Z"));
+
+        await expect(
+          storage.withTransaction((tx) => tx.jobs.cancel(job.id))
+        ).rejects.toMatchObject({ code: "already_terminal" });
+        expect((await storage.jobs.getById(job.id))?.status).toBe("expired");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("queueForSource with disabled source throws", async () => {
@@ -2260,6 +2648,114 @@ for (const backend of backends) {
       );
       expect(failed.ok).toBe(true);
       if (failed.ok) expect(failed.row.status).toBe("failed");
+    });
+
+    it("listNextForAgentAfterLeaseReap requeues an expired claimed job in one storage boundary", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T15:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Poll reaper host",
+            target_identifier: `parity-poll-reaper-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "poll reaper test" })
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "poll-reaper-inst", 120)
+        );
+
+        vi.setSystemTime(new Date("2026-04-06T15:10:00.000Z"));
+
+        const polled = await storage.withTransaction((tx) =>
+          tx.jobs.listNextForAgentAfterLeaseReap(src.id, reg.id, 1)
+        );
+        expect(polled.jobs).toHaveLength(1);
+        expect(polled.jobs[0]?.id).toBe(job.id);
+        expect(polled.gate).toBeNull();
+
+        const queued = await storage.jobs.listForSource(src.id, { status: "queued" });
+        expect(queued.some((entry) => entry.id === job.id)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("applyHeartbeatAfterLeaseReap returns lease_expired for a reaped running active job", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T16:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Heartbeat reaper host",
+            target_identifier: `parity-heartbeat-reaper-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "heartbeat reaper test" })
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "hb-reaper-inst", 120)
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.startForAgent(job.id, src.id, reg.id, "hb-reaper-inst")
+        );
+
+        vi.setSystemTime(new Date("2026-04-06T16:10:00.000Z"));
+
+        const heartbeat = await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeatAfterLeaseReap({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: job.id,
+            instanceId: "hb-reaper-inst",
+          })
+        );
+        expect(heartbeat).toEqual({ ok: false, code: "lease_expired" });
+
+        const persisted = await storage.jobs.getById(job.id);
+        expect(persisted?.status).toBe("expired");
+        expect(persisted?.error_code).toBe("lease_lost");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("claim → start → submit artifact lifecycle", async () => {

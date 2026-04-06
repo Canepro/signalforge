@@ -1,4 +1,4 @@
-import type { AnalysisResult, AuditReport } from "@/lib/analyzer/schema";
+import type { AnalysisResult, AuditReport, Finding } from "@/lib/analyzer/schema";
 import type { CompareDriftError, CompareDriftPayload } from "@/lib/compare/build-compare";
 import type {
   ActiveJobLeaseHeartbeatResult,
@@ -42,8 +42,21 @@ export type ReanalyzeSourceResult =
     }
   | { ok: false; error: "run_not_found" | "artifact_not_found" };
 
+export interface DashboardSignalRun {
+  run: RunSummary;
+  findings: Finding[];
+}
+
 export interface RunsStore {
   listSummaries(): Promise<RunSummary[]>;
+  countRuns(): Promise<number>;
+  listDashboardRecentRuns(limit: number): Promise<RunSummary[]>;
+  listDashboardWindowRuns(sinceIso: string): Promise<RunSummary[]>;
+  /**
+   * Read-optimized query for dashboard operator lanes/highlights.
+   * Returns newest runs with actionable severity plus parsed findings.
+   */
+  listDashboardSignalRuns(limit: number): Promise<DashboardSignalRun[]>;
   countSuppressedNoise(): Promise<number>;
   getApiDetail(id: string): Promise<GetRunDetailResponse | null>;
   getPageDetail(id: string): Promise<RunDetail | null>;
@@ -73,6 +86,11 @@ export interface SourceView {
   health_status: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface DashboardCollectionSourceState {
+  source: SourceView;
+  hasRegistration: boolean;
 }
 
 export interface CollectionJobView {
@@ -141,6 +159,13 @@ export type DeleteSourceResult =
 
 export interface SourcesStore {
   list(opts?: { enabled?: boolean }): Promise<SourceView[]>;
+  /**
+   * Read-optimized source + registration shape for dashboard collection cards/pulse.
+   * Avoids N+1 registration lookups by returning one row per source with registration presence.
+   */
+  listDashboardCollectionSourceStates(
+    opts?: { enabled?: boolean }
+  ): Promise<DashboardCollectionSourceState[]>;
   getById(id: string): Promise<SourceView | null>;
   create(input: CreateSourceInput): Promise<SourceView>;
   update(id: string, patch: PatchSourceInput): Promise<SourceView | null>;
@@ -157,6 +182,15 @@ export interface JobsStore {
   cancel(id: string): Promise<CollectionJobView | null>;
   reapExpiredLeases(): Promise<number>;
   listNextForAgent(
+    sourceId: string,
+    registrationId: string,
+    limit: number
+  ): Promise<ListNextQueuedJobsResult>;
+  /**
+   * Agent poll read model boundary:
+   * applies lease reaping and then returns next eligible queued jobs in one storage call.
+   */
+  listNextForAgentAfterLeaseReap(
     sourceId: string,
     registrationId: string,
     limit: number
@@ -239,6 +273,33 @@ export interface AgentsStore {
   ): Promise<AgentRegistrationCreated>;
   rotateRegistration(sourceId: string): Promise<AgentRegistrationCreated>;
   applyHeartbeat(input: {
+    sourceId: string;
+    registrationId: string;
+    capabilities: string[];
+    attributes: Record<string, unknown>;
+    agentVersion: string;
+    activeJobId: string | null;
+    instanceId: string | null;
+  }): Promise<
+    | { ok: true; result: ApplyAgentHeartbeatResult }
+    | {
+        ok: false;
+        code:
+          | "source_not_found"
+          | "registration_not_found"
+          | "active_job_not_found"
+          | "forbidden"
+          | "invalid_active_job_state"
+          | "invalid_state"
+          | "instance_mismatch"
+          | "lease_expired";
+      }
+  >;
+  /**
+   * Agent heartbeat command boundary:
+   * reap expired leases and apply heartbeat in one storage call.
+   */
+  applyHeartbeatAfterLeaseReap(input: {
     sourceId: string;
     registrationId: string;
     capabilities: string[];

@@ -441,6 +441,45 @@ describe("repository", () => {
       expect(prev!.id).toBe(older.id);
     });
 
+    it("matches a same-target baseline when created_at timestamps tie", async () => {
+      const contentA = "=== server-audit-kit ===\nhostname: host-a\n=== uname -a ===\nLinux a 5.0 x86_64\n";
+      const contentB = "=== server-audit-kit ===\nhostname: host-b\n=== uname -a ===\nLinux b 5.0 x86_64\n";
+
+      const artA = insertArtifact(db, {
+        artifact_type: "linux-audit-log",
+        source_type: "api",
+        filename: "tie-a.log",
+        content: contentA,
+      });
+      const artB = insertArtifact(db, {
+        artifact_type: "linux-audit-log",
+        source_type: "api",
+        filename: "tie-b.log",
+        content: contentB,
+      });
+
+      const resA = await analyzeArtifact(contentA);
+      const resB = await analyzeArtifact(contentB);
+      const older = insertRun(db, artA.id, resA, {
+        filename: "tie-a.log",
+        source_type: "api",
+        target_identifier: "fleet:tie",
+      });
+      const newer = insertRun(db, artB.id, resB, {
+        filename: "tie-b.log",
+        source_type: "api",
+        target_identifier: "fleet:tie",
+      });
+
+      const sameTimestamp = "2020-03-01T00:00:00.000Z";
+      db.run("UPDATE runs SET created_at = ? WHERE id = ?", [sameTimestamp, older.id]);
+      db.run("UPDATE runs SET created_at = ? WHERE id = ?", [sameTimestamp, newer.id]);
+
+      const prev = findPreviousRunForSameTarget(db, newer.id);
+      expect(prev).not.toBeNull();
+      expect(prev!.id).toBe(older.id);
+    });
+
     it("does not match same hostname when target_identifier differs", async () => {
       const content = readFileSync(join(FIXTURES, "sample-prod-server.log"), "utf-8");
       const artifact = insertArtifact(db, {

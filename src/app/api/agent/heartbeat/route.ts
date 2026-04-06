@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   try {
     const storage = await getStorage();
     const heartbeat = await storage.withTransaction((tx) =>
-      tx.agents.applyHeartbeat({
+      tx.agents.applyHeartbeatAfterLeaseReap({
         sourceId: ctx.source.id,
         registrationId: ctx.registration.id,
         capabilities,

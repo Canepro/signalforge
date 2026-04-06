@@ -14,7 +14,7 @@ export async function GET(
   try {
     const { id } = await params;
     const storage = await getStorage();
-    const row = await storage.sources.getById(id);
+    const row = await storage.withTransaction((tx) => tx.sources.getById(id));
     if (!row) {
       return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
     }

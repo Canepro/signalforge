@@ -14,6 +14,20 @@ import {
   defaultCapabilitiesForArtifactType,
   type SourceType,
 } from "../source-catalog";
+import {
+  buildHeartbeatLeaseExpiryIso,
+  buildListNextQueuedJobsResult,
+  mergeHeartbeatAttributesJson,
+  normalizeHeartbeatAgentVersion,
+} from "../storage/shared/agent-lifecycle-shared";
+import {
+  buildClaimLease,
+  buildStartLeaseExpiryIso,
+  normalizeAgentFailureInput,
+  validateClaimCommand,
+  validateFailCommand,
+  validateStartCommand,
+} from "../storage/shared/job-command-shared";
 
 export type { SourceType } from "../source-catalog";
 export { collectCapabilityForArtifactType, defaultCapabilitiesForArtifactType } from "../source-catalog";
@@ -306,6 +320,7 @@ export function deleteSource(db: Database, id: string): DeleteSourceResult {
   const row = getSourceById(db, id);
   if (!row) return { ok: false, code: "not_found" };
 
+  reapExpiredCollectionJobLeases(db);
   const blockingJob = getOne<{ id: string }>(
     db,
     `SELECT id FROM collection_jobs
@@ -441,6 +456,7 @@ export function getCollectionJobById(db: Database, id: string): CollectionJobRow
 }
 
 export function cancelCollectionJob(db: Database, jobId: string): CollectionJobRow | null {
+  reapExpiredCollectionJobLeases(db);
   const job = getCollectionJobById(db, jobId);
   if (!job) return null;
   if (job.status === "running") {
@@ -526,16 +542,6 @@ export interface ListNextQueuedJobsResult {
   gate: JobsNextGate | null;
 }
 
-function jobPassesCapabilityGate(
-  job: CollectionJobRow,
-  agentCaps: string[],
-  sourceCaps: string[]
-): boolean {
-  const required = collectCapabilityForArtifactType(job.artifact_type);
-  const inter = agentCaps.filter((c) => sourceCaps.includes(c));
-  return inter.includes(required);
-}
-
 /**
  * Phase 6d jobs/next — FIFO queued jobs for this source (strict gating).
  *
@@ -550,19 +556,6 @@ export function listNextQueuedJobSummariesForSource(
   registration: AgentRegistrationRow,
   limit: number
 ): ListNextQueuedJobsResult {
-  if (!source.enabled) {
-    return { jobs: [], gate: "source_disabled" };
-  }
-
-  if (!registration.last_heartbeat_at) {
-    return { jobs: [], gate: "heartbeat_required" };
-  }
-
-  const agentCaps = parseJsonArray(registration.last_capabilities_json ?? "[]");
-  if (agentCaps.length === 0) {
-    return { jobs: [], gate: "capabilities_empty" };
-  }
-
   const rows = allRows<CollectionJobRow>(
     db,
     `SELECT * FROM collection_jobs
@@ -571,12 +564,12 @@ export function listNextQueuedJobSummariesForSource(
     [source.id]
   );
 
-  const sourceCaps = parseJsonArray(source.capabilities_json);
-
-  const out: CollectionJobSummary[] = [];
-  for (const job of rows) {
-    if (!jobPassesCapabilityGate(job, agentCaps, sourceCaps)) continue;
-    out.push({
+  return buildListNextQueuedJobsResult({
+    sourceEnabled: source.enabled === 1,
+    lastHeartbeatAt: registration.last_heartbeat_at ?? null,
+    agentCapabilities: parseJsonArray(registration.last_capabilities_json ?? "[]"),
+    sourceCapabilities: parseJsonArray(source.capabilities_json),
+    queuedJobs: rows.map((job) => ({
       id: job.id,
       source_id: job.source_id,
       artifact_type: job.artifact_type,
@@ -584,15 +577,9 @@ export function listNextQueuedJobSummariesForSource(
       created_at: job.created_at,
       request_reason: job.request_reason,
       collection_scope: parseCollectionScopeJson(job.collection_scope_json),
-    });
-    if (out.length >= limit) break;
-  }
-
-  if (out.length === 0 && rows.length > 0) {
-    return { jobs: [], gate: "capability_mismatch" };
-  }
-
-  return { jobs: out, gate: null };
+    })),
+    limit,
+  });
 }
 
 export interface HeartbeatInput {
@@ -625,20 +612,6 @@ export interface ApplyAgentHeartbeatResult {
   active_job_lease: ActiveJobLeaseHeartbeatResult;
 }
 
-/** Extend lease by 120s from max(now, current expiry), capped 30m after claim. */
-function extendedLeaseExpiryIso(job: CollectionJobRow, nowMs: number): string {
-  const extendMs = 120_000;
-  const leaseEnd =
-    job.lease_expires_at ? new Date(job.lease_expires_at).getTime() : nowMs;
-  const base = Math.max(nowMs, leaseEnd);
-  let next = base + extendMs;
-  if (job.claimed_at) {
-    const cap = new Date(job.claimed_at).getTime() + 30 * 60_000;
-    next = Math.min(next, cap);
-  }
-  return new Date(next).toISOString();
-}
-
 export function applyAgentHeartbeat(
   db: Database,
   registration: AgentRegistrationRow,
@@ -651,14 +624,7 @@ export function applyAgentHeartbeat(
   let active_job_lease: ActiveJobLeaseHeartbeatResult = { requested: false };
 
   const capsJson = JSON.stringify(input.capabilities);
-  const mergedAttrs = (() => {
-    try {
-      const prev = JSON.parse(source.attributes_json || "{}") as Record<string, unknown>;
-      return JSON.stringify({ ...prev, ...input.attributes });
-    } catch {
-      return JSON.stringify(input.attributes);
-    }
-  })();
+  const mergedAttrs = mergeHeartbeatAttributesJson(source.attributes_json, input.attributes);
 
   db.run(
     `UPDATE sources SET
@@ -676,7 +642,7 @@ export function applyAgentHeartbeat(
       last_heartbeat_at = ?,
       last_agent_version = ?
     WHERE id = ?`,
-    [capsJson, now, input.agent_version.trim() || null, registration.id]
+    [capsJson, now, normalizeHeartbeatAgentVersion(input.agent_version), registration.id]
   );
 
   if (prevHealth !== "online") {
@@ -708,7 +674,7 @@ export function applyAgentHeartbeat(
       };
     } else {
       const prevExp = job.lease_expires_at!;
-      const newExp = extendedLeaseExpiryIso(job, nowMs);
+      const newExp = buildHeartbeatLeaseExpiryIso(job, nowMs);
       db.run(
         `UPDATE collection_jobs SET
           lease_expires_at = ?,
@@ -759,24 +725,19 @@ export function claimCollectionJobForAgent(
   agentRegistrationId: string,
   instanceId: string,
   leaseTtlSeconds: number
-):
+): 
   | { ok: true; row: CollectionJobRow }
   | { ok: false; code: "not_found" | "not_queued" | "wrong_source" } {
   const job = getCollectionJobById(db, jobId);
   if (!job) {
     return { ok: false, code: "not_found" };
   }
-  if (job.source_id !== sourceId) {
-    return { ok: false, code: "wrong_source" };
-  }
-  if (job.status !== "queued") {
-    return { ok: false, code: "not_queued" };
+  const claimValidation = validateClaimCommand(job, { sourceId });
+  if (!claimValidation.ok) {
+    return claimValidation;
   }
 
-  const ttl = Math.min(300, Math.max(60, Math.floor(leaseTtlSeconds)));
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const expires = new Date(now.getTime() + ttl * 1000).toISOString();
+  const { claimedAt, leaseExpiresAt } = buildClaimLease(leaseTtlSeconds);
 
   db.run(
     `UPDATE collection_jobs SET
@@ -788,7 +749,7 @@ export function claimCollectionJobForAgent(
       updated_at = ?,
       last_heartbeat_at = NULL
     WHERE id = ? AND source_id = ? AND status = 'queued'`,
-    [agentRegistrationId, instanceId, expires, nowIso, nowIso, jobId, sourceId]
+    [agentRegistrationId, instanceId, leaseExpiresAt, claimedAt, claimedAt, jobId, sourceId]
   );
 
   const claimed = getCollectionJobById(db, jobId);
@@ -810,8 +771,8 @@ export function claimCollectionJobForAgent(
   emitDomainEvent("collection_job.claimed", {
     job_id: jobId,
     lease_owner_id: agentRegistrationId,
-    lease_expires_at: expires,
-    occurred_at: nowIso,
+    lease_expires_at: leaseExpiresAt,
+    occurred_at: claimedAt,
   });
   return { ok: true, row };
 }
@@ -827,16 +788,21 @@ export function startCollectionJobForAgent(
   | { ok: false; code: "wrong_job" | "not_claimed" | "lease_expired" | "wrong_lease" } {
   const job = getCollectionJobById(db, jobId);
   if (!job || job.source_id !== sourceId) return { ok: false, code: "wrong_job" };
-  if (job.status !== "claimed") return { ok: false, code: "not_claimed" };
-  if (job.lease_owner_id !== agentRegistrationId || job.lease_owner_instance_id !== instanceId) {
-    return { ok: false, code: "wrong_lease" };
-  }
   const nowIso = new Date().toISOString();
-  if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-    return { ok: false, code: "lease_expired" };
+  const startValidation = validateStartCommand(
+    job,
+    {
+      sourceId,
+      registrationId: agentRegistrationId,
+      instanceId,
+    },
+    nowIso
+  );
+  if (!startValidation.ok) {
+    return startValidation;
   }
 
-  const expires = new Date(Date.now() + 300_000).toISOString();
+  const expires = buildStartLeaseExpiryIso(nowIso);
   db.run(
     `UPDATE collection_jobs SET
       status = 'running',
@@ -870,19 +836,24 @@ export function failCollectionJobForAgent(
   | { ok: false; code: "wrong_job" | "bad_state" | "lease_expired" | "wrong_lease" } {
   const job = getCollectionJobById(db, jobId);
   if (!job || job.source_id !== sourceId) return { ok: false, code: "wrong_job" };
-  if (job.status !== "claimed" && job.status !== "running") {
-    return { ok: false, code: "bad_state" };
-  }
-  if (job.lease_owner_id !== agentRegistrationId || job.lease_owner_instance_id !== instanceId) {
-    return { ok: false, code: "wrong_lease" };
-  }
   const nowIso = new Date().toISOString();
-  if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-    return { ok: false, code: "lease_expired" };
+  const failValidation = validateFailCommand(
+    job,
+    {
+      sourceId,
+      registrationId: agentRegistrationId,
+      instanceId,
+    },
+    nowIso
+  );
+  if (!failValidation.ok) {
+    return failValidation;
   }
 
-  const code = errorCode.trim().slice(0, 128) || "agent_failed";
-  const msg = errorMessage.trim().slice(0, 2048) || "failed";
+  const { errorCode: code, errorMessage: msg } = normalizeAgentFailureInput(
+    errorCode,
+    errorMessage
+  );
 
   db.run(
     `UPDATE collection_jobs SET

@@ -336,8 +336,8 @@ export function findPreviousRunForSameArtifact(
     `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON a.id = r.artifact_id
-     WHERE r.artifact_id = ? AND r.id != ? AND r.created_at < ?
-     ORDER BY r.created_at DESC
+     WHERE r.artifact_id = ? AND r.id != ? AND r.created_at <= ?
+     ORDER BY r.created_at DESC, r.id DESC
      LIMIT 1`,
     [current.artifact_id, currentRunId, current.created_at]
   );
@@ -371,8 +371,8 @@ export function findPreviousRunForSameTarget(
     `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON r.artifact_id = a.id
-     WHERE r.id != ? AND r.created_at < ? AND a.artifact_type = ?
-     ORDER BY r.created_at DESC`,
+     WHERE r.id != ? AND r.created_at <= ? AND a.artifact_type = ?
+     ORDER BY r.created_at DESC, r.id DESC`,
     [currentRunId, current.created_at, current.artifact_type]
   );
 

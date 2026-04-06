@@ -25,6 +25,15 @@ import type {
   StorageTx,
 } from "./contract";
 import {
+  mapRunSummaryRow,
+  parseFindingsFromReportJson,
+  runAttentionScore,
+  toRunSubmissionMeta,
+  validateAgentSubmissionState,
+} from "./shared/run-shared";
+import { validateHeartbeatActiveJob } from "./shared/agent-lifecycle-shared";
+import { projectCollectionJobLeaseReadModel } from "./shared/job-read-model";
+import {
   applyAgentHeartbeat,
   claimCollectionJobForAgent,
   cancelCollectionJob,
@@ -54,6 +63,122 @@ class SqliteRunsStore implements RunsStore {
 
   async listSummaries() {
     return listRuns(this.db);
+  }
+
+  async countRuns() {
+    const stmt = this.db.prepare("SELECT COUNT(*) AS total FROM runs");
+    stmt.step();
+    const row = stmt.getAsObject() as { total: number };
+    stmt.free();
+    return Number(row.total ?? 0);
+  }
+
+  async listDashboardRecentRuns(limit: number) {
+    const cappedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+    const stmt = this.db.prepare(
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON r.artifact_id = a.id
+       ORDER BY r.created_at DESC
+       LIMIT ?`
+    );
+    stmt.bind([cappedLimit]);
+
+    const out = [] as ReturnType<RunsStore["listDashboardRecentRuns"]> extends Promise<infer T> ? T : never;
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as {
+        id: string;
+        artifact_id: string;
+        filename: string;
+        artifact_type: string;
+        source_type: string;
+        created_at: string;
+        status: string;
+        report_json: string | null;
+        environment_json: string | null;
+        target_identifier: string | null;
+        collector_type: string | null;
+      };
+      out.push(mapRunSummaryRow(row));
+    }
+    stmt.free();
+    return out;
+  }
+
+  async listDashboardWindowRuns(sinceIso: string) {
+    const stmt = this.db.prepare(
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON r.artifact_id = a.id
+       WHERE r.created_at >= ?
+       ORDER BY r.created_at DESC`
+    );
+    stmt.bind([sinceIso]);
+
+    const out = [] as ReturnType<RunsStore["listDashboardWindowRuns"]> extends Promise<infer T> ? T : never;
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as {
+        id: string;
+        artifact_id: string;
+        filename: string;
+        artifact_type: string;
+        source_type: string;
+        created_at: string;
+        status: string;
+        report_json: string | null;
+        environment_json: string | null;
+        target_identifier: string | null;
+        collector_type: string | null;
+      };
+      out.push(mapRunSummaryRow(row));
+    }
+    stmt.free();
+    return out;
+  }
+
+  async listDashboardSignalRuns(limit: number) {
+    const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
+    const scanLimit = Math.min(1000, Math.max(200, cappedLimit * 200));
+    const stmt = this.db.prepare(
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON r.artifact_id = a.id
+       WHERE r.report_json IS NOT NULL
+       ORDER BY r.created_at DESC
+       LIMIT ?`
+    );
+    stmt.bind([scanLimit]);
+
+    const out: Awaited<ReturnType<RunsStore["listDashboardSignalRuns"]>> = [];
+    while (stmt.step() && out.length < cappedLimit) {
+      const row = stmt.getAsObject() as {
+        id: string;
+        artifact_id: string;
+        filename: string;
+        artifact_type: string;
+        source_type: string;
+        created_at: string;
+        status: string;
+        report_json: string | null;
+        environment_json: string | null;
+        target_identifier: string | null;
+        collector_type: string | null;
+      };
+      const run = mapRunSummaryRow(row);
+      if (runAttentionScore(run) <= 0) continue;
+      const findings = parseFindingsFromReportJson(row.report_json);
+      if (findings.length === 0) continue;
+      out.push({ run, findings });
+    }
+    stmt.free();
+
+    return out;
   }
 
   async countSuppressedNoise() {
@@ -126,15 +251,11 @@ class SqliteRunsStore implements RunsStore {
       this.db,
       artifact.id,
       input.analysis,
-      {
+      toRunSubmissionMeta({
         filename: input.filename,
-        source_type: input.sourceType,
-        target_identifier: input.ingestion.target_identifier,
-        source_label: input.ingestion.source_label,
-        collector_type: input.ingestion.collector_type,
-        collector_version: input.ingestion.collector_version,
-        collected_at: input.ingestion.collected_at,
-      },
+        sourceType: input.sourceType,
+        ingestion: input.ingestion,
+      }),
       input.parentRunId
     );
 
@@ -152,6 +273,38 @@ class SqliteSourcesStore implements SourcesStore {
 
   async list(opts?: { enabled?: boolean }) {
     return listSources(this.db, opts).map(sourceToJson);
+  }
+
+  async listDashboardCollectionSourceStates(opts?: { enabled?: boolean }) {
+    const whereClause =
+      opts?.enabled === true ? "WHERE s.enabled = 1"
+      : opts?.enabled === false ? "WHERE s.enabled = 0"
+      : "";
+
+    const stmt = this.db.prepare(
+      `SELECT s.*,
+              EXISTS(
+                SELECT 1
+                FROM agent_registrations ar
+                WHERE ar.source_id = s.id
+              ) AS has_registration
+       FROM sources s
+       ${whereClause}
+       ORDER BY s.created_at DESC`
+    );
+
+    const out: Awaited<ReturnType<SourcesStore["listDashboardCollectionSourceStates"]>> = [];
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as unknown as Parameters<typeof sourceToJson>[0] & {
+        has_registration: number | boolean;
+      };
+      out.push({
+        source: sourceToJson(row),
+        hasRegistration: Boolean(row.has_registration),
+      });
+    }
+    stmt.free();
+    return out;
   }
 
   async getById(id: string) {
@@ -177,12 +330,16 @@ class SqliteJobsStore implements JobsStore {
   constructor(private readonly db: Database) {}
 
   async listForSource(sourceId: string, opts?: { status?: string }) {
-    return listCollectionJobsForSource(this.db, sourceId, opts).map(collectionJobToJson);
+    const projected = listCollectionJobsForSource(this.db, sourceId)
+      .map(collectionJobToJson)
+      .map((job) => projectCollectionJobLeaseReadModel(job));
+
+    return opts?.status ? projected.filter((job) => job.status === opts.status) : projected;
   }
 
   async getById(id: string) {
     const row = getCollectionJobById(this.db, id);
-    return row ? collectionJobToJson(row) : null;
+    return row ? projectCollectionJobLeaseReadModel(collectionJobToJson(row)) : null;
   }
 
   async queueForSource(sourceId: string, input: Parameters<typeof insertCollectionJob>[2]) {
@@ -212,6 +369,11 @@ class SqliteJobsStore implements JobsStore {
       return { jobs: [], gate: "source_disabled" as const };
     }
     return listNextQueuedJobSummariesForSource(this.db, source, registration, limit);
+  }
+
+  async listNextForAgentAfterLeaseReap(sourceId: string, registrationId: string, limit: number) {
+    await this.reapExpiredLeases();
+    return this.listNextForAgent(sourceId, registrationId, limit);
   }
 
   async claimForAgent(
@@ -277,31 +439,14 @@ class SqliteJobsStore implements JobsStore {
   }): ReturnType<JobsStore["submitArtifactForAgent"]> {
     const job = getCollectionJobById(this.db, input.jobId);
     if (!job) return { ok: false as const, code: "not_found" };
-    if (job.source_id !== input.sourceId) return { ok: false as const, code: "wrong_source" };
-    if (job.artifact_type !== input.artifactType) {
-      return { ok: false as const, code: "artifact_type_mismatch" };
-    }
-    if (job.status === "submitted" && job.result_run_id && job.result_artifact_id) {
-      return {
-        ok: false as const,
-        code: "job_already_submitted",
-        run_id: job.result_run_id,
-        artifact_id: job.result_artifact_id,
-      };
-    }
-    if (
-      job.status !== "running" ||
-      job.lease_owner_id !== input.registrationId ||
-      !job.lease_owner_instance_id
-    ) {
-      return { ok: false as const, code: "invalid_state" };
-    }
-    if (job.lease_owner_instance_id !== input.instanceId) {
-      return { ok: false as const, code: "instance_mismatch" };
-    }
-    const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-      return { ok: false as const, code: "lease_expired" };
+    const validation = validateAgentSubmissionState(job, {
+      sourceId: input.sourceId,
+      registrationId: input.registrationId,
+      instanceId: input.instanceId,
+      artifactType: input.artifactType,
+    });
+    if (!validation.ok) {
+      return validation;
     }
 
     const artifact = insertArtifact(this.db, {
@@ -310,15 +455,16 @@ class SqliteJobsStore implements JobsStore {
       filename: input.filename,
       content: input.content,
     });
-    const run = insertRun(this.db, artifact.id, input.analysis, {
-      filename: input.filename,
-      source_type: input.sourceType,
-      target_identifier: input.ingestion.target_identifier,
-      source_label: input.ingestion.source_label,
-      collector_type: input.ingestion.collector_type,
-      collector_version: input.ingestion.collector_version,
-      collected_at: input.ingestion.collected_at,
-    });
+    const run = insertRun(
+      this.db,
+      artifact.id,
+      input.analysis,
+      toRunSubmissionMeta({
+        filename: input.filename,
+        sourceType: input.sourceType,
+        ingestion: input.ingestion,
+      })
+    );
 
     const submitted = markCollectionJobSubmittedForAgent(
       this.db,
@@ -389,20 +535,13 @@ class SqliteAgentsStore implements AgentsStore {
     if (input.activeJobId) {
       const job = getCollectionJobById(this.db, input.activeJobId);
       if (!job) return { ok: false as const, code: "active_job_not_found" };
-      if (job.source_id !== source.id) return { ok: false as const, code: "forbidden" };
-      if (job.lease_owner_id !== registration.id) return { ok: false as const, code: "forbidden" };
-      if (job.status !== "claimed" && job.status !== "running") {
-        return { ok: false as const, code: "invalid_active_job_state" };
-      }
-      if (!job.lease_owner_instance_id) {
-        return { ok: false as const, code: "invalid_state" };
-      }
-      if (job.lease_owner_instance_id !== input.instanceId) {
-        return { ok: false as const, code: "instance_mismatch" };
-      }
-      const nowIso = new Date().toISOString();
-      if (!job.lease_expires_at || job.lease_expires_at <= nowIso) {
-        return { ok: false as const, code: "lease_expired" };
+      const activeJobValidation = validateHeartbeatActiveJob(job, {
+        sourceId: source.id,
+        registrationId: registration.id,
+        instanceId: input.instanceId,
+      });
+      if (!activeJobValidation.ok) {
+        return { ok: false as const, code: activeJobValidation.code };
       }
     }
 
@@ -416,6 +555,13 @@ class SqliteAgentsStore implements AgentsStore {
         instance_id: input.instanceId,
       }),
     };
+  }
+
+  async applyHeartbeatAfterLeaseReap(
+    input: Parameters<AgentsStore["applyHeartbeatAfterLeaseReap"]>[0]
+  ): ReturnType<AgentsStore["applyHeartbeatAfterLeaseReap"]> {
+    reapExpiredCollectionJobLeases(this.db);
+    return this.applyHeartbeat(input);
   }
 }
 

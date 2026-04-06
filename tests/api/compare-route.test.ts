@@ -354,6 +354,101 @@ describe("API GET /api/runs/[id]/compare", () => {
     expect(body.evidence_delta.metadata.collected_at).toBe("changed");
   });
 
+  it("includes evidence-summary boundary metrics in compare deltas", async () => {
+    const artifact = insertArtifact(db, {
+      artifact_type: "container-diagnostics",
+      source_type: "api",
+      filename: "payments.txt",
+      content: containerArtifact({
+        hostname: "node-a",
+        runtime: "docker",
+        container_name: "payments",
+        image: "registry.example/payments:1.2.3",
+        state_status: "running",
+        health_status: "healthy",
+      }),
+    });
+
+    const baseline = insertRun(db, artifact.id, mkResult(mkReport("node-a", [])), {
+      filename: "payments-baseline.txt",
+      source_type: "api",
+      target_identifier: "container:payments",
+    });
+
+    const current = insertRun(
+      db,
+      artifact.id,
+      mkResult(
+        mkReport("node-a", [
+          {
+            ...mkFinding("f1", "Container runtime state is restarting", "high"),
+            section_source: "container/runtime-state",
+            evidence: "restarting",
+          },
+          {
+            ...mkFinding("f2", "Container failure excerpts captured", "high"),
+            section_source: "failure_log_excerpts_json",
+            evidence: JSON.stringify({
+              samples: [
+                {
+                  source: "current",
+                  reason: "restarting",
+                  excerpt_lines: ["panic: database connection refused"],
+                },
+              ],
+            }),
+          },
+        ])
+      ),
+      {
+        filename: "payments-current.txt",
+        source_type: "api",
+        target_identifier: "container:payments",
+      }
+    );
+
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-01T01:00:00.000Z", baseline.id]);
+    db.run("UPDATE runs SET created_at = ? WHERE id = ?", ["2026-03-02T01:00:00.000Z", current.id]);
+
+    const res = await GET_COMPARE(new NextRequest(`http://localhost/api/runs/${current.id}/compare`), {
+      params: Promise.resolve({ id: current.id }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.evidence_delta.metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "evidence_summary_section_count",
+          family: "container-diagnostics",
+          previous: 0,
+          current: 2,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "evidence_summary_entry_count",
+          family: "container-diagnostics",
+          previous: 0,
+          current: 6,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "evidence_summary_critical_section_count",
+          family: "container-diagnostics",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+        expect.objectContaining({
+          key: "evidence_summary_warning_section_count",
+          family: "container-diagnostics",
+          previous: 0,
+          current: 1,
+          status: "changed",
+        }),
+      ])
+    );
+  });
+
   it("returns container evidence_delta metrics when findings stay the same", async () => {
     const olderArtifact = insertArtifact(db, {
       artifact_type: "container-diagnostics",

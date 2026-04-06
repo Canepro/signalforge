@@ -262,6 +262,112 @@ describe("Phase 6 API routes", () => {
     expect(one.status).toBe(200);
   });
 
+  it("GET /api/sources/:id/collection-jobs filters on projected lease status without mutating the row", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Projected list source",
+          target_identifier: "tid-projected-list",
+          source_type: "linux_host",
+        }),
+      })
+    );
+    const { id: sourceId } = await post.json();
+
+    const jobRes = await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const job = await jobRes.json();
+
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    db.run(
+      `UPDATE collection_jobs
+       SET status = 'claimed',
+           lease_owner_id = ?,
+           lease_owner_instance_id = ?,
+           lease_expires_at = ?,
+           claimed_at = ?
+       WHERE id = ?`,
+      ["agent-1", "instance-1", expired, expired, job.id]
+    );
+
+    const listed = await GET_SOURCE_JOBS(
+      new NextRequest(
+        `http://localhost/api/sources/${sourceId}/collection-jobs?status=queued`,
+        { headers: authHeaders() }
+      ),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    expect(listed.status).toBe(200);
+    const listedBody = await listed.json();
+    expect(listedBody.jobs).toHaveLength(1);
+    expect(listedBody.jobs[0].id).toBe(job.id);
+    expect(listedBody.jobs[0].status).toBe("queued");
+
+    const stmt = db.prepare("SELECT status FROM collection_jobs WHERE id = ?");
+    stmt.bind([job.id]);
+    expect(stmt.step()).toBe(true);
+    expect((stmt.getAsObject() as { status: string }).status).toBe("claimed");
+    stmt.free();
+  });
+
+  it("GET /api/collection-jobs/:id projects lease expiry without mutating persisted status", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Projected get source",
+          target_identifier: "tid-projected-get",
+          source_type: "linux_host",
+        }),
+      })
+    );
+    const { id: sourceId } = await post.json();
+
+    const jobRes = await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const job = await jobRes.json();
+
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    db.run(
+      `UPDATE collection_jobs
+       SET status = 'running',
+           lease_owner_id = ?,
+           lease_owner_instance_id = ?,
+           lease_expires_at = ?,
+           started_at = ?
+       WHERE id = ?`,
+      ["agent-1", "instance-1", expired, expired, job.id]
+    );
+
+    const one = await GET_JOB(
+      new NextRequest(`http://localhost/api/collection-jobs/${job.id}`, { headers: authHeaders() }),
+      { params: Promise.resolve({ id: job.id }) }
+    );
+    expect(one.status).toBe(200);
+    const oneBody = await one.json();
+    expect(oneBody.status).toBe("expired");
+    expect(oneBody.error_code).toBe("lease_lost");
+
+    const stmt = db.prepare("SELECT status FROM collection_jobs WHERE id = ?");
+    stmt.bind([job.id]);
+    expect(stmt.step()).toBe(true);
+    expect((stmt.getAsObject() as { status: string }).status).toBe("running");
+    stmt.free();
+  });
+
   it("collection job create validates collection_scope by artifact family", async () => {
     const post = await POST_SOURCES(
       new NextRequest("http://localhost/api/sources", {
@@ -519,6 +625,126 @@ describe("Phase 6 API routes", () => {
     expect(del.status).toBe(409);
     const body = await del.json();
     expect(body.code).toBe("active_jobs");
+  });
+
+  it("DELETE /api/sources/:id reaps expired claimed leases before active job gating", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-04-06T12:00:00.000Z"));
+
+      const post = await POST_SOURCES(
+        new NextRequest("http://localhost/api/sources", {
+          method: "POST",
+          headers: { ...authHeaders(), "content-type": "application/json" },
+          body: JSON.stringify({
+            display_name: "Delete after lease expiry",
+            target_identifier: "tid-delete-after-expiry",
+            source_type: "linux_host",
+          }),
+        })
+      );
+      const { id: sourceId } = await post.json();
+
+      const storage = await getStorage();
+      const { row: reg } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(sourceId, "api-expired-delete-agent")
+      );
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId,
+          registrationId: reg.id,
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(sourceId, { request_reason: "api expired delete" })
+      );
+      await storage.withTransaction((tx) =>
+        tx.jobs.claimForAgent(job.id, sourceId, reg.id, "api-expired-delete-inst", 120)
+      );
+
+      vi.setSystemTime(new Date("2026-04-06T12:10:00.000Z"));
+
+      const del = await DELETE_SOURCE(
+        new NextRequest(`http://localhost/api/sources/${sourceId}`, {
+          method: "DELETE",
+          headers: authHeaders(),
+        }),
+        { params: Promise.resolve({ id: sourceId }) }
+      );
+      expect(del.status).toBe(200);
+      await expect(del.json()).resolves.toEqual({ ok: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("POST /api/collection-jobs/:id/cancel returns already_terminal after lease-expired running job is reaped", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-04-06T13:00:00.000Z"));
+
+      const post = await POST_SOURCES(
+        new NextRequest("http://localhost/api/sources", {
+          method: "POST",
+          headers: { ...authHeaders(), "content-type": "application/json" },
+          body: JSON.stringify({
+            display_name: "Cancel after lease expiry",
+            target_identifier: "tid-cancel-after-expiry",
+            source_type: "linux_host",
+          }),
+        })
+      );
+      const { id: sourceId } = await post.json();
+
+      const storage = await getStorage();
+      const { row: reg } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(sourceId, "api-expired-cancel-agent")
+      );
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId,
+          registrationId: reg.id,
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(sourceId, { request_reason: "api expired cancel" })
+      );
+      const claimed = await storage.withTransaction((tx) =>
+        tx.jobs.claimForAgent(job.id, sourceId, reg.id, "api-expired-cancel-inst", 120)
+      );
+      expect(claimed.ok).toBe(true);
+      const started = await storage.withTransaction((tx) =>
+        tx.jobs.startForAgent(job.id, sourceId, reg.id, "api-expired-cancel-inst")
+      );
+      expect(started.ok).toBe(true);
+
+      vi.setSystemTime(new Date("2026-04-06T13:10:00.000Z"));
+
+      const cancel = await POST_CANCEL(
+        new NextRequest(`http://localhost/api/collection-jobs/${job.id}/cancel`, {
+          method: "POST",
+          headers: authHeaders(),
+        }),
+        { params: Promise.resolve({ id: job.id }) }
+      );
+      expect(cancel.status).toBe(409);
+      await expect(cancel.json()).resolves.toEqual({
+        error: "Job is already in a terminal state",
+        code: "already_terminal",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("GET /api/sources returns generic 500 when storage listing throws", async () => {

@@ -10,7 +10,6 @@ import {
 import { buildRunDetail, toRunDetailJson } from "@/lib/api/run-detail-json";
 import {
   contentHash,
-  deriveSeverityCounts,
   parseEnvironmentHostname,
   submissionMetaFromRun,
   type RunRow,
@@ -32,6 +31,29 @@ import type {
   StorageTx,
 } from "./contract";
 import {
+  mapRunSummaryRow,
+  parseFindingsFromReportJson,
+  runAttentionScore,
+  toRunSubmissionMeta,
+  validateAgentSubmissionState,
+} from "./shared/run-shared";
+import {
+  buildHeartbeatLeaseExpiryIso,
+  buildListNextQueuedJobsResult,
+  mergeHeartbeatAttributesJson,
+  normalizeHeartbeatAgentVersion,
+  validateHeartbeatActiveJob,
+} from "./shared/agent-lifecycle-shared";
+import { projectCollectionJobLeaseReadModel } from "./shared/job-read-model";
+import {
+  buildClaimLease,
+  buildStartLeaseExpiryIso,
+  normalizeAgentFailureInput,
+  validateClaimCommand,
+  validateFailCommand,
+  validateStartCommand,
+} from "./shared/job-command-shared";
+import {
   generateAgentToken,
   hashAgentToken,
   type AgentRegistrationCreated,
@@ -49,10 +71,7 @@ import {
   preferredTargetMatchKey,
 } from "@/lib/target-identity";
 import { emitDomainEvent } from "@/lib/domain-events";
-import {
-  collectCapabilityForArtifactType,
-  defaultCapabilitiesForArtifactType,
-} from "@/lib/source-catalog";
+import { defaultCapabilitiesForArtifactType } from "@/lib/source-catalog";
 
 type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -311,8 +330,8 @@ async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string):
     `SELECT r.*, a.artifact_type, a.content AS artifact_content
      FROM runs r
      JOIN artifacts a ON a.id = r.artifact_id
-     WHERE r.id != $1 AND r.created_at < $2 AND a.artifact_type = $3
-     ORDER BY r.created_at DESC`,
+     WHERE r.id != $1 AND r.created_at <= $2 AND a.artifact_type = $3
+     ORDER BY r.created_at DESC, r.id DESC`,
     [currentRunId, current.created_at, current.artifact_type]
   );
 
@@ -447,29 +466,107 @@ class PostgresRunsStore implements RunsStore {
        JOIN artifacts a ON a.id = r.artifact_id
        ORDER BY r.created_at DESC`
     );
-    return rows.map((row) => {
-      const hostname = parseEnvironmentHostname(row.environment_json);
-      const env = parseJson<Record<string, boolean>>(row.environment_json, {});
-      const env_tags: string[] = [];
-      if (env.is_wsl) env_tags.push("WSL");
-      if (env.is_container) env_tags.push("Container");
-      if (env.is_virtual_machine) env_tags.push("VM");
-      if (!env.is_wsl && !env.is_container && !env.is_virtual_machine && row.environment_json) env_tags.push("Linux");
-      return {
-        id: row.id,
-        artifact_id: row.artifact_id,
-        filename: row.filename,
-        artifact_type: row.artifact_type,
-        source_type: row.source_type,
-        created_at: row.created_at,
-        status: row.status,
-        severity_counts: deriveSeverityCounts(row.report_json),
-        hostname,
-        env_tags,
-        target_identifier: row.target_identifier,
-        collector_type: row.collector_type,
-      };
-    });
+    return rows.map(mapRunSummaryRow);
+  }
+
+  async countRuns() {
+    const row = await one<{ total: string | number }>(this.q, "SELECT COUNT(*) AS total FROM runs");
+    return Number(row?.total ?? 0);
+  }
+
+  async listDashboardRecentRuns(limit: number) {
+    const cappedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+    const rows = await many<{
+      id: string;
+      artifact_id: string;
+      filename: string;
+      artifact_type: string;
+      source_type: string;
+      created_at: string;
+      status: string;
+      report_json: string | null;
+      environment_json: string | null;
+      target_identifier: string | null;
+      collector_type: string | null;
+    }>(
+      this.q,
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON a.id = r.artifact_id
+       ORDER BY r.created_at DESC
+       LIMIT $1`,
+      [cappedLimit]
+    );
+    return rows.map(mapRunSummaryRow);
+  }
+
+  async listDashboardWindowRuns(sinceIso: string) {
+    const rows = await many<{
+      id: string;
+      artifact_id: string;
+      filename: string;
+      artifact_type: string;
+      source_type: string;
+      created_at: string;
+      status: string;
+      report_json: string | null;
+      environment_json: string | null;
+      target_identifier: string | null;
+      collector_type: string | null;
+    }>(
+      this.q,
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON a.id = r.artifact_id
+       WHERE r.created_at >= $1
+       ORDER BY r.created_at DESC`,
+      [sinceIso]
+    );
+    return rows.map(mapRunSummaryRow);
+  }
+
+  async listDashboardSignalRuns(limit: number) {
+    const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
+    const scanLimit = Math.min(1000, Math.max(200, cappedLimit * 200));
+    const rows = await many<{
+      id: string;
+      artifact_id: string;
+      filename: string;
+      artifact_type: string;
+      source_type: string;
+      created_at: string;
+      status: string;
+      report_json: string | null;
+      environment_json: string | null;
+      target_identifier: string | null;
+      collector_type: string | null;
+    }>(
+      this.q,
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON a.id = r.artifact_id
+       WHERE r.report_json IS NOT NULL
+       ORDER BY r.created_at DESC
+       LIMIT $1`,
+      [scanLimit]
+    );
+
+    const out: Awaited<ReturnType<RunsStore["listDashboardSignalRuns"]>> = [];
+    for (const row of rows) {
+      if (out.length >= cappedLimit) break;
+      const run = mapRunSummaryRow(row);
+      if (runAttentionScore(run) <= 0) continue;
+      const findings = parseFindingsFromReportJson(row.report_json);
+      if (findings.length === 0) continue;
+      out.push({ run, findings });
+    }
+    return out;
   }
 
   async countSuppressedNoise() {
@@ -578,11 +675,11 @@ class PostgresRunsStore implements RunsStore {
       this.q,
       artifact.id,
       input.analysis,
-      {
-        ...input.ingestion,
+      toRunSubmissionMeta({
         filename: input.filename,
-        source_type: input.sourceType,
-      },
+        sourceType: input.sourceType,
+        ingestion: input.ingestion,
+      }),
       input.parentRunId
     );
     return {
@@ -604,6 +701,35 @@ class PostgresSourcesStore implements SourcesStore {
       : "";
     const rows = await many<PgSourceRow>(this.q, `SELECT * FROM sources ${where} ORDER BY created_at DESC`);
     return rows.map(sourceToView);
+  }
+
+  async listDashboardCollectionSourceStates(opts?: { enabled?: boolean }) {
+    const where =
+      opts?.enabled === true ? "WHERE s.enabled = TRUE"
+      : opts?.enabled === false ? "WHERE s.enabled = FALSE"
+      : "";
+
+    const rows = await many<
+      PgSourceRow & {
+        has_registration: boolean;
+      }
+    >(
+      this.q,
+      `SELECT s.*,
+              EXISTS(
+                SELECT 1
+                FROM agent_registrations ar
+                WHERE ar.source_id = s.id
+              ) AS has_registration
+       FROM sources s
+       ${where}
+       ORDER BY s.created_at DESC`
+    );
+
+    return rows.map((row) => ({
+      source: sourceToView(row),
+      hasRegistration: Boolean(row.has_registration),
+    }));
   }
 
   async getById(id: string) {
@@ -739,6 +865,7 @@ class PostgresSourcesStore implements SourcesStore {
       return { ok: false as const, code: "not_found" as const };
     }
 
+    await new PostgresJobsStore(this.q).reapExpiredLeases();
     const blockingJob = await one<{ id: string }>(
       this.q,
       `SELECT id FROM collection_jobs
@@ -768,15 +895,18 @@ class PostgresJobsStore implements JobsStore {
   constructor(private readonly q: Queryable) {}
 
   async listForSource(sourceId: string, opts?: { status?: string }) {
-    const rows = opts?.status ?
-      await many<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE source_id = $1 AND status = $2 ORDER BY created_at DESC", [sourceId, opts.status])
-      : await many<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE source_id = $1 ORDER BY created_at DESC", [sourceId]);
-    return rows.map(jobToView);
+    const rows = await many<PgCollectionJobRow>(
+      this.q,
+      "SELECT * FROM collection_jobs WHERE source_id = $1 ORDER BY created_at DESC",
+      [sourceId]
+    );
+    const projected = rows.map(jobToView).map((job) => projectCollectionJobLeaseReadModel(job));
+    return opts?.status ? projected.filter((job) => job.status === opts.status) : projected;
   }
 
   async getById(id: string) {
     const row = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [id]);
-    return row ? jobToView(row) : null;
+    return row ? projectCollectionJobLeaseReadModel(jobToView(row)) : null;
   }
 
   async queueForSource(
@@ -857,6 +987,7 @@ class PostgresJobsStore implements JobsStore {
   }
 
   async cancel(id: string) {
+    await this.reapExpiredLeases();
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [id]);
     if (!job) return null;
     if (job.status === "running") {
@@ -937,20 +1068,18 @@ class PostgresJobsStore implements JobsStore {
     const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
     const registration = await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE source_id = $1", [sourceId]);
     if (!source || !registration || registration.id !== registrationId) return { jobs: [], gate: "source_disabled" };
-    if (!source.enabled) return { jobs: [], gate: "source_disabled" };
-    if (!registration.last_heartbeat_at) return { jobs: [], gate: "heartbeat_required" };
-    const agentCaps = parseJson<string[]>(registration.last_capabilities_json, []);
-    if (agentCaps.length === 0) return { jobs: [], gate: "capabilities_empty" };
-    const sourceCaps = parseJson<string[]>(source.capabilities_json, []);
     const rows = await many<PgCollectionJobRow>(
       this.q,
       `SELECT * FROM collection_jobs WHERE source_id = $1 AND status = 'queued' ORDER BY created_at ASC`,
       [sourceId]
     );
-    const jobs = rows
-      .filter((job) => agentCaps.filter((c) => sourceCaps.includes(c)).includes(collectCapabilityForArtifactType(job.artifact_type)))
-      .slice(0, limit)
-      .map((job) => ({
+
+    return buildListNextQueuedJobsResult({
+      sourceEnabled: source.enabled,
+      lastHeartbeatAt: registration.last_heartbeat_at,
+      agentCapabilities: parseJson<string[]>(registration.last_capabilities_json, []),
+      sourceCapabilities: parseJson<string[]>(source.capabilities_json, []),
+      queuedJobs: rows.map((job) => ({
         id: job.id,
         source_id: job.source_id,
         artifact_type: job.artifact_type,
@@ -958,9 +1087,18 @@ class PostgresJobsStore implements JobsStore {
         created_at: job.created_at,
         request_reason: job.request_reason,
         collection_scope: parseCollectionScopeJson(job.collection_scope_json),
-      }));
-    if (jobs.length === 0 && rows.length > 0) return { jobs: [], gate: "capability_mismatch" };
-    return { jobs, gate: null };
+      })),
+      limit,
+    });
+  }
+
+  async listNextForAgentAfterLeaseReap(
+    sourceId: string,
+    registrationId: string,
+    limit: number
+  ): Promise<ListNextQueuedJobsResult> {
+    await this.reapExpiredLeases();
+    return this.listNextForAgent(sourceId, registrationId, limit);
   }
 
   async claimForAgent(
@@ -972,12 +1110,9 @@ class PostgresJobsStore implements JobsStore {
   ): ReturnType<JobsStore["claimForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (!job) return { ok: false as const, code: "not_found" };
-    if (job.source_id !== sourceId) return { ok: false as const, code: "wrong_source" };
-    if (job.status !== "queued") return { ok: false as const, code: "not_queued" };
-    const ttl = Math.min(300, Math.max(60, Math.floor(leaseTtlSeconds)));
-    const now = new Date();
-    const nowIso = now.toISOString();
-    const expires = new Date(now.getTime() + ttl * 1000).toISOString();
+    const claimValidation = validateClaimCommand(job, { sourceId });
+    if (!claimValidation.ok) return { ok: false as const, code: claimValidation.code };
+    const { claimedAt, leaseExpiresAt } = buildClaimLease(leaseTtlSeconds);
     const res = await this.q.query(
       `UPDATE collection_jobs SET
         status = 'claimed',
@@ -988,7 +1123,7 @@ class PostgresJobsStore implements JobsStore {
         updated_at = $5,
         last_heartbeat_at = NULL
        WHERE id = $6 AND source_id = $7 AND status = 'queued'`,
-      [registrationId, instanceId, expires, nowIso, nowIso, jobId, sourceId]
+      [registrationId, instanceId, leaseExpiresAt, claimedAt, claimedAt, jobId, sourceId]
     );
     const claimed = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (res.rowCount === 0 || !claimed || claimed.lease_owner_instance_id !== instanceId) {
@@ -996,7 +1131,7 @@ class PostgresJobsStore implements JobsStore {
     }
     await this.q.query("UPDATE agent_registrations SET last_instance_id = $1 WHERE id = $2", [instanceId, registrationId]);
     emitDomainEvent("collection_job.claimed", {
-      job_id: jobId, lease_owner_id: registrationId, lease_expires_at: expires, occurred_at: nowIso,
+      job_id: jobId, lease_owner_id: registrationId, lease_expires_at: leaseExpiresAt, occurred_at: claimedAt,
     });
     return { ok: true as const, row: jobToView(claimed) };
   }
@@ -1009,13 +1144,18 @@ class PostgresJobsStore implements JobsStore {
   ): ReturnType<JobsStore["startForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (!job || job.source_id !== sourceId) return { ok: false as const, code: "wrong_job" };
-    if (job.status !== "claimed") return { ok: false as const, code: "not_claimed" };
-    if (job.lease_owner_id !== registrationId || job.lease_owner_instance_id !== instanceId) {
-      return { ok: false as const, code: "wrong_lease" };
-    }
     const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) return { ok: false as const, code: "lease_expired" };
-    const expires = new Date(Date.now() + 300_000).toISOString();
+    const startValidation = validateStartCommand(
+      job,
+      {
+        sourceId,
+        registrationId,
+        instanceId,
+      },
+      nowIso
+    );
+    if (!startValidation.ok) return { ok: false as const, code: startValidation.code };
+    const expires = buildStartLeaseExpiryIso(nowIso);
     const res = await this.q.query(
       `UPDATE collection_jobs SET
         status = 'running',
@@ -1043,12 +1183,21 @@ class PostgresJobsStore implements JobsStore {
   ): ReturnType<JobsStore["failForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [jobId]);
     if (!job || job.source_id !== sourceId) return { ok: false as const, code: "wrong_job" };
-    if (job.status !== "claimed" && job.status !== "running") return { ok: false as const, code: "bad_state" };
-    if (job.lease_owner_id !== registrationId || job.lease_owner_instance_id !== instanceId) return { ok: false as const, code: "wrong_lease" };
     const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) return { ok: false as const, code: "lease_expired" };
-    const code = errorCode.trim().slice(0, 128) || "agent_failed";
-    const msg = errorMessage.trim().slice(0, 2048) || "failed";
+    const failValidation = validateFailCommand(
+      job,
+      {
+        sourceId,
+        registrationId,
+        instanceId,
+      },
+      nowIso
+    );
+    if (!failValidation.ok) return { ok: false as const, code: failValidation.code };
+    const { errorCode: code, errorMessage: msg } = normalizeAgentFailureInput(
+      errorCode,
+      errorMessage
+    );
     const res = await this.q.query(
       `UPDATE collection_jobs SET
         status = 'failed',
@@ -1075,19 +1224,14 @@ class PostgresJobsStore implements JobsStore {
   async submitArtifactForAgent(input: Parameters<JobsStore["submitArtifactForAgent"]>[0]): ReturnType<JobsStore["submitArtifactForAgent"]> {
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.jobId]);
     if (!job) return { ok: false as const, code: "not_found" };
-    if (job.source_id !== input.sourceId) return { ok: false as const, code: "wrong_source" };
-    if (job.artifact_type !== input.artifactType) {
-      return { ok: false as const, code: "artifact_type_mismatch" };
-    }
-    if (job.status === "submitted" && job.result_run_id && job.result_artifact_id) {
-      return { ok: false as const, code: "job_already_submitted", run_id: job.result_run_id, artifact_id: job.result_artifact_id };
-    }
-    if (job.status !== "running" || job.lease_owner_id !== input.registrationId || !job.lease_owner_instance_id) {
-      return { ok: false as const, code: "invalid_state" };
-    }
-    if (job.lease_owner_instance_id !== input.instanceId) return { ok: false as const, code: "instance_mismatch" };
+    const validation = validateAgentSubmissionState(job, {
+      sourceId: input.sourceId,
+      registrationId: input.registrationId,
+      instanceId: input.instanceId,
+      artifactType: input.artifactType,
+    });
+    if (!validation.ok) return validation;
     const nowIso = new Date().toISOString();
-    if (!job.lease_expires_at || job.lease_expires_at <= nowIso) return { ok: false as const, code: "lease_expired" };
     const artifact = await insertArtifactPg(this.q, {
       artifact_type: input.artifactType,
       source_type: input.sourceType,
@@ -1098,7 +1242,11 @@ class PostgresJobsStore implements JobsStore {
       this.q,
       artifact.id,
       input.analysis,
-      { ...input.ingestion, filename: input.filename, source_type: input.sourceType }
+      toRunSubmissionMeta({
+        filename: input.filename,
+        sourceType: input.sourceType,
+        ingestion: input.ingestion,
+      })
     );
     const res = await this.q.query(
       `UPDATE collection_jobs SET
@@ -1215,60 +1363,64 @@ class PostgresAgentsStore implements AgentsStore {
     const registration = await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE source_id = $1", [input.sourceId]);
     if (!registration || registration.id !== input.registrationId) return { ok: false as const, code: "registration_not_found" };
 
-    let active_job_lease: ApplyAgentHeartbeatResult["active_job_lease"] = { requested: false };
     const now = new Date().toISOString();
+    const nowMs = Date.now();
+    let activeJob: PgCollectionJobRow | null = null;
+    if (input.activeJobId) {
+      activeJob = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.activeJobId]);
+      if (!activeJob) return { ok: false as const, code: "active_job_not_found" };
+      const activeJobValidation = validateHeartbeatActiveJob(
+        activeJob,
+        {
+          sourceId: source.id,
+          registrationId: registration.id,
+          instanceId: input.instanceId,
+        },
+        now
+      );
+      if (!activeJobValidation.ok) {
+        return { ok: false as const, code: activeJobValidation.code };
+      }
+    }
+
+    let active_job_lease: ApplyAgentHeartbeatResult["active_job_lease"] = { requested: false };
     const prevHealth = source.health_status;
     await this.q.query(
       `UPDATE sources SET last_seen_at = $1, health_status = 'online', attributes_json = $2, updated_at = $3 WHERE id = $4`,
       [
         now,
-        JSON.stringify({ ...parseJson<Record<string, unknown>>(source.attributes_json, {}), ...input.attributes }),
+        mergeHeartbeatAttributesJson(source.attributes_json, input.attributes),
         now,
         source.id,
       ]
     );
     await this.q.query(
       `UPDATE agent_registrations SET last_capabilities_json = $1, last_heartbeat_at = $2, last_agent_version = $3 WHERE id = $4`,
-      [JSON.stringify(input.capabilities), now, input.agentVersion.trim() || null, registration.id]
+      [
+        JSON.stringify(input.capabilities),
+        now,
+        normalizeHeartbeatAgentVersion(input.agentVersion),
+        registration.id,
+      ]
     );
     if (prevHealth !== "online") {
       emitDomainEvent("source.health_changed", {
         source_id: source.id, previous_health: prevHealth, health_status: "online", occurred_at: now,
       });
     }
-    if (input.activeJobId && input.instanceId) {
-      const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.activeJobId]);
-      if (
-        !job ||
-        job.source_id !== source.id ||
-        !["claimed", "running"].includes(job.status) ||
-        job.lease_owner_id !== registration.id ||
-        job.lease_owner_instance_id !== input.instanceId ||
-        !job.lease_expires_at ||
-        job.lease_expires_at <= now
-      ) {
-        active_job_lease = { requested: true, job_id: input.activeJobId, extended: false, code: "lease_not_extended" };
-      } else {
-        const extendMs = 120_000;
-        const leaseEnd = new Date(job.lease_expires_at).getTime();
-        const base = Math.max(Date.now(), leaseEnd);
-        let next = base + extendMs;
-        if (job.claimed_at) {
-          const cap = new Date(job.claimed_at).getTime() + 30 * 60_000;
-          next = Math.min(next, cap);
-        }
-        const newExp = new Date(next).toISOString();
-        const res = await this.q.query(
-          `UPDATE collection_jobs SET lease_expires_at = $1, last_heartbeat_at = $2, updated_at = $3
-           WHERE id = $4 AND source_id = $5 AND status IN ('claimed', 'running')
-             AND lease_owner_id = $6 AND lease_owner_instance_id = $7 AND lease_expires_at = $8`,
-          [newExp, now, now, job.id, source.id, registration.id, input.instanceId, job.lease_expires_at]
-        );
-        active_job_lease =
-          res.rowCount === 1 ?
-            { requested: true, job_id: job.id, extended: true, lease_expires_at: newExp }
-          : { requested: true, job_id: job.id, extended: false, code: "lease_not_extended" };
-      }
+    if (input.activeJobId && input.instanceId && activeJob) {
+      const previousLeaseExpiry = activeJob.lease_expires_at!;
+      const newExp = buildHeartbeatLeaseExpiryIso(activeJob, nowMs);
+      const res = await this.q.query(
+        `UPDATE collection_jobs SET lease_expires_at = $1, last_heartbeat_at = $2, updated_at = $3
+         WHERE id = $4 AND source_id = $5 AND status IN ('claimed', 'running')
+           AND lease_owner_id = $6 AND lease_owner_instance_id = $7 AND lease_expires_at = $8`,
+        [newExp, now, now, activeJob.id, source.id, registration.id, input.instanceId, previousLeaseExpiry]
+      );
+      active_job_lease =
+        res.rowCount === 1 ?
+          { requested: true, job_id: activeJob.id, extended: true, lease_expires_at: newExp }
+        : { requested: true, job_id: activeJob.id, extended: false, code: "lease_not_extended" };
     }
     const updatedSource = (await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [source.id]))!;
     const updatedReg = (await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE id = $1", [registration.id]))!;
@@ -1280,6 +1432,13 @@ class PostgresAgentsStore implements AgentsStore {
         active_job_lease,
       },
     };
+  }
+
+  async applyHeartbeatAfterLeaseReap(
+    input: Parameters<AgentsStore["applyHeartbeatAfterLeaseReap"]>[0]
+  ): ReturnType<AgentsStore["applyHeartbeatAfterLeaseReap"]> {
+    await new PostgresJobsStore(this.q).reapExpiredLeases();
+    return this.applyHeartbeat(input);
   }
 }
 

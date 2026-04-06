@@ -171,6 +171,109 @@ describe("Phase 6d agent routes", () => {
     expect(j.gate).toBe("capabilities_empty");
   });
 
+  it("jobs/next reaps expired claimed leases before listing queued jobs", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-next-reap-expired-claimed");
+
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+
+    const queued = await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const job = await queued.json();
+
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    db.run(
+      `UPDATE collection_jobs
+       SET status = 'claimed',
+           lease_owner_id = ?,
+           lease_owner_instance_id = ?,
+           lease_expires_at = ?,
+           claimed_at = ?
+       WHERE id = ?`,
+      ["other-agent", "other-instance", expired, expired, job.id]
+    );
+
+    const next = await GET_NEXT(
+      new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) })
+    );
+    expect(next.status).toBe(200);
+    const nextBody = await next.json();
+    expect(nextBody.gate).toBeNull();
+    expect(nextBody.jobs).toHaveLength(1);
+    expect(nextBody.jobs[0].id).toBe(job.id);
+
+    const stmt = db.prepare("SELECT status, lease_owner_id FROM collection_jobs WHERE id = ?");
+    stmt.bind([job.id]);
+    expect(stmt.step()).toBe(true);
+    const row = stmt.getAsObject() as { status: string; lease_owner_id: string | null };
+    expect(row.status).toBe("queued");
+    expect(row.lease_owner_id).toBeNull();
+    stmt.free();
+  });
+
+  it("heartbeat reaps expired claimed leases without active_job_id", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-heartbeat-reap-expired-claimed");
+
+    const queued = await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const job = await queued.json();
+
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    db.run(
+      `UPDATE collection_jobs
+       SET status = 'claimed',
+           lease_owner_id = ?,
+           lease_owner_instance_id = ?,
+           lease_expires_at = ?,
+           claimed_at = ?
+       WHERE id = ?`,
+      ["other-agent", "other-instance", expired, expired, job.id]
+    );
+
+    const hb = await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    expect(hb.status).toBe(200);
+    expect((await hb.json()).active_job_lease).toBeNull();
+
+    const stmt = db.prepare("SELECT status, lease_owner_id FROM collection_jobs WHERE id = ?");
+    stmt.bind([job.id]);
+    expect(stmt.step()).toBe(true);
+    const row = stmt.getAsObject() as { status: string; lease_owner_id: string | null };
+    expect(row.status).toBe("queued");
+    expect(row.lease_owner_id).toBeNull();
+    stmt.free();
+  });
+
   it("jobs/next long-poll returns a newly queued job during wait window", async () => {
     const { sourceId, token } = await createSourceAndAgent(db, "tid-next-wait");
     await POST_HEARTBEAT(
@@ -992,6 +1095,69 @@ describe("Phase 6d agent routes", () => {
     expect(okBody.active_job_lease?.extended).toBe(true);
     expect(okBody.active_job_lease?.job_id).toBe(jobId);
     expect(okBody.active_job_lease?.lease_expires_at).toBeTruthy();
+  });
+
+  it("heartbeat with active_job_id returns lease_expired after running lease is reaped", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-hb-active-reaped");
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const jobId = (await (await GET_NEXT(new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) }))).json()).jobs[0].id;
+
+    await POST_CLAIM(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/claim`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "hb-exp", lease_ttl_seconds: 120 }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+    await POST_START(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/start`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "hb-exp" }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    db.run(`UPDATE collection_jobs SET lease_expires_at = ? WHERE id = ?`, [
+      new Date(Date.now() - 60_000).toISOString(),
+      jobId,
+    ]);
+
+    const hb = await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: jobId,
+          instance_id: "hb-exp",
+        }),
+      })
+    );
+
+    expect(hb.status).toBe(409);
+    expect((await hb.json()).code).toBe("lease_expired");
   });
 
   it("artifact duplicate returns 409 job_already_submitted", async () => {

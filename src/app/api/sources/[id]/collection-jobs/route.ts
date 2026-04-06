@@ -18,17 +18,20 @@ export async function GET(
   try {
     const { id: sourceId } = await params;
     const storage = await getStorage();
-    const source = await storage.sources.getById(sourceId);
+    const { source, jobs } = await storage.withTransaction(async (tx) => {
+      const source = await tx.sources.getById(sourceId);
+      if (!source) {
+        return { source: null, jobs: [] };
+      }
+
+      const { searchParams } = new URL(request.url);
+      const status = searchParams.get("status") ?? undefined;
+      const jobs = await tx.jobs.listForSource(sourceId, status ? { status } : undefined);
+      return { source, jobs };
+    });
     if (!source) {
       return NextResponse.json({ error: "Source not found", code: "not_found" }, { status: 404 });
     }
-
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") ?? undefined;
-    const jobs = await storage.withTransaction(async (tx) => {
-      await tx.jobs.reapExpiredLeases();
-      return tx.jobs.listForSource(sourceId, status ? { status } : undefined);
-    });
     return NextResponse.json({ jobs });
   } catch (err) {
     return internalServerErrorResponse(err, "GET /api/sources/[id]/collection-jobs");
