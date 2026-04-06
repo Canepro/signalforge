@@ -53,10 +53,9 @@ export async function GET(request: NextRequest) {
     const deadline = Date.now() + waitSeconds * 1000;
 
     const loadNext = () =>
-      storage.withTransaction(async (tx) => {
-        await tx.jobs.reapExpiredLeases();
-        return tx.jobs.listNextForAgent(ctx.source.id, ctx.registration.id, limit);
-      });
+      storage.withTransaction((tx) =>
+        tx.jobs.listNextForAgentAfterLeaseReap(ctx.source.id, ctx.registration.id, limit)
+      );
 
     let result = await loadNext();
 

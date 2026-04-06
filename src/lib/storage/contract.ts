@@ -183,6 +183,15 @@ export interface JobsStore {
     registrationId: string,
     limit: number
   ): Promise<ListNextQueuedJobsResult>;
+  /**
+   * Agent poll read model boundary:
+   * applies lease reaping and then returns next eligible queued jobs in one storage call.
+   */
+  listNextForAgentAfterLeaseReap(
+    sourceId: string,
+    registrationId: string,
+    limit: number
+  ): Promise<ListNextQueuedJobsResult>;
   claimForAgent(
     jobId: string,
     sourceId: string,

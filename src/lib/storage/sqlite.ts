@@ -291,6 +291,11 @@ class SqliteJobsStore implements JobsStore {
     return listNextQueuedJobSummariesForSource(this.db, source, registration, limit);
   }
 
+  async listNextForAgentAfterLeaseReap(sourceId: string, registrationId: string, limit: number) {
+    await this.reapExpiredLeases();
+    return this.listNextForAgent(sourceId, registrationId, limit);
+  }
+
   async claimForAgent(
     jobId: string,
     sourceId: string,

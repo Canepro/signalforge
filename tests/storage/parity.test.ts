@@ -2503,6 +2503,55 @@ for (const backend of backends) {
       if (failed.ok) expect(failed.row.status).toBe("failed");
     });
 
+    it("listNextForAgentAfterLeaseReap requeues an expired claimed job in one storage boundary", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T15:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Poll reaper host",
+            target_identifier: `parity-poll-reaper-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "poll reaper test" })
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "poll-reaper-inst", 120)
+        );
+
+        vi.setSystemTime(new Date("2026-04-06T15:10:00.000Z"));
+
+        const polled = await storage.withTransaction((tx) =>
+          tx.jobs.listNextForAgentAfterLeaseReap(src.id, reg.id, 1)
+        );
+        expect(polled.jobs).toHaveLength(1);
+        expect(polled.jobs[0]?.id).toBe(job.id);
+        expect(polled.gate).toBeNull();
+
+        const queued = await storage.jobs.listForSource(src.id, { status: "queued" });
+        expect(queued.some((entry) => entry.id === job.id)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("claim → start → submit artifact lifecycle", async () => {
       const src = await storage.withTransaction((tx) =>
         tx.sources.create({

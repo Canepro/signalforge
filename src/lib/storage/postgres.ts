@@ -1016,6 +1016,15 @@ class PostgresJobsStore implements JobsStore {
     return { jobs, gate: null };
   }
 
+  async listNextForAgentAfterLeaseReap(
+    sourceId: string,
+    registrationId: string,
+    limit: number
+  ): Promise<ListNextQueuedJobsResult> {
+    await this.reapExpiredLeases();
+    return this.listNextForAgent(sourceId, registrationId, limit);
+  }
+
   async claimForAgent(
     jobId: string,
     sourceId: string,
