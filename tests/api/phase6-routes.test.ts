@@ -627,6 +627,126 @@ describe("Phase 6 API routes", () => {
     expect(body.code).toBe("active_jobs");
   });
 
+  it("DELETE /api/sources/:id reaps expired claimed leases before active job gating", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-04-06T12:00:00.000Z"));
+
+      const post = await POST_SOURCES(
+        new NextRequest("http://localhost/api/sources", {
+          method: "POST",
+          headers: { ...authHeaders(), "content-type": "application/json" },
+          body: JSON.stringify({
+            display_name: "Delete after lease expiry",
+            target_identifier: "tid-delete-after-expiry",
+            source_type: "linux_host",
+          }),
+        })
+      );
+      const { id: sourceId } = await post.json();
+
+      const storage = await getStorage();
+      const { row: reg } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(sourceId, "api-expired-delete-agent")
+      );
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId,
+          registrationId: reg.id,
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(sourceId, { request_reason: "api expired delete" })
+      );
+      await storage.withTransaction((tx) =>
+        tx.jobs.claimForAgent(job.id, sourceId, reg.id, "api-expired-delete-inst", 120)
+      );
+
+      vi.setSystemTime(new Date("2026-04-06T12:10:00.000Z"));
+
+      const del = await DELETE_SOURCE(
+        new NextRequest(`http://localhost/api/sources/${sourceId}`, {
+          method: "DELETE",
+          headers: authHeaders(),
+        }),
+        { params: Promise.resolve({ id: sourceId }) }
+      );
+      expect(del.status).toBe(200);
+      await expect(del.json()).resolves.toEqual({ ok: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("POST /api/collection-jobs/:id/cancel returns already_terminal after lease-expired running job is reaped", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-04-06T13:00:00.000Z"));
+
+      const post = await POST_SOURCES(
+        new NextRequest("http://localhost/api/sources", {
+          method: "POST",
+          headers: { ...authHeaders(), "content-type": "application/json" },
+          body: JSON.stringify({
+            display_name: "Cancel after lease expiry",
+            target_identifier: "tid-cancel-after-expiry",
+            source_type: "linux_host",
+          }),
+        })
+      );
+      const { id: sourceId } = await post.json();
+
+      const storage = await getStorage();
+      const { row: reg } = await storage.withTransaction((tx) =>
+        tx.agents.createRegistration(sourceId, "api-expired-cancel-agent")
+      );
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId,
+          registrationId: reg.id,
+          capabilities: ["collect:linux-audit-log"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const { row: job } = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(sourceId, { request_reason: "api expired cancel" })
+      );
+      const claimed = await storage.withTransaction((tx) =>
+        tx.jobs.claimForAgent(job.id, sourceId, reg.id, "api-expired-cancel-inst", 120)
+      );
+      expect(claimed.ok).toBe(true);
+      const started = await storage.withTransaction((tx) =>
+        tx.jobs.startForAgent(job.id, sourceId, reg.id, "api-expired-cancel-inst")
+      );
+      expect(started.ok).toBe(true);
+
+      vi.setSystemTime(new Date("2026-04-06T13:10:00.000Z"));
+
+      const cancel = await POST_CANCEL(
+        new NextRequest(`http://localhost/api/collection-jobs/${job.id}/cancel`, {
+          method: "POST",
+          headers: authHeaders(),
+        }),
+        { params: Promise.resolve({ id: job.id }) }
+      );
+      expect(cancel.status).toBe(409);
+      await expect(cancel.json()).resolves.toEqual({
+        error: "Job is already in a terminal state",
+        code: "already_terminal",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("GET /api/sources returns generic 500 when storage listing throws", async () => {
     const spy = vi.spyOn(storageModule, "getStorage").mockResolvedValueOnce({
       sources: {

@@ -471,6 +471,7 @@ class PostgresRunsStore implements RunsStore {
 
   async listDashboardSignalRuns(limit: number) {
     const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
+    const scanLimit = Math.min(1000, Math.max(200, cappedLimit * 200));
     const rows = await many<{
       id: string;
       artifact_id: string;
@@ -490,7 +491,10 @@ class PostgresRunsStore implements RunsStore {
               r.target_identifier, r.collector_type
        FROM runs r
        JOIN artifacts a ON a.id = r.artifact_id
-       ORDER BY r.created_at DESC`
+       WHERE r.report_json IS NOT NULL
+       ORDER BY r.created_at DESC
+       LIMIT $1`,
+      [scanLimit]
     );
 
     const out: Awaited<ReturnType<RunsStore["listDashboardSignalRuns"]>> = [];
@@ -801,6 +805,7 @@ class PostgresSourcesStore implements SourcesStore {
       return { ok: false as const, code: "not_found" as const };
     }
 
+    await new PostgresJobsStore(this.q).reapExpiredLeases();
     const blockingJob = await one<{ id: string }>(
       this.q,
       `SELECT id FROM collection_jobs
@@ -922,6 +927,7 @@ class PostgresJobsStore implements JobsStore {
   }
 
   async cancel(id: string) {
+    await this.reapExpiredLeases();
     const job = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [id]);
     if (!job) return null;
     if (job.status === "running") {

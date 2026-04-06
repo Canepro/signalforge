@@ -8,14 +8,18 @@ if [[ "${VERCEL_ENV:-}" == "production" ]]; then
   exit 0
 fi
 
-# If this is a shallow clone edge case with no parent commit, allow the build.
-if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-  echo "No parent commit available, allowing preview build."
+base_ref=""
+if git show-ref --verify --quiet refs/remotes/origin/main; then
+  base_ref="$(git merge-base HEAD origin/main)"
+elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+  base_ref="HEAD^"
+else
+  echo "No merge base available, allowing preview build."
   exit 1
 fi
 
 # Only build previews when files that affect the Vercel-rendered app changed.
-if git diff --quiet HEAD^ HEAD -- \
+if git diff --quiet "${base_ref}" HEAD -- \
   src \
   middleware.ts \
   next.config.ts \

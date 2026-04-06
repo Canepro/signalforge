@@ -320,6 +320,7 @@ export function deleteSource(db: Database, id: string): DeleteSourceResult {
   const row = getSourceById(db, id);
   if (!row) return { ok: false, code: "not_found" };
 
+  reapExpiredCollectionJobLeases(db);
   const blockingJob = getOne<{ id: string }>(
     db,
     `SELECT id FROM collection_jobs
@@ -455,6 +456,7 @@ export function getCollectionJobById(db: Database, id: string): CollectionJobRow
 }
 
 export function cancelCollectionJob(db: Database, jobId: string): CollectionJobRow | null {
+  reapExpiredCollectionJobLeases(db);
   const job = getCollectionJobById(db, jobId);
   if (!job) return null;
   if (job.status === "running") {

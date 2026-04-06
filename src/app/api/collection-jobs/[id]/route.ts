@@ -13,7 +13,7 @@ export async function GET(
   try {
     const { id } = await params;
     const storage = await getStorage();
-    const row = await storage.jobs.getById(id);
+    const row = await storage.withTransaction((tx) => tx.jobs.getById(id));
     if (!row) {
       return NextResponse.json({ error: "Job not found", code: "not_found" }, { status: 404 });
     }

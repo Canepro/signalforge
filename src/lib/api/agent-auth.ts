@@ -31,7 +31,9 @@ export async function resolveAgentRequest(
   }
 
   const storage = await getStorage();
-  const resolved = await storage.agents.resolveRequestContextByTokenHash(hashAgentToken(token));
+  const resolved = await storage.withTransaction((tx) =>
+    tx.agents.resolveRequestContextByTokenHash(hashAgentToken(token))
+  );
   if (!resolved) {
     return {
       ok: false,

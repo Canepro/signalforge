@@ -91,7 +91,16 @@ export default async function SourceDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const storage = await getStorage();
-  const source = await storage.sources.getById(id);
+  const { source, jobs, registration } = await storage.withTransaction(async (tx) => {
+    const source = await tx.sources.getById(id);
+    if (!source) {
+      return { source: null, jobs: [], registration: null };
+    }
+
+    const jobs = await tx.jobs.listForSource(id);
+    const registration = await tx.agents.getRegistrationBySourceId(id);
+    return { source, jobs, registration };
+  });
   if (!source) {
     return (
       <div className="text-on-surface-variant">
@@ -99,8 +108,6 @@ export default async function SourceDetailPage({
       </div>
     );
   }
-  const jobs = await storage.jobs.listForSource(id);
-  const registration = await storage.agents.getRegistrationBySourceId(id);
   const blockingDeleteJobs = jobs.filter((job) => ["claimed", "running"].includes(job.status));
   const executionSurfaceLabel = getSourceExecutionSurfaceLabel({
     sourceType: source.source_type,

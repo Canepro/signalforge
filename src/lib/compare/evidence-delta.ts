@@ -307,11 +307,13 @@ function buildEvidenceSummaryMetrics(
   current: RunWithArtifactRow
 ): Array<EvidenceDeltaMetricRow | null> {
   const family =
-    current.artifact_type === "container-diagnostics"
-      ? "container-diagnostics"
-      : current.artifact_type === "kubernetes-bundle"
-        ? "kubernetes-bundle"
-        : "common";
+    current.artifact_type === "linux-audit-log"
+      ? "linux-audit-log"
+      : current.artifact_type === "container-diagnostics"
+        ? "container-diagnostics"
+        : current.artifact_type === "kubernetes-bundle"
+          ? "kubernetes-bundle"
+          : "common";
 
   const previousSummary = buildRunEvidenceSummary(
     baseline.artifact_type,

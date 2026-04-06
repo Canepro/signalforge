@@ -2192,6 +2192,50 @@ for (const backend of backends) {
       expect(await storage.jobs.getById(job.id)).not.toBeNull();
     });
 
+    it("delete source reaps expired claimed leases before active job gating", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T11:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Expired delete host",
+            target_identifier: `parity-expired-delete-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "expired delete gate" })
+        );
+        await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "inst-expired-delete", 120)
+        );
+
+        vi.setSystemTime(new Date("2026-04-06T11:10:00.000Z"));
+
+        const deleted = await storage.withTransaction((tx) => tx.sources.delete(src.id));
+        expect(deleted).toEqual({ ok: true });
+        expect(await storage.sources.getById(src.id)).toBeNull();
+        expect(await storage.jobs.getById(job.id)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     // --- JOBS ---
 
     it("queue and list collection jobs", async () => {
@@ -2373,6 +2417,55 @@ for (const backend of backends) {
       const job = jobs.find((j) => j.status === "queued")!;
       const cancelled = await storage.withTransaction((tx) => tx.jobs.cancel(job.id));
       expect(cancelled!.status).toBe("cancelled");
+    });
+
+    it("cancel reaps expired running leases before state validation", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T14:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Expired cancel host",
+            target_identifier: `parity-expired-cancel-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: reg } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id)
+        );
+        await storage.withTransaction((tx) =>
+          tx.agents.applyHeartbeat({
+            sourceId: src.id,
+            registrationId: reg.id,
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agentVersion: "0.1.0",
+            activeJobId: null,
+            instanceId: null,
+          })
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "expired cancel gate" })
+        );
+        const claimed = await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, reg.id, "inst-expired-cancel", 120)
+        );
+        expect(claimed.ok).toBe(true);
+        const started = await storage.withTransaction((tx) =>
+          tx.jobs.startForAgent(job.id, src.id, reg.id, "inst-expired-cancel")
+        );
+        expect(started.ok).toBe(true);
+
+        vi.setSystemTime(new Date("2026-04-06T14:10:00.000Z"));
+
+        await expect(
+          storage.withTransaction((tx) => tx.jobs.cancel(job.id))
+        ).rejects.toMatchObject({ code: "already_terminal" });
+        expect((await storage.jobs.getById(job.id))?.status).toBe("expired");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("queueForSource with disabled source throws", async () => {

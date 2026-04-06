@@ -67,14 +67,18 @@ class SqliteRunsStore implements RunsStore {
 
   async listDashboardSignalRuns(limit: number) {
     const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
+    const scanLimit = Math.min(1000, Math.max(200, cappedLimit * 200));
     const stmt = this.db.prepare(
       `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
               r.created_at, r.status, r.report_json, r.environment_json,
               r.target_identifier, r.collector_type
        FROM runs r
        JOIN artifacts a ON r.artifact_id = a.id
-       ORDER BY r.created_at DESC`
+       WHERE r.report_json IS NOT NULL
+       ORDER BY r.created_at DESC
+       LIMIT ?`
     );
+    stmt.bind([scanLimit]);
 
     const out: Awaited<ReturnType<RunsStore["listDashboardSignalRuns"]>> = [];
     while (stmt.step() && out.length < cappedLimit) {
