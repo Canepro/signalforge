@@ -14,6 +14,12 @@ import {
   defaultCapabilitiesForArtifactType,
   type SourceType,
 } from "../source-catalog";
+import {
+  buildHeartbeatLeaseExpiryIso,
+  buildListNextQueuedJobsResult,
+  mergeHeartbeatAttributesJson,
+  normalizeHeartbeatAgentVersion,
+} from "../storage/shared/agent-lifecycle-shared";
 
 export type { SourceType } from "../source-catalog";
 export { collectCapabilityForArtifactType, defaultCapabilitiesForArtifactType } from "../source-catalog";
@@ -526,16 +532,6 @@ export interface ListNextQueuedJobsResult {
   gate: JobsNextGate | null;
 }
 
-function jobPassesCapabilityGate(
-  job: CollectionJobRow,
-  agentCaps: string[],
-  sourceCaps: string[]
-): boolean {
-  const required = collectCapabilityForArtifactType(job.artifact_type);
-  const inter = agentCaps.filter((c) => sourceCaps.includes(c));
-  return inter.includes(required);
-}
-
 /**
  * Phase 6d jobs/next — FIFO queued jobs for this source (strict gating).
  *
@@ -550,19 +546,6 @@ export function listNextQueuedJobSummariesForSource(
   registration: AgentRegistrationRow,
   limit: number
 ): ListNextQueuedJobsResult {
-  if (!source.enabled) {
-    return { jobs: [], gate: "source_disabled" };
-  }
-
-  if (!registration.last_heartbeat_at) {
-    return { jobs: [], gate: "heartbeat_required" };
-  }
-
-  const agentCaps = parseJsonArray(registration.last_capabilities_json ?? "[]");
-  if (agentCaps.length === 0) {
-    return { jobs: [], gate: "capabilities_empty" };
-  }
-
   const rows = allRows<CollectionJobRow>(
     db,
     `SELECT * FROM collection_jobs
@@ -571,12 +554,12 @@ export function listNextQueuedJobSummariesForSource(
     [source.id]
   );
 
-  const sourceCaps = parseJsonArray(source.capabilities_json);
-
-  const out: CollectionJobSummary[] = [];
-  for (const job of rows) {
-    if (!jobPassesCapabilityGate(job, agentCaps, sourceCaps)) continue;
-    out.push({
+  return buildListNextQueuedJobsResult({
+    sourceEnabled: source.enabled === 1,
+    lastHeartbeatAt: registration.last_heartbeat_at ?? null,
+    agentCapabilities: parseJsonArray(registration.last_capabilities_json ?? "[]"),
+    sourceCapabilities: parseJsonArray(source.capabilities_json),
+    queuedJobs: rows.map((job) => ({
       id: job.id,
       source_id: job.source_id,
       artifact_type: job.artifact_type,
@@ -584,15 +567,9 @@ export function listNextQueuedJobSummariesForSource(
       created_at: job.created_at,
       request_reason: job.request_reason,
       collection_scope: parseCollectionScopeJson(job.collection_scope_json),
-    });
-    if (out.length >= limit) break;
-  }
-
-  if (out.length === 0 && rows.length > 0) {
-    return { jobs: [], gate: "capability_mismatch" };
-  }
-
-  return { jobs: out, gate: null };
+    })),
+    limit,
+  });
 }
 
 export interface HeartbeatInput {
@@ -625,20 +602,6 @@ export interface ApplyAgentHeartbeatResult {
   active_job_lease: ActiveJobLeaseHeartbeatResult;
 }
 
-/** Extend lease by 120s from max(now, current expiry), capped 30m after claim. */
-function extendedLeaseExpiryIso(job: CollectionJobRow, nowMs: number): string {
-  const extendMs = 120_000;
-  const leaseEnd =
-    job.lease_expires_at ? new Date(job.lease_expires_at).getTime() : nowMs;
-  const base = Math.max(nowMs, leaseEnd);
-  let next = base + extendMs;
-  if (job.claimed_at) {
-    const cap = new Date(job.claimed_at).getTime() + 30 * 60_000;
-    next = Math.min(next, cap);
-  }
-  return new Date(next).toISOString();
-}
-
 export function applyAgentHeartbeat(
   db: Database,
   registration: AgentRegistrationRow,
@@ -651,14 +614,7 @@ export function applyAgentHeartbeat(
   let active_job_lease: ActiveJobLeaseHeartbeatResult = { requested: false };
 
   const capsJson = JSON.stringify(input.capabilities);
-  const mergedAttrs = (() => {
-    try {
-      const prev = JSON.parse(source.attributes_json || "{}") as Record<string, unknown>;
-      return JSON.stringify({ ...prev, ...input.attributes });
-    } catch {
-      return JSON.stringify(input.attributes);
-    }
-  })();
+  const mergedAttrs = mergeHeartbeatAttributesJson(source.attributes_json, input.attributes);
 
   db.run(
     `UPDATE sources SET
@@ -676,7 +632,7 @@ export function applyAgentHeartbeat(
       last_heartbeat_at = ?,
       last_agent_version = ?
     WHERE id = ?`,
-    [capsJson, now, input.agent_version.trim() || null, registration.id]
+    [capsJson, now, normalizeHeartbeatAgentVersion(input.agent_version), registration.id]
   );
 
   if (prevHealth !== "online") {
@@ -708,7 +664,7 @@ export function applyAgentHeartbeat(
       };
     } else {
       const prevExp = job.lease_expires_at!;
-      const newExp = extendedLeaseExpiryIso(job, nowMs);
+      const newExp = buildHeartbeatLeaseExpiryIso(job, nowMs);
       db.run(
         `UPDATE collection_jobs SET
           lease_expires_at = ?,

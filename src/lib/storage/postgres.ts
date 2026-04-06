@@ -37,6 +37,13 @@ import {
   toRunSubmissionMeta,
   validateAgentSubmissionState,
 } from "./shared/run-shared";
+import {
+  buildHeartbeatLeaseExpiryIso,
+  buildListNextQueuedJobsResult,
+  mergeHeartbeatAttributesJson,
+  normalizeHeartbeatAgentVersion,
+  validateHeartbeatActiveJob,
+} from "./shared/agent-lifecycle-shared";
 import { projectCollectionJobLeaseReadModel } from "./shared/job-read-model";
 import {
   generateAgentToken,
@@ -56,10 +63,7 @@ import {
   preferredTargetMatchKey,
 } from "@/lib/target-identity";
 import { emitDomainEvent } from "@/lib/domain-events";
-import {
-  collectCapabilityForArtifactType,
-  defaultCapabilitiesForArtifactType,
-} from "@/lib/source-catalog";
+import { defaultCapabilitiesForArtifactType } from "@/lib/source-catalog";
 
 type Queryable = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
@@ -990,20 +994,18 @@ class PostgresJobsStore implements JobsStore {
     const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
     const registration = await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE source_id = $1", [sourceId]);
     if (!source || !registration || registration.id !== registrationId) return { jobs: [], gate: "source_disabled" };
-    if (!source.enabled) return { jobs: [], gate: "source_disabled" };
-    if (!registration.last_heartbeat_at) return { jobs: [], gate: "heartbeat_required" };
-    const agentCaps = parseJson<string[]>(registration.last_capabilities_json, []);
-    if (agentCaps.length === 0) return { jobs: [], gate: "capabilities_empty" };
-    const sourceCaps = parseJson<string[]>(source.capabilities_json, []);
     const rows = await many<PgCollectionJobRow>(
       this.q,
       `SELECT * FROM collection_jobs WHERE source_id = $1 AND status = 'queued' ORDER BY created_at ASC`,
       [sourceId]
     );
-    const jobs = rows
-      .filter((job) => agentCaps.filter((c) => sourceCaps.includes(c)).includes(collectCapabilityForArtifactType(job.artifact_type)))
-      .slice(0, limit)
-      .map((job) => ({
+
+    return buildListNextQueuedJobsResult({
+      sourceEnabled: source.enabled,
+      lastHeartbeatAt: registration.last_heartbeat_at,
+      agentCapabilities: parseJson<string[]>(registration.last_capabilities_json, []),
+      sourceCapabilities: parseJson<string[]>(source.capabilities_json, []),
+      queuedJobs: rows.map((job) => ({
         id: job.id,
         source_id: job.source_id,
         artifact_type: job.artifact_type,
@@ -1011,9 +1013,9 @@ class PostgresJobsStore implements JobsStore {
         created_at: job.created_at,
         request_reason: job.request_reason,
         collection_scope: parseCollectionScopeJson(job.collection_scope_json),
-      }));
-    if (jobs.length === 0 && rows.length > 0) return { jobs: [], gate: "capability_mismatch" };
-    return { jobs, gate: null };
+      })),
+      limit,
+    });
   }
 
   async listNextForAgentAfterLeaseReap(
@@ -1277,26 +1279,22 @@ class PostgresAgentsStore implements AgentsStore {
     if (!registration || registration.id !== input.registrationId) return { ok: false as const, code: "registration_not_found" };
 
     const now = new Date().toISOString();
+    const nowMs = Date.now();
     let activeJob: PgCollectionJobRow | null = null;
     if (input.activeJobId) {
       activeJob = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.activeJobId]);
       if (!activeJob) return { ok: false as const, code: "active_job_not_found" };
-      if (activeJob.source_id !== source.id) return { ok: false as const, code: "forbidden" };
-      if (activeJob.status === "expired" && activeJob.error_code === "lease_lost") {
-        return { ok: false as const, code: "lease_expired" };
-      }
-      if (activeJob.lease_owner_id !== registration.id) return { ok: false as const, code: "forbidden" };
-      if (activeJob.status !== "claimed" && activeJob.status !== "running") {
-        return { ok: false as const, code: "invalid_active_job_state" };
-      }
-      if (!activeJob.lease_owner_instance_id) {
-        return { ok: false as const, code: "invalid_state" };
-      }
-      if (activeJob.lease_owner_instance_id !== input.instanceId) {
-        return { ok: false as const, code: "instance_mismatch" };
-      }
-      if (!activeJob.lease_expires_at || activeJob.lease_expires_at <= now) {
-        return { ok: false as const, code: "lease_expired" };
+      const activeJobValidation = validateHeartbeatActiveJob(
+        activeJob,
+        {
+          sourceId: source.id,
+          registrationId: registration.id,
+          instanceId: input.instanceId,
+        },
+        now
+      );
+      if (!activeJobValidation.ok) {
+        return { ok: false as const, code: activeJobValidation.code };
       }
     }
 
@@ -1306,14 +1304,19 @@ class PostgresAgentsStore implements AgentsStore {
       `UPDATE sources SET last_seen_at = $1, health_status = 'online', attributes_json = $2, updated_at = $3 WHERE id = $4`,
       [
         now,
-        JSON.stringify({ ...parseJson<Record<string, unknown>>(source.attributes_json, {}), ...input.attributes }),
+        mergeHeartbeatAttributesJson(source.attributes_json, input.attributes),
         now,
         source.id,
       ]
     );
     await this.q.query(
       `UPDATE agent_registrations SET last_capabilities_json = $1, last_heartbeat_at = $2, last_agent_version = $3 WHERE id = $4`,
-      [JSON.stringify(input.capabilities), now, input.agentVersion.trim() || null, registration.id]
+      [
+        JSON.stringify(input.capabilities),
+        now,
+        normalizeHeartbeatAgentVersion(input.agentVersion),
+        registration.id,
+      ]
     );
     if (prevHealth !== "online") {
       emitDomainEvent("source.health_changed", {
@@ -1321,16 +1324,8 @@ class PostgresAgentsStore implements AgentsStore {
       });
     }
     if (input.activeJobId && input.instanceId && activeJob) {
-      const extendMs = 120_000;
       const previousLeaseExpiry = activeJob.lease_expires_at!;
-      const leaseEnd = new Date(previousLeaseExpiry).getTime();
-      const base = Math.max(Date.now(), leaseEnd);
-      let next = base + extendMs;
-      if (activeJob.claimed_at) {
-        const cap = new Date(activeJob.claimed_at).getTime() + 30 * 60_000;
-        next = Math.min(next, cap);
-      }
-      const newExp = new Date(next).toISOString();
+      const newExp = buildHeartbeatLeaseExpiryIso(activeJob, nowMs);
       const res = await this.q.query(
         `UPDATE collection_jobs SET lease_expires_at = $1, last_heartbeat_at = $2, updated_at = $3
          WHERE id = $4 AND source_id = $5 AND status IN ('claimed', 'running')
