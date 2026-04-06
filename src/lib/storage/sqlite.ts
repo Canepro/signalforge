@@ -250,14 +250,16 @@ class SqliteJobsStore implements JobsStore {
   constructor(private readonly db: Database) {}
 
   async listForSource(sourceId: string, opts?: { status?: string }) {
-    return listCollectionJobsForSource(this.db, sourceId, opts)
+    const projected = listCollectionJobsForSource(this.db, sourceId)
       .map(collectionJobToJson)
       .map((job) => projectCollectionJobLeaseReadModel(job));
+
+    return opts?.status ? projected.filter((job) => job.status === opts.status) : projected;
   }
 
   async getById(id: string) {
     const row = getCollectionJobById(this.db, id);
-    return row ? collectionJobToJson(row) : null;
+    return row ? projectCollectionJobLeaseReadModel(collectionJobToJson(row)) : null;
   }
 
   async queueForSource(sourceId: string, input: Parameters<typeof insertCollectionJob>[2]) {

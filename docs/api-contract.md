@@ -265,9 +265,9 @@ All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>
 
 **`POST /api/sources/[id]/collection-jobs`** — optional JSON: `request_reason`, `priority`, `idempotency_key` (24h dedupe per source), and typed `collection_scope` (`linux_host` / `container_target` / `kubernetes_scope`). Scope shape must match `source.expected_artifact_type`; mismatch returns **400** `invalid_collection_scope`. **201** new job, **200** same job on idempotent replay. **409** `source_disabled`.
 
-**`GET /api/sources/[id]/collection-jobs`** — optional `?status=`. Runs a small **lease reaper** before listing. **200:** `{ "jobs": CollectionJob[] }`.
+**`GET /api/sources/[id]/collection-jobs`** — optional `?status=`. Returns a read-model projection for expired leases (`claimed`→`queued`, `running`→`expired`) without mutating stored rows. Status filtering is applied after this projection. **200:** `{ "jobs": CollectionJob[] }`.
 
-**`GET /api/collection-jobs/[id]`** — reaper runs first. **200** job. **404** if missing.
+**`GET /api/collection-jobs/[id]`** — same lease read-model projection as list (no write-side reaper on this read path). **200** job. **404** if missing.
 
 **`POST /api/collection-jobs/[id]/cancel`** — **200** cancelled job. **409** if `running` or already terminal.
 
@@ -277,7 +277,7 @@ Errors are JSON `{ "error": string, "code"?: string }` unless noted.
 
 ### Phase 6d: agent execution (source-bound Bearer)
 
-All routes below require `Authorization: Bearer <agent_token>` (from registrations). A small **lease reaper** runs on these requests (same as operator job reads): expired **claimed** leases → job **queued** again; expired **running** → terminal **`expired`** (not requeued).
+All routes below require `Authorization: Bearer <agent_token>` (from registrations). A small **lease reaper** runs on these requests: expired **claimed** leases → job **queued** again; expired **running** → terminal **`expired`** (not requeued).
 
 **`POST /api/agent/heartbeat`** — JSON: `capabilities`, `attributes`, `agent_version`, optional `active_job_id`, optional `instance_id`. Updates registration caps, merges source `attributes`, sets source `last_seen_at` and `health_status=online`. **When `active_job_id` is set:** `instance_id` is **required** and must equal the job’s `lease_owner_instance_id`; job must be **claimed** or **running**, leased to this registration, lease not expired — otherwise **400** / **403** / **409** with explicit `code` (`instance_id_required`, `instance_mismatch`, `lease_expired`, etc.). Lease extension uses this **request** `instance_id` (not registration state alone). **401** if token invalid.
 

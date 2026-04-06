@@ -818,15 +818,18 @@ class PostgresJobsStore implements JobsStore {
   constructor(private readonly q: Queryable) {}
 
   async listForSource(sourceId: string, opts?: { status?: string }) {
-    const rows = opts?.status ?
-      await many<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE source_id = $1 AND status = $2 ORDER BY created_at DESC", [sourceId, opts.status])
-      : await many<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE source_id = $1 ORDER BY created_at DESC", [sourceId]);
-    return rows.map(jobToView).map((job) => projectCollectionJobLeaseReadModel(job));
+    const rows = await many<PgCollectionJobRow>(
+      this.q,
+      "SELECT * FROM collection_jobs WHERE source_id = $1 ORDER BY created_at DESC",
+      [sourceId]
+    );
+    const projected = rows.map(jobToView).map((job) => projectCollectionJobLeaseReadModel(job));
+    return opts?.status ? projected.filter((job) => job.status === opts.status) : projected;
   }
 
   async getById(id: string) {
     const row = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [id]);
-    return row ? jobToView(row) : null;
+    return row ? projectCollectionJobLeaseReadModel(jobToView(row)) : null;
   }
 
   async queueForSource(

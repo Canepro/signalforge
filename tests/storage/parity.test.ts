@@ -11,7 +11,7 @@
  *   DATABASE_URL_TEST=postgres://signalforge:signalforge@127.0.0.1:5432/signalforge bun test tests/storage/parity
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -2211,6 +2211,88 @@ for (const backend of backends) {
       const jobs = await storage.jobs.listForSource(src.id);
       expect(jobs.some((j) => j.id === row.id)).toBe(true);
       expect(jobs.find((j) => j.id === row.id)?.collection_scope ?? null).toBeNull();
+    });
+
+    it("listForSource applies status filter after lease projection", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T12:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Projected status host",
+            target_identifier: `parity-projected-status-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: registration } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id, "status-projection-agent")
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "projection filter test" })
+        );
+        const claimed = await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, registration.id, "status-projection-instance", 120)
+        );
+        expect(claimed.ok).toBe(true);
+
+        const initiallyClaimed = await storage.jobs.listForSource(src.id, { status: "claimed" });
+        expect(initiallyClaimed.some((entry) => entry.id === job.id)).toBe(true);
+
+        vi.setSystemTime(new Date("2026-04-06T12:10:00.000Z"));
+        const projectedQueued = await storage.jobs.listForSource(src.id, { status: "queued" });
+        expect(projectedQueued.some((entry) => entry.id === job.id)).toBe(true);
+
+        vi.setSystemTime(new Date("2026-04-06T12:01:00.000Z"));
+        const claimedAgain = await storage.jobs.listForSource(src.id, { status: "claimed" });
+        expect(claimedAgain.some((entry) => entry.id === job.id)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("getById projects expired running leases without mutating persisted job state", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-04-06T13:00:00.000Z"));
+
+        const src = await storage.withTransaction((tx) =>
+          tx.sources.create({
+            display_name: "Projected getById host",
+            target_identifier: `parity-projected-getbyid-${backend.name}`,
+            source_type: "linux_host",
+          })
+        );
+        const { row: registration } = await storage.withTransaction((tx) =>
+          tx.agents.createRegistration(src.id, "getbyid-projection-agent")
+        );
+        const { row: job } = await storage.withTransaction((tx) =>
+          tx.jobs.queueForSource(src.id, { request_reason: "projection getById test" })
+        );
+
+        const claimed = await storage.withTransaction((tx) =>
+          tx.jobs.claimForAgent(job.id, src.id, registration.id, "getbyid-projection-instance", 300)
+        );
+        expect(claimed.ok).toBe(true);
+        const started = await storage.withTransaction((tx) =>
+          tx.jobs.startForAgent(job.id, src.id, registration.id, "getbyid-projection-instance")
+        );
+        expect(started.ok).toBe(true);
+
+        const beforeExpiry = await storage.jobs.getById(job.id);
+        expect(beforeExpiry?.status).toBe("running");
+
+        vi.setSystemTime(new Date("2026-04-06T13:10:00.000Z"));
+        const projectedExpired = await storage.jobs.getById(job.id);
+        expect(projectedExpired?.status).toBe("expired");
+        expect(projectedExpired?.error_code).toBe("lease_lost");
+
+        vi.setSystemTime(new Date("2026-04-06T13:01:00.000Z"));
+        const runningAgain = await storage.jobs.getById(job.id);
+        expect(runningAgain?.status).toBe("running");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("queueForSource stores typed collection_scope on the job", async () => {

@@ -262,6 +262,112 @@ describe("Phase 6 API routes", () => {
     expect(one.status).toBe(200);
   });
 
+  it("GET /api/sources/:id/collection-jobs filters on projected lease status without mutating the row", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Projected list source",
+          target_identifier: "tid-projected-list",
+          source_type: "linux_host",
+        }),
+      })
+    );
+    const { id: sourceId } = await post.json();
+
+    const jobRes = await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const job = await jobRes.json();
+
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    db.run(
+      `UPDATE collection_jobs
+       SET status = 'claimed',
+           lease_owner_id = ?,
+           lease_owner_instance_id = ?,
+           lease_expires_at = ?,
+           claimed_at = ?
+       WHERE id = ?`,
+      ["agent-1", "instance-1", expired, expired, job.id]
+    );
+
+    const listed = await GET_SOURCE_JOBS(
+      new NextRequest(
+        `http://localhost/api/sources/${sourceId}/collection-jobs?status=queued`,
+        { headers: authHeaders() }
+      ),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    expect(listed.status).toBe(200);
+    const listedBody = await listed.json();
+    expect(listedBody.jobs).toHaveLength(1);
+    expect(listedBody.jobs[0].id).toBe(job.id);
+    expect(listedBody.jobs[0].status).toBe("queued");
+
+    const stmt = db.prepare("SELECT status FROM collection_jobs WHERE id = ?");
+    stmt.bind([job.id]);
+    expect(stmt.step()).toBe(true);
+    expect((stmt.getAsObject() as { status: string }).status).toBe("claimed");
+    stmt.free();
+  });
+
+  it("GET /api/collection-jobs/:id projects lease expiry without mutating persisted status", async () => {
+    const post = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Projected get source",
+          target_identifier: "tid-projected-get",
+          source_type: "linux_host",
+        }),
+      })
+    );
+    const { id: sourceId } = await post.json();
+
+    const jobRes = await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const job = await jobRes.json();
+
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    db.run(
+      `UPDATE collection_jobs
+       SET status = 'running',
+           lease_owner_id = ?,
+           lease_owner_instance_id = ?,
+           lease_expires_at = ?,
+           started_at = ?
+       WHERE id = ?`,
+      ["agent-1", "instance-1", expired, expired, job.id]
+    );
+
+    const one = await GET_JOB(
+      new NextRequest(`http://localhost/api/collection-jobs/${job.id}`, { headers: authHeaders() }),
+      { params: Promise.resolve({ id: job.id }) }
+    );
+    expect(one.status).toBe(200);
+    const oneBody = await one.json();
+    expect(oneBody.status).toBe("expired");
+    expect(oneBody.error_code).toBe("lease_lost");
+
+    const stmt = db.prepare("SELECT status FROM collection_jobs WHERE id = ?");
+    stmt.bind([job.id]);
+    expect(stmt.step()).toBe(true);
+    expect((stmt.getAsObject() as { status: string }).status).toBe("running");
+    stmt.free();
+  });
+
   it("collection job create validates collection_scope by artifact family", async () => {
     const post = await POST_SOURCES(
       new NextRequest("http://localhost/api/sources", {

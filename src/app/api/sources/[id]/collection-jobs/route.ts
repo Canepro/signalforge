@@ -25,10 +25,7 @@ export async function GET(
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") ?? undefined;
-    const jobs = await storage.withTransaction(async (tx) => {
-      await tx.jobs.reapExpiredLeases();
-      return tx.jobs.listForSource(sourceId, status ? { status } : undefined);
-    });
+    const jobs = await storage.jobs.listForSource(sourceId, status ? { status } : undefined);
     return NextResponse.json({ jobs });
   } catch (err) {
     return internalServerErrorResponse(err, "GET /api/sources/[id]/collection-jobs");
