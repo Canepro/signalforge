@@ -8,6 +8,9 @@ import { runAttentionScore } from "@/lib/storage/shared/run-shared";
 import type { RunSummary } from "@/types/api";
 import type { ArtifactType } from "@/lib/source-catalog";
 
+const DASHBOARD_PULSE_DAYS = 42;
+const DASHBOARD_RECENT_RUN_LIMIT = 200;
+
 interface DashboardStats {
   totalRuns: number;
   criticalFindings: number;
@@ -190,17 +193,37 @@ function buildCollectionPulse(
   };
 }
 
+function dashboardWindowStartIso(nowMs: number, days = DASHBOARD_PULSE_DAYS): string {
+  const start = new Date(nowMs);
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  return start.toISOString();
+}
+
 export async function loadDashboardReadModel(
   storage: Storage,
   nowMs = Date.now()
 ): Promise<DashboardReadModel> {
-  const runs = (await storage.runs.listSummaries()).map((run) => ({
+  const windowStartIso = dashboardWindowStartIso(nowMs);
+  const [recentRuns, windowRuns, totalRuns, suppressedNoise] = await Promise.all([
+    storage.runs.listDashboardRecentRuns(DASHBOARD_RECENT_RUN_LIMIT),
+    storage.runs.listDashboardWindowRuns(windowStartIso),
+    storage.runs.countRuns(),
+    storage.runs.countSuppressedNoise(),
+  ]);
+
+  const runs = recentRuns.map((run) => ({
+    ...run,
+    created_at_label: formatRelativeTime(run.created_at, nowMs),
+  }));
+  const dashboardWindowRuns = windowRuns.map((run) => ({
     ...run,
     created_at_label: formatRelativeTime(run.created_at, nowMs),
   }));
 
-  const stats = computeStats(runs);
-  stats.suppressedNoise = await storage.runs.countSuppressedNoise();
+  const stats = computeStats(dashboardWindowRuns);
+  stats.totalRuns = totalRuns;
+  stats.suppressedNoise = suppressedNoise;
 
   const sourceStates = await storage.sources.listDashboardCollectionSourceStates({ enabled: true });
 
@@ -225,7 +248,7 @@ export async function loadDashboardReadModel(
       return bMs - aMs || a.display_name.localeCompare(b.display_name);
     });
 
-  const collectionPulse = buildCollectionPulse(runs, sourceStates, nowMs);
+  const collectionPulse = buildCollectionPulse(dashboardWindowRuns, sourceStates, nowMs);
 
   const signalRuns = await storage.runs.listDashboardSignalRuns(12);
 

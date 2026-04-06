@@ -65,6 +65,81 @@ class SqliteRunsStore implements RunsStore {
     return listRuns(this.db);
   }
 
+  async countRuns() {
+    const stmt = this.db.prepare("SELECT COUNT(*) AS total FROM runs");
+    stmt.step();
+    const row = stmt.getAsObject() as { total: number };
+    stmt.free();
+    return Number(row.total ?? 0);
+  }
+
+  async listDashboardRecentRuns(limit: number) {
+    const cappedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+    const stmt = this.db.prepare(
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON r.artifact_id = a.id
+       ORDER BY r.created_at DESC
+       LIMIT ?`
+    );
+    stmt.bind([cappedLimit]);
+
+    const out = [] as ReturnType<RunsStore["listDashboardRecentRuns"]> extends Promise<infer T> ? T : never;
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as {
+        id: string;
+        artifact_id: string;
+        filename: string;
+        artifact_type: string;
+        source_type: string;
+        created_at: string;
+        status: string;
+        report_json: string | null;
+        environment_json: string | null;
+        target_identifier: string | null;
+        collector_type: string | null;
+      };
+      out.push(mapRunSummaryRow(row));
+    }
+    stmt.free();
+    return out;
+  }
+
+  async listDashboardWindowRuns(sinceIso: string) {
+    const stmt = this.db.prepare(
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON r.artifact_id = a.id
+       WHERE r.created_at >= ?
+       ORDER BY r.created_at DESC`
+    );
+    stmt.bind([sinceIso]);
+
+    const out = [] as ReturnType<RunsStore["listDashboardWindowRuns"]> extends Promise<infer T> ? T : never;
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as {
+        id: string;
+        artifact_id: string;
+        filename: string;
+        artifact_type: string;
+        source_type: string;
+        created_at: string;
+        status: string;
+        report_json: string | null;
+        environment_json: string | null;
+        target_identifier: string | null;
+        collector_type: string | null;
+      };
+      out.push(mapRunSummaryRow(row));
+    }
+    stmt.free();
+    return out;
+  }
+
   async listDashboardSignalRuns(limit: number) {
     const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
     const scanLimit = Math.min(1000, Math.max(200, cappedLimit * 200));

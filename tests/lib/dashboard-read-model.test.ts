@@ -24,7 +24,7 @@ function mkSource(overrides: Partial<SourceView> = {}): SourceView {
 }
 
 describe("loadDashboardReadModel", () => {
-  it("uses aggregated source registration states instead of per-source registration fan-out", async () => {
+  it("uses dashboard-scoped run reads instead of full-history summaries", async () => {
     const sourceStates: DashboardCollectionSourceState[] = [
       {
         source: mkSource({
@@ -53,13 +53,22 @@ describe("loadDashboardReadModel", () => {
       },
     ];
 
+    const listSummaries = vi
+      .fn()
+      .mockRejectedValue(new Error("unexpected full-history run summary read"));
     const getRegistrationBySourceId = vi
       .fn()
       .mockRejectedValue(new Error("unexpected per-source registration lookup"));
+    const listDashboardRecentRuns = vi.fn().mockResolvedValue([]);
+    const listDashboardWindowRuns = vi.fn().mockResolvedValue([]);
+    const countRuns = vi.fn().mockResolvedValue(17);
 
     const storage = {
       runs: {
-        listSummaries: vi.fn().mockResolvedValue([]),
+        listSummaries,
+        countRuns,
+        listDashboardRecentRuns,
+        listDashboardWindowRuns,
         countSuppressedNoise: vi.fn().mockResolvedValue(0),
         listDashboardSignalRuns: vi.fn().mockResolvedValue([]),
       },
@@ -73,6 +82,10 @@ describe("loadDashboardReadModel", () => {
 
     const model = await loadDashboardReadModel(storage, Date.parse("2026-04-06T12:00:00.000Z"));
 
+    expect(listSummaries).not.toHaveBeenCalled();
+    expect(listDashboardRecentRuns).toHaveBeenCalledWith(200);
+    expect(listDashboardWindowRuns).toHaveBeenCalledWith("2026-02-24T00:00:00.000Z");
+    expect(countRuns).toHaveBeenCalledTimes(1);
     expect(getRegistrationBySourceId).not.toHaveBeenCalled();
     expect(storage.sources.listDashboardCollectionSourceStates).toHaveBeenCalledWith({ enabled: true });
 
@@ -89,5 +102,6 @@ describe("loadDashboardReadModel", () => {
 
     expect(model.collectionPulse.configuredSources).toBe(2);
     expect(model.collectionPulse.onlineSources).toBe(1);
+    expect(model.totalRuns).toBe(17);
   });
 });

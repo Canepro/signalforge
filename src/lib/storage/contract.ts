@@ -49,6 +49,9 @@ export interface DashboardSignalRun {
 
 export interface RunsStore {
   listSummaries(): Promise<RunSummary[]>;
+  countRuns(): Promise<number>;
+  listDashboardRecentRuns(limit: number): Promise<RunSummary[]>;
+  listDashboardWindowRuns(sinceIso: string): Promise<RunSummary[]>;
   /**
    * Read-optimized query for dashboard operator lanes/highlights.
    * Returns newest runs with actionable severity plus parsed findings.

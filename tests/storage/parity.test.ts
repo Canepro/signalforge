@@ -393,6 +393,60 @@ for (const backend of backends) {
       expect(run!.severity_counts).toHaveProperty("medium");
     });
 
+    it("dashboard run helpers return bounded recent runs plus a time window", async () => {
+      const older = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-window-older.log",
+          content: "dashboard-window-older-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-window",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      const newer = await storage.withTransaction((tx) =>
+        tx.runs.persistAnalyzedRun({
+          artifactType: "linux-audit-log",
+          sourceType: "api",
+          filename: "dashboard-window-newer.log",
+          content: "dashboard-window-newer-content",
+          ingestion: {
+            target_identifier: "parity-dashboard-window",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: null,
+          },
+          analysis: fakeAnalysis(),
+        })
+      );
+
+      const recentRuns = await storage.runs.listDashboardRecentRuns(1);
+      expect(recentRuns).toHaveLength(1);
+      expect(recentRuns[0]!.id).toBe(newer.run_id);
+
+      const recentWindowRuns = await storage.runs.listDashboardWindowRuns(
+        new Date(Date.now() - 60_000).toISOString()
+      );
+      expect(recentWindowRuns.some((run) => run.id === older.run_id)).toBe(true);
+      expect(recentWindowRuns.some((run) => run.id === newer.run_id)).toBe(true);
+
+      const futureWindowRuns = await storage.runs.listDashboardWindowRuns(
+        new Date(Date.now() + 60_000).toISOString()
+      );
+      expect(futureWindowRuns).toEqual([]);
+
+      const totalRuns = await storage.runs.countRuns();
+      expect(totalRuns).toBeGreaterThanOrEqual(2);
+    });
+
     it("listDashboardSignalRuns returns read-optimized attention runs", async () => {
       const actionable = await storage.withTransaction((tx) =>
         tx.runs.persistAnalyzedRun({

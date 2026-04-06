@@ -469,6 +469,66 @@ class PostgresRunsStore implements RunsStore {
     return rows.map(mapRunSummaryRow);
   }
 
+  async countRuns() {
+    const row = await one<{ total: string | number }>(this.q, "SELECT COUNT(*) AS total FROM runs");
+    return Number(row?.total ?? 0);
+  }
+
+  async listDashboardRecentRuns(limit: number) {
+    const cappedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+    const rows = await many<{
+      id: string;
+      artifact_id: string;
+      filename: string;
+      artifact_type: string;
+      source_type: string;
+      created_at: string;
+      status: string;
+      report_json: string | null;
+      environment_json: string | null;
+      target_identifier: string | null;
+      collector_type: string | null;
+    }>(
+      this.q,
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON a.id = r.artifact_id
+       ORDER BY r.created_at DESC
+       LIMIT $1`,
+      [cappedLimit]
+    );
+    return rows.map(mapRunSummaryRow);
+  }
+
+  async listDashboardWindowRuns(sinceIso: string) {
+    const rows = await many<{
+      id: string;
+      artifact_id: string;
+      filename: string;
+      artifact_type: string;
+      source_type: string;
+      created_at: string;
+      status: string;
+      report_json: string | null;
+      environment_json: string | null;
+      target_identifier: string | null;
+      collector_type: string | null;
+    }>(
+      this.q,
+      `SELECT r.id, r.artifact_id, r.filename, a.artifact_type, r.source_type,
+              r.created_at, r.status, r.report_json, r.environment_json,
+              r.target_identifier, r.collector_type
+       FROM runs r
+       JOIN artifacts a ON a.id = r.artifact_id
+       WHERE r.created_at >= $1
+       ORDER BY r.created_at DESC`,
+      [sinceIso]
+    );
+    return rows.map(mapRunSummaryRow);
+  }
+
   async listDashboardSignalRuns(limit: number) {
     const cappedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
     const scanLimit = Math.min(1000, Math.max(200, cappedLimit * 200));
