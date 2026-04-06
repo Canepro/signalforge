@@ -1,5 +1,6 @@
-import type { Severity } from "@/lib/analyzer/schema";
+import type { Finding, Severity } from "@/lib/analyzer/schema";
 import { parseEnvironmentHostname, type RunWithArtifactRow } from "@/lib/db/repository";
+import { buildRunEvidenceSummary } from "@/lib/run-evidence-presentation";
 import {
   type ContainerFailureLogExcerpt,
   containerValueFor,
@@ -243,10 +244,10 @@ type NamespaceResourceDefaults = {
   hasDefaultLimits: boolean;
 };
 
-function parseReport(reportJson: string | null): { findings?: { severity?: Severity }[] } {
+function parseReport(reportJson: string | null): { findings?: Finding[] } {
   if (!reportJson) return {};
   try {
-    return JSON.parse(reportJson) as { findings?: { severity?: Severity }[] };
+    return JSON.parse(reportJson) as { findings?: Finding[] };
   } catch {
     return {};
   }
@@ -299,6 +300,67 @@ function severityCounts(reportJson: string | null): Record<Severity, number> {
     if (severity && severity in counts) counts[severity]++;
   }
   return counts;
+}
+
+function buildEvidenceSummaryMetrics(
+  baseline: RunWithArtifactRow,
+  current: RunWithArtifactRow
+): Array<EvidenceDeltaMetricRow | null> {
+  const family =
+    current.artifact_type === "container-diagnostics"
+      ? "container-diagnostics"
+      : current.artifact_type === "kubernetes-bundle"
+        ? "kubernetes-bundle"
+        : "common";
+
+  const previousSummary = buildRunEvidenceSummary(
+    baseline.artifact_type,
+    parseReport(baseline.report_json).findings ?? []
+  );
+  const currentSummary = buildRunEvidenceSummary(
+    current.artifact_type,
+    parseReport(current.report_json).findings ?? []
+  );
+
+  const previousEntryCount = previousSummary.sections.reduce(
+    (total, section) => total + section.entries.length,
+    0
+  );
+  const currentEntryCount = currentSummary.sections.reduce(
+    (total, section) => total + section.entries.length,
+    0
+  );
+
+  return [
+    metricRow(
+      "evidence_summary_section_count",
+      "Evidence summary sections",
+      previousSummary.sections.length,
+      currentSummary.sections.length,
+      family
+    ),
+    metricRow(
+      "evidence_summary_entry_count",
+      "Evidence summary entries",
+      previousEntryCount,
+      currentEntryCount,
+      family
+    ),
+    metricRow(
+      "evidence_summary_critical_section_count",
+      "Critical evidence summary sections",
+      previousSummary.sections.filter((section) => section.tone === "critical").length,
+      currentSummary.sections.filter((section) => section.tone === "critical").length,
+      family
+    ),
+    metricRow(
+      "evidence_summary_warning_section_count",
+      "Warning evidence summary sections",
+      previousSummary.sections.filter((section) => section.tone === "warning").length,
+      currentSummary.sections.filter((section) => section.tone === "warning").length,
+      family
+    ),
+  ];
 }
 
 export function buildEvidenceDelta(
@@ -1139,10 +1201,13 @@ function buildFamilyMetrics(
 ): Array<EvidenceDeltaMetricRow | null> {
   if (baseline.artifact_type !== current.artifact_type) return [];
 
+  const evidenceSummaryMetrics = buildEvidenceSummaryMetrics(baseline, current);
+
   if (current.artifact_type === "container-diagnostics") {
     const previous = summarizeContainerEvidence(baseline.artifact_content);
     const next = summarizeContainerEvidence(current.artifact_content);
     return [
+      ...evidenceSummaryMetrics,
       metricRow(
         "published_port_count",
         "Published ports",
@@ -1250,6 +1315,7 @@ function buildFamilyMetrics(
     const previous = summarizeKubernetesEvidence(baseline.artifact_content);
     const next = summarizeKubernetesEvidence(current.artifact_content);
     return [
+      ...evidenceSummaryMetrics,
       metricRow(
         "document_count",
         "Bundle documents",
