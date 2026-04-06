@@ -37,6 +37,7 @@ import {
   toRunSubmissionMeta,
   validateAgentSubmissionState,
 } from "./shared/run-shared";
+import { projectCollectionJobLeaseReadModel } from "./shared/job-read-model";
 import {
   generateAgentToken,
   hashAgentToken,
@@ -820,7 +821,7 @@ class PostgresJobsStore implements JobsStore {
     const rows = opts?.status ?
       await many<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE source_id = $1 AND status = $2 ORDER BY created_at DESC", [sourceId, opts.status])
       : await many<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE source_id = $1 ORDER BY created_at DESC", [sourceId]);
-    return rows.map(jobToView);
+    return rows.map(jobToView).map((job) => projectCollectionJobLeaseReadModel(job));
   }
 
   async getById(id: string) {

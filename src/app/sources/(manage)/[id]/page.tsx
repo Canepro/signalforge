@@ -99,10 +99,7 @@ export default async function SourceDetailPage({
       </div>
     );
   }
-  const jobs = await storage.withTransaction(async (tx) => {
-    await tx.jobs.reapExpiredLeases();
-    return tx.jobs.listForSource(id);
-  });
+  const jobs = await storage.jobs.listForSource(id);
   const registration = await storage.agents.getRegistrationBySourceId(id);
   const blockingDeleteJobs = jobs.filter((job) => ["claimed", "running"].includes(job.status));
   const executionSurfaceLabel = getSourceExecutionSurfaceLabel({

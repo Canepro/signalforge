@@ -31,6 +31,7 @@ import {
   toRunSubmissionMeta,
   validateAgentSubmissionState,
 } from "./shared/run-shared";
+import { projectCollectionJobLeaseReadModel } from "./shared/job-read-model";
 import {
   applyAgentHeartbeat,
   claimCollectionJobForAgent,
@@ -249,7 +250,9 @@ class SqliteJobsStore implements JobsStore {
   constructor(private readonly db: Database) {}
 
   async listForSource(sourceId: string, opts?: { status?: string }) {
-    return listCollectionJobsForSource(this.db, sourceId, opts).map(collectionJobToJson);
+    return listCollectionJobsForSource(this.db, sourceId, opts)
+      .map(collectionJobToJson)
+      .map((job) => projectCollectionJobLeaseReadModel(job));
   }
 
   async getById(id: string) {
