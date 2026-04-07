@@ -9,3 +9,4 @@ out/
 *.db-shm
 .vercel
 infra/aca/main.json
+.env*.local

@@ -7,14 +7,14 @@ Use this document when you are sending evidence into SignalForge from:
 - a collector
 - another service or agent
 
-For the full HTTP surface, see [`api-contract.md`](./api-contract.md).
+For the full HTTP surface, see `[api-contract.md](./api-contract.md)`.
 
 SignalForge **analyzes** evidence; it does **not** collect it directly.
 Collectors run **outside** the app and push artifacts in over HTTP.
 
 This document describes the current `POST /api/runs` submission contract.
 
-**Collection jobs (Phase 6d):** agents complete a **running** job with `POST /api/collection-jobs/{id}/artifact` (`multipart/form-data`, same file + optional ingestion fields as below). Send **`instance_id`** as a form field or **`X-SignalForge-Agent-Instance-Id`** header matching the job lease. The server forces target/collector context from the bound **Source**; see [`api-contract.md`](./api-contract.md) (Phase 6d). Reference **pull-model** implementation (heartbeat, claim, collector run, upload): `signalforge-agent` (separate repo; collectors stay in **signalforge-collectors**).
+**Collection jobs (Phase 6d):** agents complete a **running** job with `POST /api/collection-jobs/{id}/artifact` (`multipart/form-data`, same file + optional ingestion fields as below). Send `**instance_id`** as a form field or `**X-SignalForge-Agent-Instance-Id**` header matching the job lease. The server forces target/collector context from the bound **Source**; see `[api-contract.md](./api-contract.md)` (Phase 6d). Reference **pull-model** implementation (heartbeat, claim, collector run, upload): `signalforge-agent` (separate repo; collectors stay in **signalforge-collectors**).
 
 ## Endpoint
 
@@ -30,10 +30,12 @@ This document describes the current `POST /api/runs` submission contract.
 
 ## Required Payload
 
-| Mode | Required fields |
-|------|------------------|
-| **JSON** | `content` (string, artifact text). Optionally `filename`, `artifact_type`, `source_type`. |
-| **Multipart** | `file` (uploaded file). Optionally `artifact_type`, `source_type`. |
+
+| Mode          | Required fields                                                                           |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| **JSON**      | `content` (string, artifact text). Optionally `filename`, `artifact_type`, `source_type`. |
+| **Multipart** | `file` (uploaded file). Optionally `artifact_type`, `source_type`.                        |
+
 
 If `artifact_type` is omitted, the server infers a type from content.
 Today, the shipped artifact families are `linux-audit-log`, `container-diagnostics`, and `kubernetes-bundle`.
@@ -55,13 +57,15 @@ Current normalized Kubernetes document kinds include:
 All metadata fields are optional.
 If you omit them, SignalForge behaves like a legacy upload.
 
-| Field | Purpose |
-|-------|---------|
+
+| Field               | Purpose                                                                                                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `target_identifier` | Stable operator- or collector-chosen id (e.g. `fleet:prod:web-01`). **Preferred** for same-target baseline selection and compare when you need stronger identity than hostname-from-log. |
-| `source_label` | Human-readable origin (e.g. `github-actions`, `laptop`, `bastion`). |
-| `collector_type` | Implementation id (e.g. `signalforge-collectors`). |
-| `collector_version` | Version string of the collector. |
-| `collected_at` | ISO 8601 timestamp of when evidence was **captured on the host** (parsed and normalized server-side). |
+| `source_label`      | Human-readable origin (e.g. `github-actions`, `laptop`, `bastion`).                                                                                                                      |
+| `collector_type`    | Implementation id (e.g. `signalforge-collectors`).                                                                                                                                       |
+| `collector_version` | Version string of the collector.                                                                                                                                                         |
+| `collected_at`      | ISO 8601 timestamp of when evidence was **captured on the host** (parsed and normalized server-side).                                                                                    |
+
 
 **JSON:** same keys as top-level properties next to `content` and `filename`.
 
@@ -72,16 +76,16 @@ Length limits and validation follow `src/lib/ingestion/meta.ts` (e.g. `collected
 ## Target Identity vs Hostname
 
 - **Hostname** is still derived from the artifact by the adapter (`linux-audit-log`) when present.
-- **`target_identifier`** is **submission metadata**: use it when you have a fleet id, enrollment id, or stable label that should tie runs together even if hostnames differ or logs are ambiguous.
-- Compare and baseline selection use **`target_identifier` first**, then normalized hostname, then same-artifact history when identity is missing (see `findPreviousRunForSameTarget`).
+- `**target_identifier`** is **submission metadata**: use it when you have a fleet id, enrollment id, or stable label that should tie runs together even if hostnames differ or logs are ambiguous.
+- Compare and baseline selection use `**target_identifier` first**, then normalized hostname, then same-artifact history when identity is missing (see `findPreviousRunForSameTarget`).
 
 ### Recommended `target_identifier` shapes by artifact family
 
-- **`linux-audit-log`**: use a stable machine or fleet id such as `fleet:prod:web-01` when hostname alone is not trustworthy enough.
-- **`container-diagnostics`**: choose the compare scope deliberately.
+- `**linux-audit-log`**: use a stable machine or fleet id such as `fleet:prod:web-01` when hostname alone is not trustworthy enough.
+- `**container-diagnostics**`: choose the compare scope deliberately.
   - workload-stable compare: `container-workload:<host>:<runtime>:<service>`
   - instance-level compare: `container-instance:<host>:<runtime>:<container-id>`
-- **`kubernetes-bundle`**: make cluster and scope explicit.
+- `**kubernetes-bundle**`: make cluster and scope explicit.
   - cluster-scoped bundle: `cluster:<cluster-name>`
   - namespace-scoped bundle: `cluster:<cluster-name>:namespace:<namespace>`
 
@@ -143,7 +147,7 @@ cd signalforge-collectors
 
 ## Reference Collector (outside SignalForge)
 
-The **`signalforge-collectors`** repository includes a narrow **reference push path**: `submit-to-signalforge.sh` runs `first-audit.sh` (or accepts `--file` for an existing log) and POSTs to this contract with `collector_type=signalforge-collectors` and related metadata.
+The `**signalforge-collectors**` repository includes a narrow **reference push path**: `submit-to-signalforge.sh` runs `first-audit.sh` (or accepts `--file` for an existing log) and POSTs to this contract with `collector_type=signalforge-collectors` and related metadata.
 
 That same pattern can later be reused for:
 
@@ -160,7 +164,7 @@ From the shell, `scripts/signalforge-read.sh compare <run-id>` prints the same J
 
 ## CLI Helpers
 
-`scripts/analyze.sh` wraps multipart upload and accepts optional flags or `SIGNALFORGE_*` env vars for the same fields. Examples:
+`scripts/analyze.sh` wraps multipart upload and accepts optional flags or `SIGNALFORGE_`* env vars for the same fields. Examples:
 
 ```bash
 ./scripts/analyze.sh ./audit.log
@@ -176,4 +180,4 @@ SIGNALFORGE_BASE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y
 - No **auth** on this route in the current product (secure your deployment and network as needed).
 - **Source registration** exists via `/sources` (Phase 6c) for operator-managed targets and collection jobs. The `POST /api/runs` path described here remains available for direct submissions without source context.
 
-For product boundary and future collector direction, see [`../plans/phase-5-collector-architecture.md`](../plans/phase-5-collector-architecture.md).
+For product boundary and future collector direction, see `[../plans/phase-5-collector-architecture.md](../plans/phase-5-collector-architecture.md)`.
