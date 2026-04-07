@@ -30,8 +30,8 @@ Options:
   -h, --help              Show this help
 
 Environment (optional; flags override env):
-  SIGNALFORGE_BASE_URL
-  SIGNALFORGE_URL
+  SIGNALFORGE_BASE_URL  (preferred; for live operator/agent traffic use the ACA URL)
+  SIGNALFORGE_URL       (legacy compatibility alias; avoid legacy *.vercel.app caller targets)
   SIGNALFORGE_ARTIFACT_TYPE
   SIGNALFORGE_TARGET_IDENTIFIER
   SIGNALFORGE_SOURCE_LABEL

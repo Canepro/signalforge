@@ -350,6 +350,8 @@ Use that port in:
 - `SIGNALFORGE_BASE_URL`
 - `SIGNALFORGE_URL` only when you are using the older compatibility name
 
+For long-lived agents or other external callers, point to the ACA app URL (for example `https://signalforge.canepro.me`) and avoid legacy `*.vercel.app` endpoints.
+
 ### The LLM is unavailable
 
 SignalForge still analyzes the artifact and returns a deterministic fallback report.

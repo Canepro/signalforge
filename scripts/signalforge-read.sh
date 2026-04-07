@@ -22,8 +22,8 @@ Options:
   -h, --help       Show this help
 
 Environment:
-  SIGNALFORGE_BASE_URL
-  SIGNALFORGE_URL
+  SIGNALFORGE_BASE_URL  (preferred; for live operator/agent traffic use the ACA URL)
+  SIGNALFORGE_URL       (legacy compatibility alias; avoid legacy *.vercel.app caller targets)
 
 Exit codes:
   0 — HTTP 200, JSON printed to stdout

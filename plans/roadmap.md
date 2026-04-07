@@ -144,7 +144,7 @@ Published contract/docs:
 
 ## Deployment
 
-The live SignalForge instance is deployed on **Vercel** with a **Neon Postgres** backend. Local development defaults to SQLite.
+SignalForge app hosting is on **Azure Container Apps** with a **Neon Postgres** backend. Vercel remains a preview/review surface only. Local development defaults to SQLite.
 
 **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon (production), Vitest, GitHub Actions CI.
 
@@ -152,7 +152,7 @@ The live SignalForge instance is deployed on **Vercel** with a **Neon Postgres**
 
 Recommended near-term choices:
 
-1. Migrate production hosting from Vercel to Azure Container Apps so agent-driven host and cluster artifact ingestion is no longer blocked by small function request-body limits. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
+1. Keep app-hosting traffic on ACA and keep Vercel out of the ingestion-critical caller path; all long-lived agents should use the ACA URL. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
 2. Use the system with more real submissions and collect friction once the production ingestion path is credible again.
 3. Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 4. Close the remaining Phase 9 validation tail: live Postgres parity for the new scope columns, plus production-like container-host and cluster-side deployment smoke after the repo-local Linux, container, and Kubernetes job-driven flows. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
