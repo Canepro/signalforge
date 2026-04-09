@@ -50,6 +50,20 @@ It does **not** currently:
 
 Collection stays external by design. Remediation remains deferred and would require a separate higher-trust model if introduced later.
 
+## Why this matters for operators
+
+- Turns raw diagnostics artifacts into structured, reviewable findings.
+- Preserves evidence and run history for traceability.
+- Supports compare workflows to detect operational drift.
+- Keeps collection external and explicit, reducing hidden runtime risk.
+
+## Current status
+
+- Live app path available at `https://signalforge.canepro.me`.
+- Supports `linux-audit-log`, `container-diagnostics`, and `kubernetes-bundle` artifacts.
+- Repo includes CI, image publishing, and Azure Container Apps (ACA) deployment workflows.
+- The ecosystem split is active: control plane (`signalforge`), agent (`signalforge-agent`), and collectors (`signalforge-collectors`).
+
 ## Tech Stack
 
 - **Framework:** Next.js (App Router)
@@ -60,7 +74,7 @@ Collection stays external by design. Remediation remains deferred and would requ
 - **Durable DB:** Postgres / Neon
 - **Testing:** Vitest
 - **CI:** GitHub Actions
-- **App-hosting path:** Dockerized app with Azure Container Apps
+- **App-hosting path:** Dockerized app on Azure Container Apps (ACA)
 - **Preview/review path:** Vercel previews
 
 ## Deployment Surfaces
@@ -82,7 +96,7 @@ Current deployment docs:
 Reference operator deployment:
 
 - app URL: `https://signalforge.canepro.me`
-- preview or review: Vercel remains separate from the live ACA app path
+- preview or review: Vercel remains separate from the live Azure Container Apps (ACA) path
 
 ## Start Here
 
@@ -239,7 +253,7 @@ See:
 
 The highest-signal current infrastructure and release work is now:
 
-- keep the repo-owned GHCR publish and ACA deploy path healthy
+- keep the repo-owned GHCR publish and Azure Container Apps (ACA) deploy path healthy
 - keep Vercel strictly in the preview or review role
 - keep the cross-repo operator contract portable across app, agent, and collectors
 - avoid turning one operator's machine, registry, or cluster into the canonical product model
