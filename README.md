@@ -50,6 +50,20 @@ It does **not** currently:
 
 Collection stays external by design. Remediation remains deferred and would require a separate higher-trust model if introduced later.
 
+## Why this matters for operators
+
+- Turns raw diagnostics artifacts into structured, reviewable findings.
+- Preserves evidence and run history for traceability.
+- Supports compare workflows to detect operational drift.
+- Keeps collection external and explicit, reducing hidden runtime risk.
+
+## Current status
+
+- Live app path available at `https://signalforge.canepro.me`.
+- Supports `linux-audit-log`, `container-diagnostics`, and `kubernetes-bundle` artifacts.
+- Repo includes CI, image publish, and ACA deploy workflows.
+- The ecosystem split is active: control plane (`signalforge`), agent (`signalforge-agent`), and collectors (`signalforge-collectors`).
+
 ## Tech Stack
 
 - **Framework:** Next.js (App Router)
