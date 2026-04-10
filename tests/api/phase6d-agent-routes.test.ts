@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { File } from "undici";
 import { NextRequest } from "next/server";
 import { POST as POST_SOURCES } from "@/app/api/sources/route";
 import { POST as POST_REG } from "@/app/api/agent/registrations/route";
