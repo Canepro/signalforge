@@ -949,7 +949,7 @@ describe("Phase 6d agent routes", () => {
     expect(getArtifactById(db, artifactId)).toBeNull();
   });
 
-  it("artifact upload infers collected_at from uploaded file metadata when omitted", async () => {
+  it("artifact upload infers collected_at from collector filename metadata when omitted", async () => {
     const { sourceId, token } = await createSourceAndAgent(db, "tid-art-collected-at");
     await POST_HEARTBEAT(
       new NextRequest("http://localhost/api/agent/heartbeat", {
@@ -996,10 +996,8 @@ describe("Phase 6d agent routes", () => {
     form.append("instance_id", "ts-a");
     form.append(
       "file",
-      new File([SAMPLE_LOG], "server_audit_20260329_001155.log", {
-        type: "text/plain",
-        lastModified: Date.UTC(2026, 2, 29, 0, 11, 55),
-      })
+      new Blob([SAMPLE_LOG], { type: "text/plain" }),
+      "server_audit_20260329_001155.log"
     );
     const art = await POST_ARTIFACT(
       new NextRequest(`http://localhost/api/collection-jobs/${jobId}/artifact`, {
