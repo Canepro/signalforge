@@ -4,7 +4,7 @@ This document is the repo-owned release and deploy contract for the SignalForge 
 
 It keeps three concerns separate on purpose:
 
-- preview and review stay on Vercel
+- browser review defaults to ACA or local, with Vercel kept as an intentional manual preview path only
 - app-image publishing happens on GHCR
 - the app runs on Azure Container Apps
 - operator-owned public domains bind to the ACA app, not to Vercel preview URLs

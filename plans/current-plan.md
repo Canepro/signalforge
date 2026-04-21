@@ -46,9 +46,9 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations, and the committed ACA contract keeps Neon Postgres as the durable app backend.
-- **Deployment surfaces:** the repo supports local Next.js development, a Vercel-compatible preview/review path, and a committed containerized ACA app path (`Dockerfile` + `infra/aca/main.bicep`).
+- **Deployment surfaces:** the repo supports local Next.js development, the committed ACA app path (`Dockerfile` + `infra/aca/main.bicep`), and optional manual Vercel previews when explicitly needed.
 - **ACA hosting:** the app path is the checked-in ACA contract, and the reference instance now runs under the durable app name `ca-signalforge`.
-- **Preview hosting:** Vercel remains in the preview/review role; do not treat it as the main app-hosting source of truth.
+- **Preview hosting:** Vercel is no longer an automatic Git deployment path; use it only for intentional manual preview or review work and do not treat it as the main app-hosting source of truth.
 - **Release path:** the repo now has a GHCR publish workflow, a manual-dispatch ACA deploy workflow, and checked-in deploy or smoke helpers.
 - **Cross-repo operator contract:** current cleanup focus is portability across `signalforge`, `signalforge-agent`, and `signalforge-collectors` so one operator's workstation, cluster, or registry does not become the default product shape.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
@@ -73,7 +73,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 
 ## Recommended next work (high level)
 
-- Keep the app path on ACA and keep Vercel confined to preview or review usage. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
+- Keep the app path on ACA and keep Vercel out of the default deployment path. Use Vercel only for intentional manual preview or review work when it adds value. Source of truth: [`phase-10-aca-migration.md`](./phase-10-aca-migration.md).
 - Keep the repo-owned GHCR publish and ACA deploy path healthy, explicit, and operator-controlled. Source of truth: [`phase-10c-public-image-and-release-pipeline.md`](./phase-10c-public-image-and-release-pipeline.md).
 - Continue removing personal-environment assumptions from docs, scripts, examples, and adjacent repos so self-hosting remains straightforward for operators outside the reference instance.
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LivePageRefresh } from "@/components/live-page-refresh";
+import { shouldEnableOperatorLiveRefresh } from "@/lib/runtime/vercel-environment";
 import { SourceHealthDot } from "@/components/source-health-dot";
 import { getStorage } from "@/lib/storage";
 import {
@@ -30,10 +31,11 @@ export default async function SourcesListPage({
   const sp = searchParams ? await searchParams : undefined;
   const storage = await getStorage();
   const sources = await storage.sources.list();
+  const enableLiveRefresh = shouldEnableOperatorLiveRefresh();
 
   return (
     <div className="space-y-6">
-      <LivePageRefresh intervalMs={10000} />
+      {enableLiveRefresh ? <LivePageRefresh intervalMs={10000} /> : null}
       {sp?.deleted === "1" && (
         <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
           Source deleted.

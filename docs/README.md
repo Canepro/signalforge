@@ -112,7 +112,7 @@ Use `DATABASE_DRIVER` to select the backend. For Postgres, set `DATABASE_URL` an
 The repo currently documents and ships three deployment surfaces:
 
 - local development with SQLite by default
-- Vercel-compatible preview hosting for branch and PR review
+- ACA or local browser review by default, with optional manual Vercel preview only when intentionally needed
 - a committed container + ACA deployment path for the app itself
 
 Code and infra sources of truth:
@@ -126,6 +126,7 @@ Keep the wording precise:
 
 - do not describe Vercel as the only deployment environment
 - do not describe Vercel as the main app-hosting path
+- do not describe Vercel as an automatic branch or PR deployment path
 - do describe ACA as the app-hosting path when that distinction matters
 - do treat legacy `staging` names as historical resource identifiers rather than the canonical environment taxonomy
 
