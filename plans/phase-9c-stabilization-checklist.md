@@ -39,11 +39,11 @@ That check currently covers:
 - Sources login, list, new, and detail
 - mobile navigation dialog close and focus containment
 
-## Preview Gate
+## Review Gate
 
-Before merge or release signoff, validate a real Vercel preview for the linked `signalforge` project.
+Before merge or release signoff, validate a real browser session against the chosen review surface. Use ACA or local by default. If you intentionally created a Vercel preview, validate that preview too.
 
-- [ ] preview deployment exists for the current branch or PR
+- [ ] review surface is available for the current change
 - [ ] desktop Chrome or Edge review completed
 - [ ] mobile Safari-class or Chrome mobile review completed
 - [ ] no important action is icon-only or hover-only

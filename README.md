@@ -75,14 +75,14 @@ Collection stays external by design. Remediation remains deferred and would requ
 - **Testing:** Vitest
 - **CI:** GitHub Actions
 - **App-hosting path:** Dockerized app on Azure Container Apps (ACA)
-- **Preview/review path:** Vercel previews
+- **Preview/review path:** optional manual Vercel preview only when intentionally needed
 
 ## Deployment Surfaces
 
 The repo currently documents three deployment surfaces that should not be conflated:
 
 - **Local development:** SQLite by default
-- **Preview/review:** Vercel-compatible branch and PR previews
+- **Preview/review:** ACA or local browser review by default; optional manual Vercel preview when explicitly needed
 - **App-hosting path:** Azure Container Apps with `DATABASE_DRIVER=postgres`
 
 Current deployment docs:
@@ -96,7 +96,7 @@ Current deployment docs:
 Reference operator deployment:
 
 - app URL: `https://signalforge.canepro.me`
-- preview or review: Vercel remains separate from the live Azure Container Apps (ACA) path
+- preview or review: ACA remains the default review surface; Vercel is no longer an automatic Git deployment path
 
 ## Start Here
 
@@ -254,7 +254,7 @@ See:
 The highest-signal current infrastructure and release work is now:
 
 - keep the repo-owned GHCR publish and Azure Container Apps (ACA) deploy path healthy
-- keep Vercel strictly in the preview or review role
+- keep Vercel out of the default Git deployment path and use it only for intentional manual preview work
 - keep the cross-repo operator contract portable across app, agent, and collectors
 - avoid turning one operator's machine, registry, or cluster into the canonical product model
 

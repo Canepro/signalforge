@@ -18,6 +18,7 @@ import {
   getSourceExecutionSurfaceLabel,
   type ArtifactType,
 } from "@/lib/source-catalog";
+import { shouldEnableOperatorLiveRefresh } from "@/lib/runtime/vercel-environment";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -114,13 +115,14 @@ export default async function SourceDetailPage({
     artifactType: source.expected_artifact_type,
     defaultCollectionScope: source.default_collection_scope,
   });
+  const enableLiveRefresh = shouldEnableOperatorLiveRefresh();
   const isNonLinuxFamily =
     source.expected_artifact_type === "container-diagnostics" ||
     source.expected_artifact_type === "kubernetes-bundle";
 
   return (
     <div className="space-y-8">
-      <LivePageRefresh intervalMs={8000} />
+      {enableLiveRefresh ? <LivePageRefresh intervalMs={8000} /> : null}
       {/* Header */}
       <div>
         <Link href="/sources" className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary transition-colors">

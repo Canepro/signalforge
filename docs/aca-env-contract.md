@@ -15,7 +15,7 @@ Scope:
 - the app container image comes from the Slice 1 container build
 - ACA provides the public HTTPS endpoint
 - Neon remains the system of record for production data
-- Vercel previews may remain in place for branch review, but not for agent upload traffic
+- optional manual Vercel previews may still be used for UI review, but not for agent upload traffic
 
 ## Required app environment
 
