@@ -51,6 +51,8 @@ export function extractAuditReportFromCodexTurnPayload(payload: unknown): AuditR
     for (const key of [
       "structuredOutput",
       "structured_output",
+      "structuredContent",
+      "structured_content",
       "output",
       "finalOutput",
       "final_output",

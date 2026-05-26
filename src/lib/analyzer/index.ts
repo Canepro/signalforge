@@ -29,11 +29,11 @@ export interface AnalyzeOptions {
 function displayModelForMeta(options: AnalyzeOptions): string {
   const provider = (process.env.LLM_PROVIDER ?? "openai").trim().toLowerCase();
   if (provider === "codex_app_server" || provider === "codex-app-server") {
-    return (
+    const model =
       options.model?.trim() ||
       process.env.CODEX_APP_SERVER_MODEL?.trim() ||
-      "gpt-5.4"
-    );
+      "gpt-5.4";
+    return `codex-app-server:${model}`;
   }
   return (
     options.model?.trim() ||

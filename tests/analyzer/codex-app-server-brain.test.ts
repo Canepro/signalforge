@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AuditReportSchema } from "@/lib/analyzer/schema";
-import { resolveCodexAppServerConfig } from "@/lib/analyzer/codex-app-server/config";
+import {
+  codexBrainTurnSafetyParams,
+  resolveCodexAppServerConfig,
+} from "@/lib/analyzer/codex-app-server/config";
 import { extractAuditReportFromCodexTurnPayload } from "@/lib/analyzer/codex-app-server/extract-report";
 import type { AuditReport } from "@/lib/analyzer/schema";
 
@@ -71,6 +74,23 @@ describe("extractAuditReportFromCodexTurnPayload", () => {
     expect(extracted).toEqual(sampleReport);
     expect(AuditReportSchema.safeParse(extracted).success).toBe(true);
   });
+
+  it("parses the Codex protocol structuredContent field", () => {
+    const extracted = extractAuditReportFromCodexTurnPayload({
+      method: "turn/completed",
+      params: { turn: { structuredContent: sampleReport } },
+    });
+    expect(extracted).toEqual(sampleReport);
+  });
+});
+
+describe("codex brain turn safety", () => {
+  it("uses read-only sandbox with network disabled and no approvals", () => {
+    expect(codexBrainTurnSafetyParams()).toEqual({
+      approvalPolicy: "never",
+      sandboxPolicy: { type: "readOnly", networkAccess: false },
+    });
+  });
 });
 
 describe("analyzeArtifact with codex_app_server", () => {
@@ -115,6 +135,7 @@ describe("analyzeArtifact with codex_app_server", () => {
     });
 
     expect(result.meta.llm_succeeded).toBe(false);
+    expect(result.meta.model_used).toBe("codex-app-server:gpt-5.4");
     expect(result.analysis_error).toMatch(/valid audit report/i);
     expect(result.report).not.toBeNull();
   });

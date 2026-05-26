@@ -137,10 +137,10 @@ export function resolveCodexAppServerConfig(
 /** Sandbox + approval settings for SignalForge analysis turns (no shell/file mutation). */
 export function codexBrainTurnSafetyParams(): {
   approvalPolicy: "never";
-  sandboxPolicy: { type: "readOnly" };
+  sandboxPolicy: { type: "readOnly"; networkAccess: false };
 } {
   return {
     approvalPolicy: "never",
-    sandboxPolicy: { type: "readOnly" },
+    sandboxPolicy: { type: "readOnly", networkAccess: false },
   };
 }
