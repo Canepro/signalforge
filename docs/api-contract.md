@@ -159,6 +159,8 @@ Full run detail including embedded report JSON and ingestion metadata.
 Serialization: `toRunDetailJson()` in `src/lib/api/run-detail-json.ts`.  
 TypeScript: `GetRunDetailResponse`. Schema: `docs/schemas/run-detail-response.schema.json` (report object summarized; full audit report shape lives in analyzer code).
 
+**Page-only operator summary:** the `/runs/[id]` UI uses `storage.runs.getPageDetail()`, which returns the broader `RunDetail` type and may include `summary_modules` (artifact-aware stat grids, bar lists, and callouts built from persisted artifact bytes). That field is **not** part of `GET /api/runs/[id]` / `GetRunDetailResponse` so agent integrations stay stable. Module kinds and chartable-vs-callout rules live in `src/lib/run-detail-summary-contract.ts`; assembly lives in `src/lib/run-detail-summary.ts`.
+
 ---
 
 ### `GET /api/runs/[id]/report`

@@ -71,7 +71,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
 - The current source and agent model is still effectively one registration per source, which may become limiting for Kubernetes or future multi-scope execution.
-- Run detail still under-surfaces some operator-relevant operational evidence, especially when quantitative pressure signals exist in the artifact but the page presents them mainly as text findings instead of artifact-aware summaries.
+- Run detail now surfaces artifact-aware summary modules on the page path, but later Phase 9d slices still owe richer Kubernetes scheduling-pressure wording, Linux top-process summaries, and findings-band cleanup once operators validate the new layer on real runs.
 
 ## Recommended next work (high level)
 

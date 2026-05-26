@@ -1,6 +1,6 @@
 # Phase 9d Design: Run Detail Operator Summary and Findings Redesign
 
-> Status: planned follow-on. This phase narrows the frontend follow-up after Phase 9c and the broader operational-diagnostics work in Phase 9b. It exists to make run detail tell a stronger operator story from evidence that SignalForge already collects.
+> Status: in progress. **Slice 1** (summary-module contract, shared priority callouts, page-detail wiring) is implemented on `main`. Slices 2–5 (Kubernetes capacity polish, container/Linux depth, page cleanup) remain follow-ons. See [`current-plan.md`](./current-plan.md).
 
 ## Why this exists
 
