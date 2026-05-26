@@ -37,6 +37,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 | 8b | `container-diagnostics`: adapter, ingestion, compare, fixtures/golden tests, container-aware fallback wording and metrics | Done |
 | 8c | `kubernetes-bundle` push path: locked `kubernetes-bundle.v1` manifest, adapter, ingestion, compare, fixtures/golden tests, scope-aware target identity | Done |
 | 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, compare normalization, deterministic platform noise, and exposure-plus-identity joins | Done |
+| 8d-follow-on | Kubernetes operational compare keys: warning-event counts, node `top` percentages, rollout replica progress, ResourceQuota utilization; steady zero-restart workload status noise | Done |
 | 9 (repo-local) | Typed job-scoped collection parameters in SignalForge: source defaults, per-job overrides, resolved `collection_scope` in `jobs/next`, published schemas, Sources UI visibility, and contract tests | Done |
 | 9c | Frontend operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources | Done |
 | 9d | Run-detail operator summary: artifact-aware summary modules (stat grids, bar lists, callouts), scheduling-pressure wording, top consumers, compact findings filters; page-only `summary_modules` | Done |
@@ -68,7 +69,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 
 ## Known limitations
 
-- Multi-artifact support is no longer just scaffolding, but Phase 8 quality is still uneven: container coverage is solid first-slice quality, while Kubernetes still has more depth on findings than on noise suppression and finding-key normalization.
+- Multi-artifact support is no longer just scaffolding, but Phase 8 quality is still uneven: container coverage is solid first-slice quality, while Kubernetes operational diagnostics may still need tuning as collector snapshots vary.
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
 - The current source and agent model is still effectively one registration per source, which may become limiting for Kubernetes or future multi-scope execution.
@@ -82,7 +83,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
-- Compare/export hardening — compare UI **Export compare JSON** / **Copy compare JSON** (follow-on PR); CLI remains `scripts/signalforge-read.sh compare`.
+- Compare export is shipped on the compare UI (**Export compare JSON** / **Copy compare JSON**, PR #19); CLI remains `scripts/signalforge-read.sh compare`.
 - Phase 8 next-step prep remains in place in [`phase-8-containers-k8s.md`](./phase-8-containers-k8s.md). The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
 - For Kubernetes specifically, prefer a higher quality bar over the smallest possible demo: use official upstream guidance, relevant local skills, realistic fixtures, and read-only live-cluster inspection when that materially improves rule credibility. Use richer platform examples when helpful, but keep the actual detections and wording anchored in plain Kubernetes primitives so the product still fits operators with simpler clusters.
 - Phase 9 job-scoped collection is now wired across `signalforge`, `signalforge-agent`, and `signalforge-collectors`, with repo-local end-to-end validation for Linux plus shim-backed container and Kubernetes flows. The remaining Phase 9 follow-on is narrower: live Postgres parity for the new scope columns plus production-like host or cluster runtime smoke outside this workstation. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).

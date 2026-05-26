@@ -283,6 +283,114 @@ describe("findings-diff", () => {
     ).toBe("kubernetes workload adds linux capabilities: payments/payments-api");
   });
 
+  it("normalizes Kubernetes operational titles when only counts or percentages change", () => {
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes warning events indicate scheduling failures (12 events)"
+      )
+    ).toBe("kubernetes warning events indicate scheduling failures");
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes warning events indicate image pull failures (3 events)"
+      )
+    ).toBe("kubernetes warning events indicate image pull failures");
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes node memory usage is elevated: aks-nodepool1-000001 (91.0%)"
+      )
+    ).toBe("kubernetes node memory usage is elevated: aks-nodepool1-000001");
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes node CPU usage is elevated: aks-nodepool1-000001 (93.5%)"
+      )
+    ).toBe("kubernetes node cpu usage is elevated: aks-nodepool1-000001");
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes rollout incomplete: Deployment payments/payments-api (ready 1/3, updated 2/3)"
+      )
+    ).toBe("kubernetes rollout incomplete: deployment payments/payments-api");
+    expect(
+      normalizeFindingTitle(
+        "Kubernetes ResourceQuota is near exhaustion: payments/quota (cpu at 92.5%)"
+      )
+    ).toBe("kubernetes resourcequota is near exhaustion: payments/quota (cpu)");
+  });
+
+  it("treats Kubernetes operational metric drift as the same ongoing finding", () => {
+    const baseline: Finding[] = [
+      f({
+        id: "1",
+        title:
+          "Kubernetes warning events indicate scheduling failures (8 events)",
+        severity: "high",
+        category: "kubernetes",
+        section_source: "events/warning-events.json",
+      }),
+      f({
+        id: "2",
+        title:
+          "Kubernetes node memory usage is elevated: aks-nodepool1-000001 (91.0%)",
+        severity: "medium",
+        category: "kubernetes",
+        section_source: "metrics/node-top.json",
+      }),
+      f({
+        id: "3",
+        title:
+          "Kubernetes rollout incomplete: Deployment payments/payments-api (ready 1/3, updated 2/3)",
+        severity: "high",
+        category: "kubernetes",
+        section_source: "workloads/rollout-status.json",
+      }),
+      f({
+        id: "4",
+        title: "Kubernetes ResourceQuota is near exhaustion: payments/quota (cpu at 92.5%)",
+        severity: "medium",
+        category: "kubernetes",
+        section_source: "quotas/resource-quotas.json",
+      }),
+    ];
+    const current: Finding[] = [
+      f({
+        id: "5",
+        title:
+          "Kubernetes warning events indicate scheduling failures (14 events)",
+        severity: "high",
+        category: "kubernetes",
+        section_source: "events/warning-events.json",
+      }),
+      f({
+        id: "6",
+        title:
+          "Kubernetes node memory usage is elevated: aks-nodepool1-000001 (94.2%)",
+        severity: "medium",
+        category: "kubernetes",
+        section_source: "metrics/node-top.json",
+      }),
+      f({
+        id: "7",
+        title:
+          "Kubernetes rollout incomplete: Deployment payments/payments-api (ready 2/3, updated 3/3)",
+        severity: "high",
+        category: "kubernetes",
+        section_source: "workloads/rollout-status.json",
+      }),
+      f({
+        id: "8",
+        title: "Kubernetes ResourceQuota is near exhaustion: payments/quota (cpu at 96.0%)",
+        severity: "medium",
+        category: "kubernetes",
+        section_source: "quotas/resource-quotas.json",
+      }),
+    ];
+
+    const d = compareFindingsDrift(baseline, current);
+    expect(d.summary.unchanged).toBe(4);
+    expect(d.summary.new).toBe(0);
+    expect(d.summary.resolved).toBe(0);
+    expect(d.rows).toHaveLength(0);
+  });
+
   it("treats Kubernetes count-only title drift as the same ongoing finding", () => {
     const baseline: Finding[] = [
       f({

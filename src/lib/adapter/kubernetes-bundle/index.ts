@@ -521,6 +521,20 @@ export class KubernetesBundleAdapter implements ArtifactAdapter {
           continue;
         }
 
+        if (
+          status &&
+          restarts === 0 &&
+          ["available", "up-to-date", "up to date"].includes(normalizedStatus ?? "")
+        ) {
+          noise.push({
+            observation: `Kubernetes workload steady: ${label} (${status})`,
+            reason_expected:
+              "Steady zero-restart rollout status snapshots are expected platform state and do not need a diagnostic finding.",
+            related_environment: "Kubernetes",
+          });
+          continue;
+        }
+
         if (status && ["succeeded", "completed"].includes(normalizedStatus ?? "")) {
           noise.push({
             observation: `Kubernetes workload completed successfully: ${label} (${status})`,
