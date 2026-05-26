@@ -1,7 +1,17 @@
-import { AuditReportSchema, type AuditReport } from "../schema";
+import {
+  AuditEnrichmentSchema,
+  AuditReportSchema,
+  type AuditEnrichment,
+  type AuditReport,
+} from "../schema";
 
 function tryParseAuditReport(value: unknown): AuditReport | null {
   const parsed = AuditReportSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+function tryParseAuditEnrichment(value: unknown): AuditEnrichment | null {
+  const parsed = AuditEnrichmentSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
@@ -10,6 +20,16 @@ function tryParseAuditReportJson(text: string): AuditReport | null {
   if (!trimmed.startsWith("{")) return null;
   try {
     return tryParseAuditReport(JSON.parse(trimmed));
+  } catch {
+    return null;
+  }
+}
+
+function tryParseAuditEnrichmentJson(text: string): AuditEnrichment | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    return tryParseAuditEnrichment(JSON.parse(trimmed));
   } catch {
     return null;
   }
@@ -81,6 +101,61 @@ export function extractAuditReportFromCodexTurnPayload(payload: unknown): AuditR
   collectStrings(payload, strings);
   for (const text of strings) {
     const fromText = tryParseAuditReportJson(text);
+    if (fromText) return fromText;
+  }
+
+  return null;
+}
+
+export function extractAuditEnrichmentFromCodexTurnPayload(
+  payload: unknown
+): AuditEnrichment | null {
+  const direct = tryParseAuditEnrichment(payload);
+  if (direct) return direct;
+
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+
+    const params = record.params;
+    if (params && typeof params === "object") {
+      const fromParams = extractAuditEnrichmentFromCodexTurnPayload(params);
+      if (fromParams) return fromParams;
+    }
+
+    for (const key of [
+      "structuredOutput",
+      "structured_output",
+      "structuredContent",
+      "structured_content",
+      "output",
+      "finalOutput",
+      "final_output",
+      "enrichment",
+      "report",
+    ]) {
+      const candidate = tryParseAuditEnrichment(record[key]);
+      if (candidate) return candidate;
+    }
+
+    const turn = record.turn;
+    if (turn && typeof turn === "object") {
+      const fromTurn = extractAuditEnrichmentFromCodexTurnPayload(turn);
+      if (fromTurn) return fromTurn;
+    }
+
+    const items = record.items;
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const fromItem = extractAuditEnrichmentFromCodexTurnPayload(item);
+        if (fromItem) return fromItem;
+      }
+    }
+  }
+
+  const strings: string[] = [];
+  collectStrings(payload, strings);
+  for (const text of strings) {
+    const fromText = tryParseAuditEnrichmentJson(text);
     if (fromText) return fromText;
   }
 

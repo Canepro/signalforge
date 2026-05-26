@@ -43,6 +43,20 @@ export const AuditReportSchema = z.object({
 });
 export type AuditReport = z.infer<typeof AuditReportSchema>;
 
+export const FindingNoteSchema = z.object({
+  id: z.string(),
+  why_it_matters: z.string(),
+  recommended_action: z.string(),
+});
+export type FindingNote = z.infer<typeof FindingNoteSchema>;
+
+export const AuditEnrichmentSchema = z.object({
+  summary: z.array(z.string()).min(1).max(7),
+  top_actions_now: z.array(z.string()).length(3),
+  finding_notes: z.array(FindingNoteSchema).max(40),
+});
+export type AuditEnrichment = z.infer<typeof AuditEnrichmentSchema>;
+
 export const PreFindingSchema = z.object({
   title: z.string(),
   severity_hint: SeveritySchema,
@@ -164,6 +178,50 @@ export function auditReportJsonSchema(): Record<string, unknown> {
         "noise_or_expected",
         "top_actions_now",
       ],
+      additionalProperties: false,
+    },
+  };
+}
+
+export function auditEnrichmentJsonSchema(): Record<string, unknown> {
+  return {
+    name: "audit_enrichment",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        summary: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 1,
+          maxItems: 7,
+          description: "3-5 bullet points summarizing the overall posture",
+        },
+        top_actions_now: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 3,
+          description: "Exactly 3 prioritized actions, ordered by impact",
+        },
+        finding_notes: {
+          type: "array",
+          maxItems: 40,
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              why_it_matters: { type: "string" },
+              recommended_action: { type: "string" },
+            },
+            required: ["id", "why_it_matters", "recommended_action"],
+            additionalProperties: false,
+          },
+          description:
+            "Optional enrichment for the highest-signal finding IDs included in the prompt.",
+        },
+      },
+      required: ["summary", "top_actions_now", "finding_notes"],
       additionalProperties: false,
     },
   };

@@ -1,12 +1,15 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import { auditReportJsonSchema } from "../schema";
+import { auditEnrichmentJsonSchema, auditReportJsonSchema } from "../schema";
 import {
   codexBrainTurnSafetyParams,
   type CodexAppServerResolvedConfig,
   type CodexAppServerStdioConfig,
 } from "./config";
-import { extractAuditReportFromCodexTurnPayload } from "./extract-report";
+import {
+  extractAuditEnrichmentFromCodexTurnPayload,
+  extractAuditReportFromCodexTurnPayload,
+} from "./extract-report";
 import {
   isJsonRpcResponse,
   parseJsonRpcLine,
@@ -27,6 +30,11 @@ export type CodexBrainPrompt = {
 
 export type CodexBrainResult = {
   report: import("../schema").AuditReport;
+  tokensUsed: number;
+};
+
+export type CodexEnrichmentBrainResult = {
+  enrichment: import("../schema").AuditEnrichment;
   tokensUsed: number;
 };
 
@@ -142,6 +150,39 @@ export class CodexAppServerSession {
     config: CodexAppServerResolvedConfig,
     prompts: CodexBrainPrompt
   ): Promise<CodexBrainResult> {
+    const { output, tokensUsed } = await this.runTurn(config, prompts, auditReportJsonSchema());
+    const report = extractAuditReportFromCodexTurnPayload(output);
+
+    if (!report) {
+      throw new Error("Codex App Server turn completed without a valid audit report payload");
+    }
+
+    return { report, tokensUsed };
+  }
+
+  async analyzeArtifactEnrichmentTurn(
+    config: CodexAppServerResolvedConfig,
+    prompts: CodexBrainPrompt
+  ): Promise<CodexEnrichmentBrainResult> {
+    const { output, tokensUsed } = await this.runTurn(
+      config,
+      prompts,
+      auditEnrichmentJsonSchema()
+    );
+    const enrichment = extractAuditEnrichmentFromCodexTurnPayload(output);
+
+    if (!enrichment) {
+      throw new Error("Codex App Server turn completed without a valid audit enrichment payload");
+    }
+
+    return { enrichment, tokensUsed };
+  }
+
+  private async runTurn(
+    config: CodexAppServerResolvedConfig,
+    prompts: CodexBrainPrompt,
+    schemaSpec: Record<string, unknown>
+  ): Promise<{ output: unknown; tokensUsed: number }> {
     if (config.transport === "websocket") {
       throw new Error(
         "Codex App Server WebSocket transport is not implemented in SignalForge yet; use CODEX_APP_SERVER_TRANSPORT=stdio."
@@ -173,7 +214,6 @@ export class CodexAppServerSession {
         throw new Error("Codex App Server thread/start did not return a thread id");
       }
 
-      const schemaSpec = auditReportJsonSchema();
       const outputSchema = schemaSpec.schema as Record<string, unknown>;
 
       const turnResult = await this.request("turn/start", {
@@ -187,17 +227,13 @@ export class CodexAppServerSession {
       this.turnPayloads.push(turnResult);
       await this.waitForTurnCompletion(config.turnTimeoutMs);
 
-      const report = extractAuditReportFromCodexTurnPayload({
+      const output = {
         turnResult,
         notifications: [...this.turnPayloads],
-      });
-
-      if (!report) {
-        throw new Error("Codex App Server turn completed without a valid audit report payload");
-      }
+      };
 
       const tokensUsed = extractTokenUsageFromTurnPayloads(this.turnPayloads);
-      return { report, tokensUsed };
+      return { output, tokensUsed };
     } finally {
       this.close();
     }

@@ -6,7 +6,10 @@ import {
   codexBrainTurnSafetyParams,
   resolveCodexAppServerConfig,
 } from "@/lib/analyzer/codex-app-server/config";
-import { extractAuditReportFromCodexTurnPayload } from "@/lib/analyzer/codex-app-server/extract-report";
+import {
+  extractAuditEnrichmentFromCodexTurnPayload,
+  extractAuditReportFromCodexTurnPayload,
+} from "@/lib/analyzer/codex-app-server/extract-report";
 import type { AuditReport } from "@/lib/analyzer/schema";
 
 const FIXTURES = join(__dirname, "../fixtures");
@@ -92,6 +95,29 @@ describe("extractAuditReportFromCodexTurnPayload", () => {
       params: { turn: { structuredContent: sampleReport } },
     });
     expect(extracted).toEqual(sampleReport);
+  });
+});
+
+describe("extractAuditEnrichmentFromCodexTurnPayload", () => {
+  it("parses compact enrichment embedded in turn/completed notifications", () => {
+    const enrichment = {
+      summary: ["Large cluster run needs exposure review."],
+      top_actions_now: ["Action A", "Action B", "Action C"],
+      finding_notes: [
+        {
+          id: "F001",
+          why_it_matters: "Public exposure expands the cluster attack surface.",
+          recommended_action: "Make the Service internal unless public access is required.",
+        },
+      ],
+    };
+
+    const extracted = extractAuditEnrichmentFromCodexTurnPayload({
+      method: "turn/completed",
+      params: { structuredOutput: enrichment },
+    });
+
+    expect(extracted).toEqual(enrichment);
   });
 });
 

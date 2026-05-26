@@ -4,17 +4,28 @@ import type { ResponseCreateParamsNonStreaming } from "openai/resources/response
 import { getAdapter, detectArtifactType } from "../adapter/registry";
 import {
   AuditReportSchema,
+  AuditEnrichmentSchema,
   type AnalysisResult,
+  type AuditEnrichment,
   type AuditReport,
   type EnvironmentContext,
   type Finding,
   type NoiseItem,
   type PreFinding,
 } from "./schema";
-import { buildSystemPrompt, buildUserPrompt } from "./prompts";
-import { callCodexAppServerBrain, type CodexBrainCallOptions } from "./codex-app-server/brain";
+import {
+  COMPACT_LLM_FINDING_LIMIT,
+  buildCompactUserPrompt,
+  buildSystemPrompt,
+  buildUserPrompt,
+} from "./prompts";
+import {
+  callCodexAppServerBrain,
+  callCodexAppServerEnrichmentBrain,
+  type CodexBrainCallOptions,
+} from "./codex-app-server/brain";
 import { createOpenAIClient, resolveBrainProvider } from "./brain-provider";
-import { auditReportResponseFormat } from "./response-format";
+import { auditEnrichmentResponseFormat, auditReportResponseFormat } from "./response-format";
 
 export interface AnalyzeOptions {
   apiKey?: string;
@@ -25,6 +36,9 @@ export interface AnalyzeOptions {
   /** @internal test-only: bypass stdio spawn for Codex App Server brain calls. */
   _codexBrainFactory?: CodexBrainCallOptions["_sessionFactory"];
 }
+
+const COMPACT_LLM_FINDING_THRESHOLD = 80;
+const COMPACT_LLM_EVIDENCE_CHAR_THRESHOLD = 50_000;
 
 function displayModelForMeta(options: AnalyzeOptions): string {
   const provider = (process.env.LLM_PROVIDER ?? "openai").trim().toLowerCase();
@@ -86,21 +100,42 @@ export async function analyzeArtifact(
 
     if (resolved.provider === "codex_app_server") {
       try {
-        const codex = await callCodexAppServerBrain(
-          {
-            system: buildSystemPrompt(),
-            user: buildUserPrompt(env, noise, preFindings, sections, incomplete, reason),
-          },
-          { model: options.model, _sessionFactory: options._codexBrainFactory }
-        );
+        const useCompactLlm = shouldUseCompactLlm(preFindings);
+        const codex = useCompactLlm
+          ? await callCodexAppServerEnrichmentBrain(
+              {
+                system: buildSystemPrompt(),
+                user: buildCompactUserPrompt(
+                  env,
+                  noise,
+                  selectCompactFindings(preFindings, env),
+                  preFindings.length,
+                  incomplete,
+                  reason
+                ),
+              },
+              { model: options.model }
+            )
+          : await callCodexAppServerBrain(
+              {
+                system: buildSystemPrompt(),
+                user: buildUserPrompt(env, noise, preFindings, sections, incomplete, reason),
+              },
+              { model: options.model, _sessionFactory: options._codexBrainFactory }
+            );
         const duration = Date.now() - startMs;
-        const reconciledFindings = reconcileSeverity(codex.report.findings, preFindings);
+        const codexReport = "enrichment" in codex
+          ? buildReportFromEnrichment(codex.enrichment, env, noise, preFindings)
+          : codex.report;
+        const reconciledFindings = useCompactLlm
+          ? codexReport.findings
+          : reconcileSeverity(codexReport.findings, preFindings);
         const mergedReport: AuditReport = {
-          summary: codex.report.summary,
+          summary: codexReport.summary,
           findings: reconciledFindings,
           environment_context: env,
           noise_or_expected: noise,
-          top_actions_now: codex.report.top_actions_now,
+          top_actions_now: codexReport.top_actions_now,
         };
         return {
           report: mergedReport,
@@ -136,19 +171,15 @@ export async function analyzeArtifact(
   }
 
   try {
-    const { report: llmReport, tokensUsed } = await callLlm(
-      client,
-      model,
-      env,
-      noise,
-      preFindings,
-      sections,
-      incomplete,
-      reason
-    );
+    const useCompactLlm = shouldUseCompactLlm(preFindings);
+    const { report: llmReport, tokensUsed } = useCompactLlm
+      ? await callCompactLlm(client, model, env, noise, preFindings, incomplete, reason)
+      : await callLlm(client, model, env, noise, preFindings, sections, incomplete, reason);
     const duration = Date.now() - startMs;
 
-    const reconciledFindings = reconcileSeverity(llmReport.findings, preFindings);
+    const reconciledFindings = useCompactLlm
+      ? llmReport.findings
+      : reconcileSeverity(llmReport.findings, preFindings);
 
     const mergedReport: AuditReport = {
       summary: llmReport.summary,
@@ -176,6 +207,77 @@ export async function analyzeArtifact(
     const message = err instanceof Error ? err.message : String(err);
     return buildFallbackResult(env, noise, preFindings, incomplete, reason, model, startMs, message);
   }
+}
+
+function shouldUseCompactLlm(preFindings: PreFinding[]): boolean {
+  if (preFindings.length >= COMPACT_LLM_FINDING_THRESHOLD) return true;
+  const evidenceChars = preFindings.reduce((total, finding) => total + finding.evidence.length, 0);
+  return evidenceChars >= COMPACT_LLM_EVIDENCE_CHAR_THRESHOLD;
+}
+
+function findingFromPreFinding(
+  pf: PreFinding,
+  index: number,
+  env: EnvironmentContext,
+  note?: { why_it_matters?: string; recommended_action?: string }
+): Finding {
+  const base: Finding = {
+    id: `F${String(index + 1).padStart(3, "0")}`,
+    title: pf.title,
+    severity: pf.severity_hint,
+    category: pf.category,
+    section_source: pf.section_source,
+    evidence: pf.evidence,
+    why_it_matters: "(LLM explanation unavailable)",
+    recommended_action: buildActionForFinding(
+      {
+        id: `F${String(index + 1).padStart(3, "0")}`,
+        title: pf.title,
+        severity: pf.severity_hint,
+        category: pf.category,
+        section_source: pf.section_source,
+        evidence: pf.evidence,
+        why_it_matters: "",
+        recommended_action: "",
+      },
+      env
+    ),
+  };
+
+  return {
+    ...base,
+    why_it_matters: note?.why_it_matters?.trim() || summarizeFallbackFinding(base),
+    recommended_action: note?.recommended_action?.trim() || base.recommended_action,
+  };
+}
+
+function buildReportFromEnrichment(
+  enrichment: AuditEnrichment,
+  env: EnvironmentContext,
+  noise: NoiseItem[],
+  preFindings: PreFinding[]
+): AuditReport {
+  const notesById = new Map(
+    enrichment.finding_notes.map((note) => [
+      note.id,
+      {
+        why_it_matters: note.why_it_matters,
+        recommended_action: note.recommended_action,
+      },
+    ])
+  );
+  const findings = preFindings.map((pf, index) => {
+    const id = `F${String(index + 1).padStart(3, "0")}`;
+    return findingFromPreFinding(pf, index, env, notesById.get(id));
+  });
+
+  return {
+    summary: enrichment.summary,
+    findings,
+    environment_context: env,
+    noise_or_expected: noise,
+    top_actions_now: enrichment.top_actions_now,
+  };
 }
 
 function buildFallbackResult(
@@ -854,4 +956,56 @@ async function callLlm(
   const parsed = JSON.parse(text);
   const report = AuditReportSchema.parse(parsed);
   return { report, tokensUsed };
+}
+
+function selectCompactFindings(
+  preFindings: PreFinding[],
+  env: EnvironmentContext
+): Array<{ finding: PreFinding; originalIndex: number }> {
+  return preFindings
+    .map((finding, originalIndex) => ({
+      finding,
+      originalIndex,
+      sortFinding: findingFromPreFinding(finding, originalIndex, env),
+    }))
+    .sort((a, b) => compareFindingsForFallback(a.sortFinding, b.sortFinding))
+    .slice(0, COMPACT_LLM_FINDING_LIMIT)
+    .map(({ finding, originalIndex }) => ({ finding, originalIndex }));
+}
+
+async function callCompactLlm(
+  client: OpenAI,
+  model: string,
+  env: EnvironmentContext,
+  noise: NoiseItem[],
+  preFindings: PreFinding[],
+  incomplete: boolean,
+  incompleteReason?: string
+): Promise<LlmResult> {
+  const selectedFindings = selectCompactFindings(preFindings, env);
+  const body: ResponseCreateParamsNonStreaming = {
+    model,
+    stream: false,
+    instructions: buildSystemPrompt(),
+    input: buildCompactUserPrompt(
+      env,
+      noise,
+      selectedFindings,
+      preFindings.length,
+      incomplete,
+      incompleteReason
+    ),
+    text: {
+      format: auditEnrichmentResponseFormat(),
+    },
+  };
+
+  const response = await client.responses.create(body);
+  const tokensUsed = extractTokenUsage(response);
+  const parsed = JSON.parse(response.output_text);
+  const enrichment = AuditEnrichmentSchema.parse(parsed);
+  return {
+    report: buildReportFromEnrichment(enrichment, env, noise, preFindings),
+    tokensUsed,
+  };
 }

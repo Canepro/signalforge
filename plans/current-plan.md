@@ -43,6 +43,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 | 9d | Run-detail operator summary: artifact-aware summary modules (stat grids, bar lists, callouts), scheduling-pressure wording, top consumers, compact findings filters; page-only `summary_modules` | Done |
 | Autonomous Kubernetes actions | Source-owned automation signals, source-bound diagnostic triggers, deterministic safe-fix policy gate, fix action runs, execution-agent dry-run/apply APIs, post-fix verification, and Sources UI visibility | Done |
 | 11a (auth.md slice 1) | Static agent discovery (`/auth.md`, `/.well-known/*`), scope vocabulary, `POST /agent/auth` alias for collection-agent registration | Done |
+| 12a | Large-run brain hardening: compact LLM enrichment for large deterministic runs so real Kubernetes bundles keep operator summaries without requiring the model to return every finding/evidence string | Done |
 
 ## Product snapshot
 
@@ -67,6 +68,16 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - Kubernetes analysis now covers public Service exposure, namespace isolation gaps, RBAC over-breadth, workload-to-identity joins, exposed-workload-to-identity joins, token/Secret usage, workload hardening, host-escape style settings, probes, and resource governance.
 - The strongest remaining Phase 8 architectural risk is unchanged: the current execution model is still effectively one registration per source, which may be too narrow for future Kubernetes or mixed-scope execution forms.
 
+## Fleet diagnostic direction
+
+SignalForge's next product direction is a source-bound diagnostics control plane
+for Vincent's real machines and operational surfaces: Mac workstation,
+Linux/VPS hosts, AKS, OKE, container runtimes, and future narrow evidence
+surfaces. Selene should be able to request diagnostics and read results for the
+Sources she is authorized for, while collection and action execution stay in
+source-local agents or wrappers rather than inside the app. Source of truth:
+[`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
+
 ## Known limitations
 
 - Multi-artifact support is no longer just scaffolding, but Phase 8 quality is still uneven: container coverage is solid first-slice quality, while Kubernetes operational diagnostics may still need tuning as collector snapshots vary.
@@ -82,6 +93,8 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - Continue removing personal-environment assumptions from docs, scripts, examples, and adjacent repos so self-hosting remains straightforward for operators outside the reference instance.
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
+- Harden large-run LLM enrichment on real Kubernetes bundles before expanding Selene to more Sources. Source of truth: [`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
+- Start the fleet diagnostic surface map for Mac, Linux/VPS, AKS, OKE, and container/runtime Sources, with stable `target_identifier`, artifact family, execution form, credential store, and Selene scope per Source.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare export is shipped on the compare UI (**Export compare JSON** / **Copy compare JSON**, PR #19); CLI remains `scripts/signalforge-read.sh compare`.
 - Phase 8 next-step prep remains in place in [`phase-8-containers-k8s.md`](./phase-8-containers-k8s.md). The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
