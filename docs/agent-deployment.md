@@ -30,6 +30,17 @@ Do not treat the execution surface as the full target description for container 
 
 Use this path for the common operator workflow: create a Source in SignalForge, enroll the agent, install the service on the VM, and let SignalForge queue jobs to it.
 
+For auth.md-based enrollment from the sibling **`signalforge-agent`** repo:
+
+```bash
+export SIGNALFORGE_BASE_URL=https://your-signalforge.example
+export SIGNALFORGE_ADMIN_TOKEN='…'   # install-time only
+signalforge-agent discover
+signalforge-agent enroll --source-id <source-uuid> --token-file /etc/signalforge-agent/token
+```
+
+Then configure `SIGNALFORGE_AGENT_TOKEN_FILE` for the long-running service. On **409** `source_already_registered`, reissue from Sources UI — do not retry enroll in a loop.
+
 ### Prerequisites
 
 On the target Linux VM, you need:
