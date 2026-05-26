@@ -1,6 +1,8 @@
 import {
   ALL_DOCUMENTED_AGENT_SCOPES,
+  AUTOMATION_AGENT_SCOPES,
   COLLECTION_AGENT_SCOPES,
+  impliedAutomationAgentCapabilities,
   impliedCollectionCapabilities,
 } from "./scopes";
 
@@ -65,7 +67,9 @@ export function buildAuthorizationServerMetadata(urls: DiscoveryUrls) {
 
 export function buildAuthMarkdown(urls: DiscoveryUrls): string {
   const capabilityExample = impliedCollectionCapabilities("linux-audit-log").join(", ");
-  const scopeList = COLLECTION_AGENT_SCOPES.map((s) => `- \`${s}\``).join("\n");
+  const collectionScopeList = COLLECTION_AGENT_SCOPES.map((s) => `- \`${s}\``).join("\n");
+  const automationScopeList = AUTOMATION_AGENT_SCOPES.map((s) => `- \`${s}\``).join("\n");
+  const automationCapabilityExample = impliedAutomationAgentCapabilities().join(", ");
 
   return `# auth.md
 
@@ -100,9 +104,25 @@ Duplicate enroll returns **409** \`source_already_registered\`. Rotate via Sourc
 
 ## Scopes (discovery vocabulary)
 
-${scopeList}
+### Collection execution agents
+
+${collectionScopeList}
 
 Runtime jobs/next gating still uses capability strings such as \`${capabilityExample}\` on heartbeat.
+
+### Automation agents (e.g. Selene)
+
+Automation agents are separate from collection execution agents and from the Codex App Server analysis brain.
+
+Enroll at \`POST ${urls.baseUrl}/api/automation-agent/registrations\` with operator Bearer proof. Store the issued token outside this repo (for example \`SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN\` in Infisical).
+
+${automationScopeList}
+
+Documented capability examples: \`${automationCapabilityExample}\`. Route handlers continue to use existing source-bound automation-agent capability gates until scope enforcement is added in a later slice.
+
+## Analysis brain (Codex App Server)
+
+SignalForge can use a local Codex App Server process for the single analysis explanation pass when \`LLM_PROVIDER=codex_app_server\`. That path does not replace automation-agent tokens and does not run collection or kubectl.
 
 ## Claim flow
 

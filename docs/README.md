@@ -42,6 +42,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`operators/README.md`](./operators/README.md) | Operator docs entrypoint for Sources, agents, collection jobs, and current execution guidance |
 | [`operators/sources-and-agents.md`](./operators/sources-and-agents.md) | Sources UI, enrollment, collection-job lifecycle, and the control-plane / execution-plane split |
 | [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md) | Source-bound automation-agent setup, HTTP connection model, and helper-script workflow for external AI agents |
+| [`operators/selene-codex-app-server-integration.md`](./operators/selene-codex-app-server-integration.md) | Selene automation-agent vs Codex App Server analysis brain roles, scopes, and Infisical secret boundaries |
 | [`operators/autonomous-kubernetes-actions.md`](./operators/autonomous-kubernetes-actions.md) | Autonomous Kubernetes signal and safe-fix action model, including trust boundaries and required capabilities |
 | [`../examples/automation_agent_client.py`](../examples/automation_agent_client.py) | Minimal dependency-free example client for Codex- or OpenClaw-style agents consuming the automation-agent API |
 | [`../examples/openclaw_recommendation_handoff.py`](../examples/openclaw_recommendation_handoff.py) | Recommendation-only OpenClaw-style handoff builder that wraps SignalForge summaries without granting execution rights |
