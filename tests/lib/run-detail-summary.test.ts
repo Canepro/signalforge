@@ -403,6 +403,31 @@ memory_percent: 96.50`
     });
   });
 
+  it("treats missing container memory limit as unknown instead of no limit", () => {
+    const modules = buildRunDetailSummaryModules(
+      mkRun({ artifact_type: "container-diagnostics" }),
+      `=== container-diagnostics ===
+runtime: podman
+state_status: running
+health_status: healthy
+restart_count: 0
+oom_killed: false
+cpu_percent: 4.00
+memory_percent: 96.50`
+    );
+
+    expect(modules.find((module) => module.id === "container-failure-callouts")).toMatchObject({
+      tone: "warning",
+      callouts: expect.arrayContaining([
+        expect.objectContaining({
+          title: "High memory utilization",
+          body: expect.stringContaining("memory limit was not recorded"),
+          tone: "warning",
+        }),
+      ]),
+    });
+  });
+
   it("uses kubernetes capacity modules without scheduling stats when metrics are absent", async () => {
     const bundle = await import("node:fs/promises").then((fs) =>
       fs.readFile("tests/fixtures/kubernetes-payments-bundle.json", "utf8")

@@ -687,15 +687,17 @@ function buildContainerModules(_run: RunDetail, artifactContent: string): RunDet
   ];
 
   const callouts: RunDetailSummaryCallout[] = [];
-  if (
-    memoryPercent !== null &&
-    memoryPercent >= 90 &&
-    (memoryLimitBytes === null || memoryLimitBytes === 0)
-  ) {
+  if (memoryPercent !== null && memoryPercent >= 90 && memoryLimitBytes === 0) {
     callouts.push({
       title: "Memory pressure without a limit",
       body: `Runtime memory usage is ${percentLabel(memoryPercent)} with no configured memory limit — OOM risk is elevated.`,
       tone: "critical",
+    });
+  } else if (memoryPercent !== null && memoryPercent >= 85 && memoryLimitBytes === null) {
+    callouts.push({
+      title: "High memory utilization",
+      body: `One-shot sample shows ${percentLabel(memoryPercent)} memory usage, but the configured memory limit was not recorded.`,
+      tone: "warning",
     });
   } else if (memoryPercent !== null && memoryPercent >= 85) {
     callouts.push({
