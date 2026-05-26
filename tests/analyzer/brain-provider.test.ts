@@ -23,7 +23,19 @@ describe("brain-provider", () => {
         transport: "stdio",
         command: ["codex", "app-server"],
         model: "gpt-5.4",
+        turnTimeoutMs: 120000,
       },
+    });
+  });
+
+  it("resolves codex_app_server turn timeout override", () => {
+    process.env.LLM_PROVIDER = "codex_app_server";
+    process.env.CODEX_APP_SERVER_TURN_TIMEOUT_MS = "45000";
+    const r = resolveBrainProvider(process.env);
+    expect(r).toMatchObject({
+      ready: true,
+      provider: "codex_app_server",
+      config: { turnTimeoutMs: 45000 },
     });
   });
 

@@ -13,4 +13,25 @@ describe("getAppRuntimeHealthReport", () => {
 
     expect(report.admin_api.status).toBe("enabled");
   });
+
+  it("reports Codex App Server brain provider metadata without checking secrets", () => {
+    const report = getAppRuntimeHealthReport(
+      {
+        ...process.env,
+        DATABASE_DRIVER: "sqlite",
+        LLM_PROVIDER: "codex_app_server",
+        CODEX_APP_SERVER_TRANSPORT: "stdio",
+        CODEX_APP_SERVER_MODEL: "gpt-5.4",
+        CODEX_APP_SERVER_TURN_TIMEOUT_MS: "45000",
+      } satisfies NodeJS.ProcessEnv
+    );
+
+    expect(report.llm).toEqual({
+      provider: "codex_app_server",
+      status: "configured",
+      model: "gpt-5.4",
+      transport: "stdio",
+      turn_timeout_ms: 45000,
+    });
+  });
 });

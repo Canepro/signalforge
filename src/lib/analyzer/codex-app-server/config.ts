@@ -7,6 +7,7 @@ export type CodexAppServerStdioConfig = {
   /** argv for the app-server process (e.g. `codex`, `app-server`). */
   command: string[];
   model: string;
+  turnTimeoutMs: number;
 };
 
 export type CodexAppServerWebSocketConfig = {
@@ -16,6 +17,7 @@ export type CodexAppServerWebSocketConfig = {
     | { kind: "capability-token"; tokenFile: string }
     | { kind: "signed-bearer"; sharedSecretFile: string };
   model: string;
+  turnTimeoutMs: number;
 };
 
 export type CodexAppServerResolvedConfig =
@@ -28,6 +30,7 @@ export type ResolveCodexAppServerResult =
 
 const DEFAULT_COMMAND = "codex app-server";
 const DEFAULT_MODEL = "gpt-5.4";
+export const DEFAULT_TURN_TIMEOUT_MS = 120_000;
 
 function parseCommand(commandEnv: string | undefined): string[] {
   const raw = commandEnv?.trim() || DEFAULT_COMMAND;
@@ -54,6 +57,14 @@ function fileExists(path: string): boolean {
   }
 }
 
+function parseTurnTimeoutMs(raw: string | undefined): number {
+  const trimmed = raw?.trim();
+  if (!trimmed) return DEFAULT_TURN_TIMEOUT_MS;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 1_000) return DEFAULT_TURN_TIMEOUT_MS;
+  return Math.floor(parsed);
+}
+
 /**
  * Resolve Codex App Server transport settings from env.
  * WebSocket is opt-in and requires explicit auth file configuration on loopback only.
@@ -64,6 +75,7 @@ export function resolveCodexAppServerConfig(
 ): ResolveCodexAppServerResult {
   const transport = (env.CODEX_APP_SERVER_TRANSPORT ?? "stdio").trim().toLowerCase();
   const model = (overrides.model ?? env.CODEX_APP_SERVER_MODEL ?? DEFAULT_MODEL).trim();
+  const turnTimeoutMs = parseTurnTimeoutMs(env.CODEX_APP_SERVER_TURN_TIMEOUT_MS);
 
   if (transport === "stdio" || transport === "") {
     return {
@@ -72,6 +84,7 @@ export function resolveCodexAppServerConfig(
         transport: "stdio",
         command: parseCommand(env.CODEX_APP_SERVER_COMMAND),
         model,
+        turnTimeoutMs,
       },
     };
   }
@@ -111,6 +124,7 @@ export function resolveCodexAppServerConfig(
         wsUrl,
         auth: { kind: "capability-token", tokenFile },
         model,
+        turnTimeoutMs,
       },
     };
   }
@@ -123,6 +137,7 @@ export function resolveCodexAppServerConfig(
         wsUrl,
         auth: { kind: "signed-bearer", sharedSecretFile },
         model,
+        turnTimeoutMs,
       },
     };
   }

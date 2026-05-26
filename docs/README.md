@@ -52,6 +52,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
 | [`../scripts/smoke-automation-agent-local.sh`](../scripts/smoke-automation-agent-local.sh) | One-command local end-to-end smoke for automation-agent request, execution-agent fulfillment, and findings polling |
+| [`../scripts/smoke-codex-app-server-brain.sh`](../scripts/smoke-codex-app-server-brain.sh) | One-command local fixture smoke for the Codex App Server analysis brain provider |
 | [`history.md`](./history.md) | Running project history log for milestones, migration triggers, validations, and major operating decisions |
 | [`ui-system-direction.md`](./ui-system-direction.md) | Current UI-system decision, including how SignalForge should treat `shadcn/ui` versus the existing `sf-*` design primitives |
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |

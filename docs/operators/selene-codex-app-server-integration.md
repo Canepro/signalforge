@@ -16,12 +16,20 @@ When `LLM_PROVIDER=codex_app_server`, SignalForge:
 
 1. Runs the deterministic adapter pipeline first (pre-findings, noise, incomplete detection).
 2. Starts an **ephemeral** Codex thread per analysis over stdio (`codex app-server` by default).
-3. Sends a single `turn/start` with `outputSchema` matching `AuditReportSchema`, `sandboxPolicy: { type: "readOnly" }`, and `approvalPolicy: "never"`.
+3. Sends a single `turn/start` with `outputSchema` matching `AuditReportSchema`, `sandboxPolicy: { type: "readOnly", networkAccess: false }`, and `approvalPolicy: "never"`.
 4. Parses strict JSON from the turn result; on failure, uses the same deterministic fallback as OpenAI/Azure misconfiguration.
 
 SignalForge does **not** expose Codex shell/file tools for analysis. If your app-server build cannot honor read-only turns, do not enable this provider until it can.
 
 WebSocket transport is opt-in and requires loopback URLs plus token files; stdio is the supported default.
+
+Use the fixture-based smoke when validating a Mac-local Codex App Server setup:
+
+```bash
+bun run smoke:codex-brain
+```
+
+The smoke does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim that Vincent's current workstation is WSL.
 
 See [Codex App Server](https://developers.openai.com/codex/app-server) and `README.md` for `CODEX_APP_SERVER_*` variables.
 

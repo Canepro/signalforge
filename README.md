@@ -217,9 +217,18 @@ If provider configuration is missing or invalid, SignalForge uses a deterministi
 | `CODEX_APP_SERVER_TRANSPORT` | If `codex_app_server` | `stdio` | `stdio` (recommended) or `websocket` (loopback + auth files only) |
 | `CODEX_APP_SERVER_COMMAND` | No | `codex app-server` | argv for spawning the app-server process |
 | `CODEX_APP_SERVER_MODEL` | No | `gpt-5.4` | Model id for Codex threads |
+| `CODEX_APP_SERVER_TURN_TIMEOUT_MS` | No | `120000` | Per-analysis Codex turn wait before deterministic fallback |
 | `CODEX_APP_SERVER_WS_URL` | If websocket transport | — | Loopback WebSocket URL only |
 | `CODEX_APP_SERVER_WS_TOKEN_FILE` | If websocket transport | — | Path to capability token file |
 | `CODEX_APP_SERVER_WS_SHARED_SECRET_FILE` | If websocket transport | — | Path to signed-bearer shared secret file |
+
+Local Codex App Server smoke:
+
+```bash
+bun run smoke:codex-brain
+```
+
+The smoke uses checked-in fixtures. It does not inspect the current machine, so it remains valid on macOS even when older Linux/WSL fixtures are used as historical artifact samples.
 
 ## App Variables
 

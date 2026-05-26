@@ -13,6 +13,9 @@ type LlmHealth = {
   provider: BrainProviderId | string;
   status: "configured" | "fallback";
   reason?: string;
+  model?: string;
+  transport?: string;
+  turn_timeout_ms?: number;
 };
 
 type AdminApiHealth = {
@@ -66,9 +69,20 @@ function resolveLlmHealth(env: NodeJS.ProcessEnv): LlmHealth {
   const resolved = resolveBrainProvider(env);
 
   if (resolved.ready) {
+    if (resolved.provider === "codex_app_server") {
+      return {
+        provider: resolved.provider,
+        status: "configured",
+        model: resolved.config.model,
+        transport: resolved.config.transport,
+        turn_timeout_ms: resolved.config.turnTimeoutMs,
+      };
+    }
+
     return {
       provider: resolved.provider,
       status: "configured",
+      model: resolved.model,
     };
   }
 
