@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SignalForge Session Closeout — 2026-05-20</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115; --paper: #171a20; --line: #343843;
+      --ink: #f3f1e8; --muted: #b9b5aa; --accent: #d1a85b;
+      --good: #8fcf91; --warn: #e2b15e; --mono: ui-monospace, Menlo, Monaco, Consolas, monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.55; }
+    .shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 56px; }
+    .status { display: inline-block; padding: 4px 10px; border: 1px solid var(--good); color: var(--good); border-radius: 999px; font-size: 0.85rem; font-weight: 650; }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 12px 0 8px; }
+    h2 { margin: 28px 0 10px; font-size: 1.2rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    p, li { color: var(--muted); }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin: 16px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--line); padding: 9px 11px; text-align: left; vertical-align: top; }
+    th { background: #121419; }
+    code, pre { font-family: var(--mono); font-size: 0.88rem; }
+    pre { background: #121419; border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; color: #ddd; }
+    .pass { color: var(--good); font-weight: 650; }
+    a { color: var(--accent); }
+    .meta { font-size: 0.9rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="meta">2026-05-20 · implementation-closeout · SignalForge</div>
+    <span class="status">Done</span>
+    <h1>Recommended path executed</h1>
+    <p>Postgres parity → automation slice commit → Phase 11 slice 1 implementation. Branch is <strong>2 commits ahead</strong> of <code>origin/main</code>; not pushed.</p>
+
+    <div class="card">
+      <strong>Commits on main (local):</strong>
+      <ol>
+        <li><code>cd3af5a</code> — automation-agent diagnostics + Kubernetes safe-fix</li>
+        <li><code>(HEAD)</code> — auth.md discovery + <code>POST /agent/auth</code> alias</li>
+      </ol>
+    </div>
+
+    <h2>Verification</h2>
+    <table>
+      <thead><tr><th>Check</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Postgres parity (95 tests, migrations 001–006)</td><td class="pass">PASS — signalforge-pg via Podman</td></tr>
+        <tr><td><code>bun run typecheck</code></td><td class="pass">PASS</td></tr>
+        <tr><td><code>bun run test</code></td><td class="pass">PASS — 449/449</td></tr>
+        <tr><td><code>bun run build</code></td><td class="pass">PASS</td></tr>
+        <tr><td><code>bun run smoke:automation-agent</code></td><td class="pass">PASS</td></tr>
+        <tr><td><code>tests/api/auth-md-discovery.test.ts</code></td><td class="pass">PASS — 6/6</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Phase 11 slice 1 delivered</h2>
+    <table>
+      <thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /auth.md</code></td><td>Markdown discovery guide</td></tr>
+        <tr><td><code>GET /.well-known/oauth-protected-resource</code></td><td>PRM JSON</td></tr>
+        <tr><td><code>GET /.well-known/oauth-authorization-server</code></td><td>AS metadata + <code>agent_auth</code></td></tr>
+        <tr><td><code>POST /agent/auth</code></td><td>Admin Bearer alias; adds scope metadata</td></tr>
+      </tbody>
+    </table>
+    <p>Shared registration logic: <code>src/lib/api/collection-agent-registration.ts</code>. Scopes are metadata-only; runtime still uses <code>collect:*</code> capabilities.</p>
+
+    <h2>Related reports</h2>
+    <ul>
+      <li><a href="./2026-05-20-automation-slice-merge-prep.html">Automation slice merge prep</a></li>
+      <li><a href="./2026-05-20-phase-11-plan-amendments.html">Phase 11 plan amendments</a></li>
+    </ul>
+
+    <h2>Next steps (optional)</h2>
+    <ol>
+      <li><code>git push origin main</code> (or open a PR branch if you prefer review-first)</li>
+      <li>Confirm CI Storage Parity job green on push</li>
+      <li><code>signalforge-agent</code> follow-up: fetch <code>/auth.md</code> + explicit enroll command</li>
+      <li>Phase 11 slice 2: claim flow behind feature flag (only when ready)</li>
+    </ol>
+
+    <h2>Manual smoke (local dev)</h2>
+    <pre>curl -fsS http://localhost:3000/auth.md
+curl -fsS http://localhost:3000/.well-known/oauth-protected-resource | jq .
+curl -fsS http://localhost:3000/.well-known/oauth-authorization-server | jq .
+
+# registration (admin Bearer)
+curl -fsS -X POST http://localhost:3000/agent/auth \
+  -H "Authorization: Bearer $SIGNALFORGE_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"source_id":"<uuid>","display_name":"edge"}'</pre>
+  </div>
+</body>
+</html>
