@@ -1,7 +1,7 @@
 node_modules
 
 # Optional sibling clone for cross-repo agent work (separate git repository)
-signalforge-agent//
+signalforge-agent/
 .next/
 out/
 .env
