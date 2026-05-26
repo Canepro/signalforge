@@ -212,13 +212,13 @@ describe("run-detail-summary", () => {
     expect(modules.map((module) => module.id)).toEqual(
       expect.arrayContaining([
         "kubernetes-capacity-snapshot",
-        "run-health-summary",
-        "kubernetes-node-capacity-bars",
-        "kubernetes-top-consumers",
+        "kubernetes-top-node-consumers",
+        "kubernetes-top-pod-memory",
         "kubernetes-guardrails",
         "kubernetes-instability-callouts",
       ])
     );
+    expect(modules.some((module) => module.id === "run-health-summary")).toBe(false);
 
     const capacity = modules.find((module) => module.id === "kubernetes-capacity-snapshot");
     expect(capacity).toMatchObject({
@@ -227,10 +227,14 @@ describe("run-detail-summary", () => {
       stats: expect.arrayContaining([
         expect.objectContaining({ label: "Peak memory", value: "85.0%" }),
         expect.objectContaining({ label: "Peak CPU", value: "34.0%" }),
+        expect.objectContaining({
+          label: "Scheduling pressure",
+          detail: expect.stringContaining("FailedScheduling"),
+        }),
+        expect.objectContaining({
+          detail: expect.stringMatching(/insufficient cpu/i),
+        }),
       ]),
-    });
-    expect(modules.find((module) => module.id === "run-health-summary")).toMatchObject({
-      prominence: "supporting",
     });
     expect(modules.find((module) => module.id === "priority-callouts")).toMatchObject({
       kind: "callout-list",
@@ -322,6 +326,64 @@ failure_log_excerpts_json: [{"source":"current","reason":"restarting","excerpt_l
     });
   });
 
+  it("uses kubernetes capacity modules without scheduling stats when metrics are absent", async () => {
+    const bundle = await import("node:fs/promises").then((fs) =>
+      fs.readFile("tests/fixtures/kubernetes-payments-bundle.json", "utf8")
+    );
+    const run = mkRun({
+      artifact_type: "kubernetes-bundle",
+      report: {
+        summary: ["Summary"],
+        findings: [],
+        environment_context: {
+          hostname: "aks-prod-eu-1",
+          os: "Kubernetes (aks)",
+          kernel: "k8s",
+          is_wsl: false,
+          is_container: false,
+          is_virtual_machine: false,
+          ran_as_root: false,
+          uptime: "unknown",
+        },
+        noise_or_expected: [],
+        top_actions_now: [],
+      },
+    });
+
+    const modules = buildRunDetailSummaryModules(run, bundle);
+    expect(modules.map((module) => module.id)).toEqual(
+      expect.arrayContaining([
+        "kubernetes-capacity-snapshot",
+        "kubernetes-top-node-consumers",
+        "kubernetes-top-pod-memory",
+      ])
+    );
+    const capacityModule = modules.find(
+      (module) => module.id === "kubernetes-capacity-snapshot" && module.kind === "stat-grid"
+    );
+    const capacityStats = capacityModule?.kind === "stat-grid" ? capacityModule.stats : [];
+    expect(capacityStats.some((stat) => stat.label === "Scheduling pressure")).toBe(false);
+    expect(modules.some((module) => module.id === "kubernetes-instability-callouts")).toBe(true);
+  });
+
+  it("returns no artifact-family modules when artifact bytes are missing", () => {
+    const modules = buildRunDetailSummaryModules(
+      mkRun({
+        artifact_type: "kubernetes-bundle",
+        report: {
+          summary: ["Summary"],
+          findings: [mkFinding("1", "Example finding", "high")],
+          environment_context: mkRun().environment!,
+          noise_or_expected: [],
+          top_actions_now: [],
+        },
+      }),
+      null
+    );
+    expect(modules.some((module) => module.id === "kubernetes-capacity-snapshot")).toBe(false);
+    expect(modules.some((module) => module.id === "run-health-summary")).toBe(true);
+  });
+
   it("builds Linux host pressure modules from raw audit content", async () => {
     const fixture = await import("node:fs/promises").then((fs) =>
       fs.readFile("tests/fixtures/sample-prod-server.log", "utf8")
@@ -371,6 +433,34 @@ failure_log_excerpts_json: [{"source":"current","reason":"restarting","excerpt_l
       stats: expect.arrayContaining([
         expect.objectContaining({ label: "Peak disk use", value: "78%" }),
         expect.objectContaining({ label: "Pending upgrades", value: "0" }),
+      ]),
+    });
+    expect(modules.some((module) => module.id === "host-top-processes")).toBe(false);
+  });
+
+  it("builds Linux top-process bars when ps output is present", async () => {
+    const fixture = await import("node:fs/promises").then((fs) =>
+      fs.readFile("tests/fixtures/wsl-mar2026-full.log", "utf8")
+    );
+    const run = mkRun({
+      artifact_type: "linux-audit-log",
+      report: {
+        summary: ["Summary"],
+        findings: [],
+        environment_context: mkRun().environment!,
+        noise_or_expected: [],
+        top_actions_now: [],
+      },
+    });
+
+    const modules = buildRunDetailSummaryModules(run, fixture);
+    const topProcesses = modules.find((module) => module.id === "host-top-processes");
+    expect(topProcesses).toMatchObject({
+      kind: "bar-list",
+      bars: expect.arrayContaining([
+        expect.objectContaining({
+          value_label: expect.stringMatching(/% mem/),
+        }),
       ]),
     });
   });

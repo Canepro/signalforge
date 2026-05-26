@@ -39,6 +39,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 | 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, compare normalization, deterministic platform noise, and exposure-plus-identity joins | Done |
 | 9 (repo-local) | Typed job-scoped collection parameters in SignalForge: source defaults, per-job overrides, resolved `collection_scope` in `jobs/next`, published schemas, Sources UI visibility, and contract tests | Done |
 | 9c | Frontend operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources | Done |
+| 9d | Run-detail operator summary: artifact-aware summary modules (stat grids, bar lists, callouts), scheduling-pressure wording, top consumers, compact findings filters; page-only `summary_modules` | Done |
 | Autonomous Kubernetes actions | Source-owned automation signals, source-bound diagnostic triggers, deterministic safe-fix policy gate, fix action runs, execution-agent dry-run/apply APIs, post-fix verification, and Sources UI visibility | Done |
 | 11a (auth.md slice 1) | Static agent discovery (`/auth.md`, `/.well-known/*`), scope vocabulary, `POST /agent/auth` alias for collection-agent registration | Done |
 
@@ -71,7 +72,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
 - The current source and agent model is still effectively one registration per source, which may become limiting for Kubernetes or future multi-scope execution.
-- Run detail now surfaces artifact-aware summary modules on the page path, but later Phase 9d slices still owe richer Kubernetes scheduling-pressure wording, Linux top-process summaries, and findings-band cleanup once operators validate the new layer on real runs.
+- Run detail surfaces artifact-aware summary modules on the page path (`getPageDetail` / `summary_modules`). JSON `GET /api/runs/[id]` intentionally omits them for stable agent contracts.
 
 ## Recommended next work (high level)
 
@@ -91,7 +92,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
   - richer container runtime-health diagnostics such as state, health, restart, OOM, bounded unhealthy log excerpts, memory limits/reservations, and one-shot CPU/memory stats
   - findings and dashboard presentation that surfaces this evidence instead of burying it
   - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
-- The next focused UI follow-on inside that work should be the run-detail operator summary redesign in [`phase-9d-run-detail-operator-summary.md`](./phase-9d-run-detail-operator-summary.md), which defines how charts, structured callouts, and reusable artifact-aware summary modules should reduce operator reading load without turning the page into dashboard filler.
+- Phase 9d run-detail operator summary (slices 1–5) is shipped; see [`phase-9d-run-detail-operator-summary.md`](./phase-9d-run-detail-operator-summary.md). Further UI work should validate on real ACA runs before broad new surface area.
 - Preferred deployment stance for `signalforge-agent` is now environment-specific: host `systemd` remains the preferred path for `linux-audit-log`, a long-running containerized runner on the runtime host is the preferred path for `container-diagnostics`, and a cluster-side Deployment is the preferred path for `kubernetes-bundle`. The sibling repo now includes all three packaging forms plus token-file credential loading, `preflight`, a dry-run installer flow, explicit `kubectl` and kubeconfig pinning, managed kubeconfig install support, and stricter container-runtime readiness checks that require real Docker or Podman access rather than bare binary presence. A real `systemd-run --user` smoke now validates the preferred host-service path without requiring root.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).

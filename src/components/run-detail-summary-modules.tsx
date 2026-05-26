@@ -113,14 +113,14 @@ export function RunDetailSummaryModules({
   const orderedModules = [...primaryModules, ...supportingModules];
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3 sm:space-y-4" aria-label="Operator summary">
       {orderedModules.map((module) => (
         <article
           key={module.id}
           className={`sf-panel overflow-hidden ${prominencePanelClasses[module.prominence]}`}
         >
-          <div className="sf-panel-header">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div className="sf-panel-header px-3 py-3 sm:px-4 sm:py-3.5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="sf-kicker">{prominenceHeaderCopy[module.prominence]}</div>
                 <h3
@@ -142,9 +142,11 @@ export function RunDetailSummaryModules({
             </div>
           </div>
 
-          <div className={`px-4 py-3.5 ${module.prominence === "primary" ? "lg:px-5 lg:py-4.5" : ""}`}>
+          <div
+            className={`px-3 py-3 sm:px-4 sm:py-3.5 ${module.prominence === "primary" ? "lg:px-5 lg:py-4" : ""}`}
+          >
             {module.kind === "stat-grid" ? (
-              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {module.stats.map((stat) => (
                   <StatCard key={`${module.id}-${stat.label}-${stat.value}`} stat={stat} />
                 ))}
@@ -152,7 +154,7 @@ export function RunDetailSummaryModules({
             ) : null}
 
             {module.kind === "bar-list" ? (
-              <div className="grid gap-2.5 xl:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-1 lg:grid-cols-2">
                 {module.bars.map((bar) => (
                   <SummaryBar key={`${module.id}-${bar.label}-${bar.value_label}`} bar={bar} />
                 ))}

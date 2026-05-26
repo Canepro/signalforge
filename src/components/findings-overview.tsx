@@ -17,6 +17,8 @@ interface FindingsOverviewProps {
   activeSeverity: Severity | "all";
   onSignalChange: (signal: FindingSignal | "all") => void;
   onSeverityChange: (severity: Severity | "all") => void;
+  /** Compact layout when run-detail summary modules already carry the operator story. */
+  compact?: boolean;
 }
 
 export function FindingsOverview({
@@ -26,6 +28,7 @@ export function FindingsOverview({
   activeSeverity,
   onSignalChange,
   onSeverityChange,
+  compact = false,
 }: FindingsOverviewProps) {
   const signalSummary = summarizeFindingSignals(findings);
   const severityCounts = severityOrder.map((severity) => ({
@@ -37,6 +40,97 @@ export function FindingsOverview({
     activeSignal === "all"
       ? "All signal buckets"
       : (FINDING_SIGNAL_DEFINITIONS.find((item) => item.signal === activeSignal)?.label ?? activeSignal);
+
+  if (compact) {
+    return (
+      <section className="rounded-xl border border-outline-variant/15 bg-surface-container-low/55 px-3 py-3 sm:px-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+              Findings table filters
+            </div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-on-surface-variant">
+              {filteredCount} of {findings.length} visible
+              {filtersActive ? (
+                <>
+                  {" "}
+                  · {activeSignalLabel.toLowerCase()} ·{" "}
+                  {activeSeverity === "all" ? "all severities" : activeSeverity}
+                </>
+              ) : null}
+            </p>
+          </div>
+          {filtersActive ? (
+            <button
+              type="button"
+              className="sf-btn-secondary shrink-0 px-3 py-1.5 text-xs"
+              onClick={() => {
+                onSignalChange("all");
+                onSeverityChange("all");
+              }}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {signalSummary.map((item) => {
+            const selected = activeSignal === item.signal;
+            return (
+              <button
+                key={item.signal}
+                type="button"
+                title={item.description}
+                aria-pressed={selected}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  selected
+                    ? "border-primary/30 bg-primary/[0.08] text-primary"
+                    : item.count > 0
+                      ? "border-outline-variant/20 bg-surface-container-lowest text-on-surface hover:bg-surface-container"
+                      : "border-outline-variant/10 bg-surface-container-lowest/80 text-on-surface-variant opacity-70"
+                }`}
+                onClick={() => onSignalChange(selected ? "all" : item.signal)}
+              >
+                {item.label} ({item.count})
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+              activeSeverity === "all"
+                ? "border-primary/30 bg-primary/[0.08] text-primary"
+                : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant"
+            }`}
+            onClick={() => onSeverityChange("all")}
+          >
+            All severities
+          </button>
+          {severityCounts.map(({ severity, count }) => (
+            <button
+              key={severity}
+              type="button"
+              className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors ${
+                activeSeverity === severity
+                  ? "border-primary/30 bg-primary/[0.08] text-primary"
+                  : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant"
+              } ${count === 0 ? "opacity-60" : ""}`}
+              onClick={() => onSeverityChange(severity)}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <SeverityBadge severity={severity} />
+                <span>{count}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="sf-panel">

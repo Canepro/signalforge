@@ -44,6 +44,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const noise = run.noise ?? report?.noise_or_expected ?? [];
   const topActions = report?.top_actions_now ?? [];
   const summaryModules = run.summary_modules ?? [];
+  const hasOperatorSummary = summaryModules.length > 0;
   const filteredFindings = findings.filter((finding) => {
     const matchesSignal =
       activeSignal === "all" || classifyFindingSignal(finding) === activeSignal;
@@ -275,6 +276,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                     activeSeverity={activeSeverity}
                     onSignalChange={setActiveSignal}
                     onSeverityChange={setActiveSeverity}
+                    compact={hasOperatorSummary}
                   />
                 ) : null}
 

@@ -1,6 +1,6 @@
 # Phase 9d Design: Run Detail Operator Summary and Findings Redesign
 
-> Status: in progress. **Slice 1** (summary-module contract, shared priority callouts, page-detail wiring) is implemented on `main`. Slices 2–5 (Kubernetes capacity polish, container/Linux depth, page cleanup) remain follow-ons. See [`current-plan.md`](./current-plan.md).
+> Status: **done** (slices 1–5). Slice 1 landed on `main` (contract, priority callouts, page-detail wiring). Slices 2–5 add Kubernetes scheduling-pressure and consumer summaries, container/Linux depth (including top processes when `ps` is present), compact findings filters when summary modules are shown, and responsive run-detail polish. `summary_modules` remain page-only via `getPageDetail()` — not on `GET /api/runs/[id]`. See [`current-plan.md`](./current-plan.md).
 
 ## Why this exists
 
@@ -255,26 +255,23 @@ Do not let `shadcn/ui` become a second styling language on the page.
 - separate chartable evidence from callout evidence
 - keep existing page shell intact
 
-### Slice 2: Kubernetes capacity story
+### Slice 2: Kubernetes capacity story — done
 
-- add `ClusterCapacitySnapshot`
-- improve scheduling-pressure wording
-- add top node and pod consumer summaries
+- `ClusterCapacitySnapshot` with explicit **Scheduling pressure** stat when `FailedScheduling` / insufficient CPU or memory evidence exists (deterministic copy from bundle events)
+- Top node memory/CPU bar modules and separate top pod memory/CPU consumer bars
 
-### Slice 3: container runtime story
+### Slice 3: container runtime story — done
 
-- elevate runtime health and one-shot resource evidence into stronger summary
-  modules
+- `ContainerRuntimeHealth` primary module; resource bars and guardrails; memory-pressure callouts when usage is high or unlimited
 
-### Slice 4: Linux host pressure story
+### Slice 4: Linux host pressure story — done
 
-- add compact pressure and top-process summaries where evidence quality is good
+- `HostPressureSnapshot`, storage bars, and `Top Processes` when the audit includes `ps` output under **Running Processes**
 
-### Slice 5: page cleanup
+### Slice 5: page cleanup — done
 
-- simplify the current findings overview band once the new summary layer is in
-  place
-- reduce duplicated summary chrome
+- Compact findings filter band when `summary_modules` are present (avoids duplicating signal/severity chrome)
+- Responsive spacing on summary modules; `Run Health Summary` hidden when a family primary module already carries the story
 
 ## Acceptance criteria
 
