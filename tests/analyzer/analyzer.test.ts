@@ -501,4 +501,67 @@ describe("LLM success path (mocked)", () => {
 
     expect(report.findings[0]?.why_it_matters).toContain("Mocked explanation");
   });
+
+  it("uses compact enrichment for large Kubernetes runs and keeps full deterministic findings", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const services = Array.from({ length: 90 }, (_, i) => ({
+      namespace: "surface",
+      name: `public-${String(i + 1).padStart(2, "0")}`,
+      type: "LoadBalancer",
+    }));
+    const raw = JSON.stringify({
+      schema_version: "kubernetes-bundle.v1",
+      cluster: { name: "oke-prod-eu1", provider: "oke" },
+      scope: { level: "cluster" },
+      documents: [
+        {
+          path: "services/public-services.json",
+          kind: "service-exposure",
+          media_type: "application/json",
+          content: JSON.stringify(services),
+        },
+      ],
+    });
+
+    let requestBody: { text?: { format?: { name?: string } }; input?: string } | undefined;
+    const mockClient = {
+      responses: {
+        create: async (body: { text?: { format?: { name?: string } }; input?: string }) => {
+          requestBody = body;
+          return {
+            output_text: JSON.stringify({
+              summary: [
+                "OKE has broad public Service exposure that should be reviewed as a fleet surface.",
+              ],
+              top_actions_now: [
+                "Review all public LoadBalancer Services and remove any that do not need external reachability.",
+                "Move internet-facing Services behind the intended ingress or gateway layer.",
+                "Re-run the Kubernetes diagnostic after exposure changes to confirm the surface is reduced.",
+              ],
+              finding_notes: [
+                {
+                  id: "F001",
+                  why_it_matters: "This Service is externally reachable and contributes to the public cluster surface.",
+                  recommended_action: "Confirm public reachability is required for this Service or make it internal.",
+                },
+              ],
+            }),
+            usage: { input_tokens: 3000, output_tokens: 500, total_tokens: 3500 },
+          };
+        },
+      },
+    } as never;
+
+    const result = await analyzeArtifact(raw, {
+      apiKey: "sk-test-fake",
+      _openaiClient: mockClient,
+    });
+
+    expect(result.meta.llm_succeeded).toBe(true);
+    expect(requestBody?.text?.format?.name).toBe("audit_enrichment");
+    expect(result.report?.findings.length).toBeGreaterThanOrEqual(90);
+    expect(result.report?.findings[0]?.why_it_matters).toContain("externally reachable");
+    expect(result.report?.findings[1]?.why_it_matters).toContain("may expose the workload");
+    expect(result.report?.top_actions_now[0]).toContain("LoadBalancer");
+  });
 });
