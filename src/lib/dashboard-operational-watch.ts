@@ -2,6 +2,8 @@ import type { Finding } from "@/lib/analyzer/schema";
 import type { RunSummary } from "@/types/api";
 
 export type DashboardOperationalWatchLaneId =
+  | "scheduling"
+  | "runtime"
   | "failure"
   | "rollout"
   | "capacity"
@@ -63,7 +65,39 @@ function workloadTarget(namespace: string | null, name: string | null): string {
   return [namespace, name].filter(Boolean).join("/") || "unknown-workload";
 }
 
+function isSchedulingWarningFinding(finding: Finding): boolean {
+  if (finding.section_source !== "events/warning-events.json") return false;
+  return finding.title.includes("scheduling failures");
+}
+
+function isWarningEventFinding(finding: Finding): boolean {
+  return finding.section_source === "events/warning-events.json";
+}
+
 function classifyFindingLane(finding: Finding): DashboardOperationalWatchLaneId | null {
+  if (isSchedulingWarningFinding(finding)) {
+    return "scheduling";
+  }
+  if (isWarningEventFinding(finding)) {
+    if (finding.title.includes("mount or volume")) return "storage";
+    if (finding.title.includes("eviction or OOM")) return "capacity";
+    return "failure";
+  }
+  if (
+    finding.section_source === "state_status" ||
+    finding.section_source === "health_status" ||
+    finding.section_source === "failure_log_excerpts_json" ||
+    finding.section_source === "DISK & MEMORY USAGE" ||
+    finding.section_source === "RECENT ERRORS & LOGS" ||
+    finding.title.startsWith("Container runtime state is ") ||
+    finding.title === "Container health check is failing" ||
+    finding.title === "Container was OOM-killed" ||
+    finding.title.startsWith("Container restarted ") ||
+    finding.title.startsWith("Container memory usage is elevated") ||
+    finding.title === "Container has no memory limit configured"
+  ) {
+    return "runtime";
+  }
   if (
     finding.section_source === "logs/unhealthy-workload-excerpts.json" ||
     finding.section_source === "failure_log_excerpts_json"
@@ -98,6 +132,124 @@ function classifyFindingLane(finding: Finding): DashboardOperationalWatchLaneId 
     return "storage";
   }
   return null;
+}
+
+function buildSchedulingItem(
+  run: RunSummary,
+  targetName: string,
+  finding: Finding
+): DashboardOperationalWatchItem {
+  const parsed = parseEvidenceJson(finding);
+  const eventCount = asNumber(parsed?.warning_event_count) ?? 1;
+  const samples = Array.isArray(parsed?.samples)
+    ? (parsed.samples as Array<Record<string, unknown>>)
+    : [];
+  const firstSample = samples[0] ?? null;
+  const objectLabel = asStringArray(parsed?.affected_objects)[0] ?? targetName;
+  const message =
+    asString(firstSample?.message) ??
+    `${eventCount} scheduling warning${eventCount === 1 ? "" : "s"} captured`;
+  return {
+    run_id: run.id,
+    label: objectLabel,
+    detail:
+      `${eventCount} event${eventCount === 1 ? "" : "s"} · ${message}`,
+    target_name: targetName,
+    created_at_label: run.created_at_label ?? run.created_at,
+  };
+}
+
+function buildRuntimeItem(
+  run: RunSummary,
+  targetName: string,
+  finding: Finding
+): DashboardOperationalWatchItem {
+  if (finding.section_source === "DISK & MEMORY USAGE") {
+    const match = finding.title.match(/at (\d+)%/i);
+    const usage = match?.[1] ?? "?";
+    const fsMatch = finding.title.match(/: ([^ ]+) at /);
+    return {
+      run_id: run.id,
+      label: fsMatch?.[1] ?? targetName,
+      detail: `${finding.title.includes("critical") ? "Critical" : "Warning"} disk use at ${usage}%`,
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  if (finding.section_source === "RECENT ERRORS & LOGS") {
+    return {
+      run_id: run.id,
+      label: targetName,
+      detail: finding.title.replace(/^Recent /, ""),
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  if (finding.section_source === "failure_log_excerpts_json") {
+    return buildFailureItem(run, targetName, finding);
+  }
+
+  if (finding.title.startsWith("Container memory usage is elevated")) {
+    const match = finding.title.match(/\(([^)]+)\)/);
+    return {
+      run_id: run.id,
+      label: targetName,
+      detail: `Memory ${match?.[1] ?? (finding.evidence.trim() || "elevated")}`,
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  if (finding.title === "Container has no memory limit configured") {
+    return {
+      run_id: run.id,
+      label: targetName,
+      detail: "No memory limit configured",
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  if (finding.title === "Container was OOM-killed") {
+    return {
+      run_id: run.id,
+      label: targetName,
+      detail: "OOMKilled at collection time",
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  if (finding.title.startsWith("Container restarted ")) {
+    return {
+      run_id: run.id,
+      label: targetName,
+      detail: finding.title.replace("Container ", ""),
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  if (finding.title === "Container health check is failing") {
+    return {
+      run_id: run.id,
+      label: targetName,
+      detail: "Health check failing",
+      target_name: targetName,
+      created_at_label: run.created_at_label ?? run.created_at,
+    };
+  }
+
+  const state = finding.evidence.trim() || finding.title.replace("Container runtime state is ", "");
+  return {
+    run_id: run.id,
+    label: targetName,
+    detail: `Runtime state ${state}`,
+    target_name: targetName,
+    created_at_label: run.created_at_label ?? run.created_at,
+  };
 }
 
 function buildFailureItem(
@@ -346,6 +498,8 @@ function buildItemForLane(
   targetName: string,
   finding: Finding
 ): DashboardOperationalWatchItem {
+  if (laneId === "scheduling") return buildSchedulingItem(run, targetName, finding);
+  if (laneId === "runtime") return buildRuntimeItem(run, targetName, finding);
   if (laneId === "failure") return buildFailureItem(run, targetName, finding);
   if (laneId === "rollout") return buildRolloutItem(run, targetName, finding);
   if (laneId === "capacity") return buildCapacityItem(run, targetName, finding);
@@ -356,6 +510,32 @@ export function buildDashboardOperationalWatch(
   snapshots: DashboardOperationalWatchRun[]
 ): DashboardOperationalWatchLane[] {
   const lanes = new Map<DashboardOperationalWatchLaneId, LaneState>([
+    [
+      "scheduling",
+      {
+        id: "scheduling",
+        title: "Scheduling Pressure",
+        summary:
+          "FailedScheduling and insufficient capacity warnings — the same signals run detail surfaces before the findings table.",
+        tone: "critical",
+        run_count: 0,
+        items: [],
+        seen_runs: new Set<string>(),
+      },
+    ],
+    [
+      "runtime",
+      {
+        id: "runtime",
+        title: "Runtime & Host Pressure",
+        summary:
+          "Container runtime health, memory pressure, and Linux disk or error signals from recent attention-worthy runs.",
+        tone: "warning",
+        run_count: 0,
+        items: [],
+        seen_runs: new Set<string>(),
+      },
+    ],
     [
       "failure",
       {
@@ -420,7 +600,18 @@ export function buildDashboardOperationalWatch(
     }
   }
 
-  return Array.from(lanes.values())
+  const laneOrder: DashboardOperationalWatchLaneId[] = [
+    "scheduling",
+    "runtime",
+    "failure",
+    "rollout",
+    "capacity",
+    "storage",
+  ];
+
+  return laneOrder
+    .map((laneId) => lanes.get(laneId))
+    .filter((lane): lane is LaneState => lane !== undefined)
     .map(({ seen_runs, ...lane }) => ({
       ...lane,
       run_count: seen_runs.size,

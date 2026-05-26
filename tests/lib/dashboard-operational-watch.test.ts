@@ -216,4 +216,106 @@ describe("dashboard-operational-watch", () => {
       ],
     });
   });
+
+  it("surfaces scheduling pressure with aggregated warning-event counts", () => {
+    const watch = buildDashboardOperationalWatch([
+      {
+        run: mkRun("run-sched", "oke-cluster"),
+        target_name: "oke-cluster",
+        findings: [
+          mkFinding(
+            "sched-1",
+            "Kubernetes warning events indicate scheduling failures (27 events)",
+            "high",
+            "events/warning-events.json",
+            {
+              warning_event_count: 27,
+              namespaces: ["signalforge"],
+              affected_objects: ["Pod/signalforge-agent"],
+              samples: [
+                {
+                  reason: "FailedScheduling",
+                  message: "0/2 nodes are available: 2 Insufficient cpu.",
+                  count: 27,
+                },
+              ],
+            }
+          ),
+        ],
+      },
+    ]);
+
+    expect(watch.map((lane) => lane.id)).toEqual(["scheduling"]);
+    expect(watch[0]).toMatchObject({
+      id: "scheduling",
+      tone: "critical",
+      run_count: 1,
+      items: [
+        {
+          label: "Pod/signalforge-agent",
+          detail: expect.stringContaining("27 events"),
+        },
+      ],
+    });
+  });
+
+  it("groups container and linux runtime pressure into the runtime lane", () => {
+    const watch = buildDashboardOperationalWatch([
+      {
+        run: mkRun("run-container", "postgres-db"),
+        target_name: "postgres-db",
+        findings: [
+          mkFinding(
+            "c-1",
+            "Container memory usage is elevated (96.1%)",
+            "high",
+            "memory_percent",
+            "96.1"
+          ),
+          mkFinding(
+            "c-2",
+            "Container was OOM-killed",
+            "critical",
+            "oom_killed",
+            "true"
+          ),
+        ],
+      },
+      {
+        run: mkRun("run-linux", "web-server-prod-01"),
+        target_name: "web-server-prod-01",
+        findings: [
+          mkFinding(
+            "l-1",
+            "Disk usage warning: /dev/sdb1 at 78%",
+            "medium",
+            "DISK & MEMORY USAGE",
+            "/dev/sdb1 78%"
+          ),
+          mkFinding(
+            "l-2",
+            "Recent syslog errors observed (3 lines)",
+            "medium",
+            "RECENT ERRORS & LOGS",
+            "3 errors"
+          ),
+        ],
+      },
+    ]);
+
+    const runtime = watch.find((lane) => lane.id === "runtime");
+    expect(runtime).toMatchObject({
+      run_count: 2,
+      items: [
+        expect.objectContaining({
+          label: "postgres-db",
+          detail: "Memory 96.1%",
+        }),
+        expect.objectContaining({
+          label: "/dev/sdb1",
+          detail: "Warning disk use at 78%",
+        }),
+      ],
+    });
+  });
 });

@@ -38,11 +38,11 @@ export function DashboardOperationalWatch({
           Cross-run signals
         </p>
       </div>
-      <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-on-surface-variant">
-        Fleet-level signals from recent attention-worthy runs — failure evidence, rollout drag, quota pressure, and storage pressure.
+      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-on-surface-variant">
+        Fleet-level signals from recent attention-worthy runs — scheduling pressure, runtime and host stress, failure excerpts, rollout drag, capacity, and storage blockers.
       </p>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {lanes.map((lane) => (
           <article
             key={lane.id}

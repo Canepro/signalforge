@@ -1,6 +1,6 @@
 # Phase 9b Design: Operational Diagnostics Enrichment and Rich Presentation
 
-> Status: in progress. The first presentation slice is already in this branch: dashboard `Collection Pulse`, run-detail findings overview/filtering, compare operational-delta cards, and recent-operational-signal dashboard summaries. The richer diagnostics collection work is now partially implemented across `signalforge` and `signalforge-collectors`, with agent-side follow-on still required where job-driven scope should request optional diagnostics explicitly.
+> Status: in progress. Dashboard `Operational Watch` now includes **Scheduling Pressure** and **Runtime & Host Pressure** lanes (alongside failure, rollout, capacity, and storage). Run-detail operator summary (Phase 9d) is shipped on `main`. Collection Pulse, compare operational-delta cards, and recent-operational-signal highlights remain in place. Richer diagnostics collection is partially implemented across `signalforge` and `signalforge-collectors`, with agent-side follow-on still required where job-driven scope should request optional diagnostics explicitly.
 
 ## Why this exists
 
