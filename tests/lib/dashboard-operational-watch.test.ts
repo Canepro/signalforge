@@ -318,4 +318,31 @@ describe("dashboard-operational-watch", () => {
       ],
     });
   });
+
+  it("describes container OOM state without implying collection-time timing", () => {
+    const watch = buildDashboardOperationalWatch([
+      {
+        run: mkRun("run-oom", "postgres-db"),
+        target_name: "postgres-db",
+        findings: [
+          mkFinding(
+            "oom-1",
+            "Container was OOM-killed",
+            "critical",
+            "oom_killed",
+            "true"
+          ),
+        ],
+      },
+    ]);
+
+    expect(watch.find((lane) => lane.id === "runtime")).toMatchObject({
+      items: [
+        expect.objectContaining({
+          label: "postgres-db",
+          detail: "OOMKilled flagged",
+        }),
+      ],
+    });
+  });
 });

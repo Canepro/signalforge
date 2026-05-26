@@ -216,7 +216,7 @@ function buildRuntimeItem(
     return {
       run_id: run.id,
       label: targetName,
-      detail: "OOMKilled at collection time",
+      detail: "OOMKilled flagged",
       target_name: targetName,
       created_at_label: run.created_at_label ?? run.created_at,
     };
