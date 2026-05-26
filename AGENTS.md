@@ -365,3 +365,26 @@ Any new agent should:
 4. skim this file
 5. inspect the relevant code paths
 6. preserve the deterministic-first architecture
+
+## Cursor Cloud specific instructions
+
+### Environment
+
+- **Runtime:** Bun 1.3.11 (installed via `curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.11"`). After install, ensure `~/.bun/bin` is on `PATH`.
+- **Database:** Defaults to SQLite (in-process via `sql.js`). No external database needed for local dev or tests.
+- **LLM:** Optional. Without `OPENAI_API_KEY` or Azure credentials, the app uses deterministic fallback — all features work except LLM-generated explanations.
+- **`.env.local`:** Copy from `.env.example` if missing (`cp .env.example .env.local`). Defaults are sufficient for local development.
+
+### Key commands
+
+All standard commands are documented in the `## Commands` section above. Key reminders:
+
+- Use `bun run test` (Vitest via `vitest run`), **not** bare `bun test`.
+- `bun run lint` (`next lint`) will prompt for interactive ESLint setup if no `.eslintrc*` or `eslint.config.*` exists. The repo currently has no ESLint config, so this command is not functional without setup.
+- `bun run typecheck` runs `next typegen && tsc --noEmit` and is the primary static analysis check.
+
+### Dev server
+
+- `bun run dev` starts Next.js with Turbopack on `localhost:3000`.
+- The hello-world validation is: submit a fixture via `./scripts/analyze.sh tests/fixtures/sample-prod-server.log`, then read it back via `./scripts/signalforge-read.sh --url http://localhost:3000 run <run-id>`.
+- The dev server uses SQLite by default and creates `./signalforge.db` on first request.
