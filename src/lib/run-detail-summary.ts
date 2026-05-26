@@ -283,6 +283,10 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
     ) ?? [];
 
   const schedulingWarnings = warningEvents.filter((event) => event.reason === "FailedScheduling");
+  const schedulingWarningCount = schedulingWarnings.reduce(
+    (sum, event) => sum + (event.count ?? 1),
+    0
+  );
   const schedulingPressure = describeKubernetesSchedulingPressure(schedulingWarnings);
   const peakMemory = nodeTop.reduce((max, node) => Math.max(max, node.memory_percent ?? 0), 0);
   const peakCpu = nodeTop.reduce((max, node) => Math.max(max, node.cpu_percent ?? 0), 0);
@@ -315,7 +319,8 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
       ? [
           {
             label: "Scheduling pressure",
-            value: schedulingWarnings.length === 1 ? "1 event" : `${schedulingWarnings.length} events`,
+            value:
+              schedulingWarningCount === 1 ? "1 event" : `${schedulingWarningCount} events`,
             detail: schedulingPressure.detail,
             tone: "critical" as const,
           },
@@ -770,7 +775,11 @@ function buildContainerModules(_run: RunDetail, artifactContent: string): RunDet
       id: "container-failure-callouts",
       title: "Failure Callouts",
       summary: "Short bounded log evidence so the immediate failure mode is visible without expanding the findings table.",
-      tone: "warning",
+      tone: moduleTone(
+        callouts.some((callout) => callout.tone === "critical"),
+        "critical",
+        "warning"
+      ),
       prominence: "supporting",
       kind: "callout-list",
       callouts,

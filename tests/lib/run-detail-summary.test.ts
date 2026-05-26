@@ -247,6 +247,58 @@ describe("run-detail-summary", () => {
     });
   });
 
+  it("sums aggregated FailedScheduling counts in the scheduling pressure stat", () => {
+    const run = mkRun({
+      artifact_type: "kubernetes-bundle",
+      report: {
+        summary: ["Summary"],
+        findings: [],
+        environment_context: mkRun().environment!,
+        noise_or_expected: [],
+        top_actions_now: [],
+      },
+    });
+
+    const bundle = JSON.stringify({
+      schema_version: "kubernetes-bundle.v1",
+      cluster: { name: "demo-cluster", provider: "demo" },
+      scope: { level: "cluster" },
+      collected_at: "2026-03-30T20:08:30.447Z",
+      collector: { type: "signalforge-collectors", version: "1.0.0" },
+      documents: [
+        {
+          path: "events/warning-events.json",
+          kind: "warning-events",
+          media_type: "application/json",
+          content: JSON.stringify([
+            {
+              namespace: "payments",
+              involved_kind: "Pod",
+              involved_name: "payments-api",
+              reason: "FailedScheduling",
+              message: "0/3 nodes are available: 3 Insufficient cpu.",
+              count: 27,
+              last_timestamp: "2026-03-30T19:15:05Z",
+            },
+          ]),
+        },
+      ],
+    });
+
+    const modules = buildRunDetailSummaryModules(run, bundle);
+    const capacity = modules.find(
+      (module) => module.id === "kubernetes-capacity-snapshot" && module.kind === "stat-grid"
+    );
+    expect(capacity?.kind === "stat-grid" ? capacity.stats : []).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Scheduling pressure",
+          value: "27 events",
+        }),
+      ])
+    );
+  });
+
   it("omits priority callouts when the run has no findings", () => {
     const modules = buildRunDetailSummaryModules(
       mkRun({
@@ -322,6 +374,31 @@ failure_log_excerpts_json: [{"source":"current","reason":"restarting","excerpt_l
         expect.objectContaining({ label: "Health", value: "unhealthy" }),
         expect.objectContaining({ label: "Restarts", value: "6" }),
         expect.objectContaining({ label: "OOM killed", value: "Yes" }),
+      ]),
+    });
+  });
+
+  it("derives container failure callout module tone from contained callouts", () => {
+    const modules = buildRunDetailSummaryModules(
+      mkRun({ artifact_type: "container-diagnostics" }),
+      `=== container-diagnostics ===
+runtime: podman
+state_status: running
+health_status: healthy
+restart_count: 0
+oom_killed: false
+memory_limit_bytes: 0
+cpu_percent: 4.00
+memory_percent: 96.50`
+    );
+
+    expect(modules.find((module) => module.id === "container-failure-callouts")).toMatchObject({
+      tone: "critical",
+      callouts: expect.arrayContaining([
+        expect.objectContaining({
+          title: "Memory pressure without a limit",
+          tone: "critical",
+        }),
       ]),
     });
   });
