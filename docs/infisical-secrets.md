@@ -76,6 +76,8 @@ Store app-runtime names in Infisical rather than GitHub-specific names:
 - `SIGNALFORGE_ADMIN_TOKEN`
 - optional `OPENAI_API_KEY`
 - optional `AZURE_OPENAI_API_KEY`
+- optional `LLM_PROVIDER` and Codex App Server transport settings (`CODEX_APP_SERVER_*`) when using the local analysis brain
+- optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN` for the Selene automation-agent client (store in Infisical; never commit plaintext)
 
 The workflow maps those names to the deploy helper inputs:
 

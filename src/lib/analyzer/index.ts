@@ -12,7 +12,8 @@ import {
   type PreFinding,
 } from "./schema";
 import { buildSystemPrompt, buildUserPrompt } from "./prompts";
-import { createOpenAIClient, resolveLlmConfig } from "./llm-provider";
+import { callCodexAppServerBrain, type CodexBrainCallOptions } from "./codex-app-server/brain";
+import { createOpenAIClient, resolveBrainProvider } from "./brain-provider";
 import { auditReportResponseFormat } from "./response-format";
 
 export interface AnalyzeOptions {
@@ -21,9 +22,19 @@ export interface AnalyzeOptions {
   artifactType?: string;
   /** @internal test-only: inject an OpenAI SDK–compatible client (OpenAI or Azure-shaped base URL). */
   _openaiClient?: OpenAI;
+  /** @internal test-only: bypass stdio spawn for Codex App Server brain calls. */
+  _codexBrainFactory?: CodexBrainCallOptions["_sessionFactory"];
 }
 
 function displayModelForMeta(options: AnalyzeOptions): string {
+  const provider = (process.env.LLM_PROVIDER ?? "openai").trim().toLowerCase();
+  if (provider === "codex_app_server" || provider === "codex-app-server") {
+    return (
+      options.model?.trim() ||
+      process.env.CODEX_APP_SERVER_MODEL?.trim() ||
+      "gpt-5.4"
+    );
+  }
   return (
     options.model?.trim() ||
     process.env.OPENAI_MODEL?.trim() ||
@@ -56,7 +67,7 @@ export async function analyzeArtifact(
     client = options._openaiClient;
     model = options.model?.trim() || process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
   } else {
-    const resolved = resolveLlmConfig(process.env, {
+    const resolved = resolveBrainProvider(process.env, {
       apiKey: options.apiKey,
       model: options.model,
     });
@@ -72,6 +83,54 @@ export async function analyzeArtifact(
         resolved.reason
       );
     }
+
+    if (resolved.provider === "codex_app_server") {
+      try {
+        const codex = await callCodexAppServerBrain(
+          {
+            system: buildSystemPrompt(),
+            user: buildUserPrompt(env, noise, preFindings, sections, incomplete, reason),
+          },
+          { model: options.model, _sessionFactory: options._codexBrainFactory }
+        );
+        const duration = Date.now() - startMs;
+        const reconciledFindings = reconcileSeverity(codex.report.findings, preFindings);
+        const mergedReport: AuditReport = {
+          summary: codex.report.summary,
+          findings: reconciledFindings,
+          environment_context: env,
+          noise_or_expected: noise,
+          top_actions_now: codex.report.top_actions_now,
+        };
+        return {
+          report: mergedReport,
+          environment: env,
+          noise,
+          pre_findings: preFindings,
+          is_incomplete: incomplete,
+          incomplete_reason: reason,
+          meta: {
+            model_used: codex.modelLabel,
+            tokens_used: codex.tokensUsed,
+            duration_ms: duration,
+            llm_succeeded: true,
+          },
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return buildFallbackResult(
+          env,
+          noise,
+          preFindings,
+          incomplete,
+          reason,
+          metaModel,
+          startMs,
+          message
+        );
+      }
+    }
+
     client = createOpenAIClient(resolved);
     model = resolved.model;
   }

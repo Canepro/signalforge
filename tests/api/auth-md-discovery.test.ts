@@ -42,6 +42,8 @@ describe("auth.md discovery routes", () => {
     expect(body).toContain("/.well-known/oauth-protected-resource");
     expect(body).toContain("POST http://localhost:3000/agent/auth");
     expect(body).toContain("/api/automation-agent/registrations");
+    expect(body).toContain("diagnostic_request.create");
+    expect(body).toContain("SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN");
   });
 
   it("GET /.well-known/oauth-protected-resource returns PRM JSON", async () => {
@@ -52,6 +54,8 @@ describe("auth.md discovery routes", () => {
     const body = await res.json();
     expect(body.resource_name).toBe("SignalForge");
     expect(body.scopes_supported).toContain("collection_job.execute");
+    expect(body.scopes_supported).toContain("diagnostic_request.create");
+    expect(body.scopes_supported).toContain("fix_action.request");
     expect(body.authorization_servers).toEqual(["http://localhost:3000"]);
   });
 

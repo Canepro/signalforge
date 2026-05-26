@@ -1,5 +1,5 @@
 import { getAdminTokenFromEnv } from "@/lib/api/admin-auth";
-import { resolveLlmConfig, type LlmProviderId } from "@/lib/analyzer/llm-provider";
+import { resolveBrainProvider, type BrainProviderId } from "@/lib/analyzer/brain-provider";
 import { resolveStorageDriver } from "@/lib/storage";
 
 type StorageHealth = {
@@ -10,7 +10,7 @@ type StorageHealth = {
 };
 
 type LlmHealth = {
-  provider: LlmProviderId | string;
+  provider: BrainProviderId | string;
   status: "configured" | "fallback";
   reason?: string;
 };
@@ -61,9 +61,9 @@ function resolveStorageHealth(env: NodeJS.ProcessEnv): StorageHealth {
 
 function resolveLlmHealth(env: NodeJS.ProcessEnv): LlmHealth {
   const provider = ((env.LLM_PROVIDER ?? "openai").trim().toLowerCase() || "openai") as
-    | LlmProviderId
+    | BrainProviderId
     | string;
-  const resolved = resolveLlmConfig(env);
+  const resolved = resolveBrainProvider(env);
 
   if (resolved.ready) {
     return {

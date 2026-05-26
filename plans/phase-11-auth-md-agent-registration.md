@@ -1,6 +1,6 @@
 # Phase 11: auth.md Agent Registration Spike
 
-Status: slice 1 implemented (discovery + `/agent/auth` alias); claim/OTP follow-ons deferred  
+Status: slice 1 implemented (discovery + `/agent/auth` alias); automation-agent scope vocabulary in discovery; claim/OTP follow-ons deferred  
 Created: 2026-05-26  
 Amended: 2026-05-20  
 Implemented slice 1: 2026-05-20  
@@ -34,8 +34,7 @@ The first slice covers **collection execution-agent registration only**.
 
 Out of scope for slice 1:
 
-- `POST /api/automation-agent/registrations` and automation-agent discovery
-- claim / OTP / ID-JAG flows
+- claim / OTP / ID-JAG flows (automation-agent discovery metadata is documented in slice 1b; routes unchanged)
 - admin session-cookie auth on registration routes
 - scope enforcement at route level (scopes are discovery metadata only in slice 1)
 

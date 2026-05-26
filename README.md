@@ -199,6 +199,7 @@ SignalForge supports:
 
 - OpenAI direct
 - Azure OpenAI Responses API
+- Codex App Server (local JSON-RPC `codex app-server` stdio transport)
 
 If provider configuration is missing or invalid, SignalForge uses a deterministic fallback.
 
@@ -206,13 +207,19 @@ If provider configuration is missing or invalid, SignalForge uses a deterministi
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `LLM_PROVIDER` | No | `openai` | `openai` or `azure` |
+| `LLM_PROVIDER` | No | `openai` | `openai`, `azure`, or `codex_app_server` |
 | `OPENAI_API_KEY` | If `openai` | — | OpenAI API key |
 | `OPENAI_MODEL` | No | `gpt-5-mini` | OpenAI model override |
 | `AZURE_OPENAI_ENDPOINT` | If `azure` | — | Azure endpoint |
 | `AZURE_OPENAI_API_KEY` | If `azure` | — | Azure API key |
 | `AZURE_OPENAI_API_VERSION` | Legacy Azure only | — | Required for resource-root URLs, omit for `/openai/v1` |
 | `AZURE_OPENAI_DEPLOYMENT` | If `azure` | — | Deployment name passed as Responses `model` |
+| `CODEX_APP_SERVER_TRANSPORT` | If `codex_app_server` | `stdio` | `stdio` (recommended) or `websocket` (loopback + auth files only) |
+| `CODEX_APP_SERVER_COMMAND` | No | `codex app-server` | argv for spawning the app-server process |
+| `CODEX_APP_SERVER_MODEL` | No | `gpt-5.4` | Model id for Codex threads |
+| `CODEX_APP_SERVER_WS_URL` | If websocket transport | — | Loopback WebSocket URL only |
+| `CODEX_APP_SERVER_WS_TOKEN_FILE` | If websocket transport | — | Path to capability token file |
+| `CODEX_APP_SERVER_WS_SHARED_SECRET_FILE` | If websocket transport | — | Path to signed-bearer shared secret file |
 
 ## App Variables
 
