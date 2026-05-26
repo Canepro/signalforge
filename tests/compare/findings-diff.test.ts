@@ -347,7 +347,7 @@ describe("findings-diff", () => {
         title: "Kubernetes ResourceQuota is near exhaustion: payments/quota (cpu at 92.5%)",
         severity: "medium",
         category: "kubernetes",
-        section_source: "governance/resource-quotas.json",
+        section_source: "quotas/resource-quotas.json",
       }),
     ];
     const current: Finding[] = [
@@ -380,7 +380,7 @@ describe("findings-diff", () => {
         title: "Kubernetes ResourceQuota is near exhaustion: payments/quota (cpu at 96.0%)",
         severity: "medium",
         category: "kubernetes",
-        section_source: "governance/resource-quotas.json",
+        section_source: "quotas/resource-quotas.json",
       }),
     ];
 
