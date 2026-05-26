@@ -10,3 +10,5 @@ out/
 .vercel
 infra/aca/main.json
 .env*.local
+__pycache__/
+*.pyc

@@ -1,0 +1,20 @@
+{
+  "request_id": "sample-request-id",
+  "status": "submitted",
+  "run_id": "sample-run-id",
+  "artifact_type": "linux-audit-log",
+  "target_identifier": "sample-prod-server",
+  "severity_counts": {
+    "critical": 0,
+    "high": 1,
+    "medium": 2,
+    "low": 0
+  },
+  "top_action": "Confirm whether the public web listeners are intended, then restrict inbound access to approved sources at the firewall layer.",
+  "finding_titles": [
+    "HTTPS listener (TLS) reachable on all network interfaces (port 443)",
+    "HTTP listener (web) reachable on all network interfaces (port 80)",
+    "Filesystem warning observed for a mounted data volume"
+  ],
+  "compare_api": "/api/runs/sample-run-id/compare"
+}

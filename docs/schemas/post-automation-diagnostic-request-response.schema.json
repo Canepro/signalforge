@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/post-automation-diagnostic-request-response.schema.json",
+  "title": "Automation diagnostic request accepted response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string" },
+    "collection_job_id": { "type": "string" },
+    "source_id": { "type": "string" },
+    "status": { "type": "string" },
+    "poll_url": { "type": "string" }
+  },
+  "required": ["request_id", "collection_job_id", "source_id", "status", "poll_url"]
+}

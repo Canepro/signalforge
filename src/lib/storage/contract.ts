@@ -1,8 +1,10 @@
 import type { AnalysisResult, AuditReport, Finding } from "@/lib/analyzer/schema";
+import type { KubernetesFixActionPayload } from "@/lib/automation/fix-policy";
 import type { CompareDriftError, CompareDriftPayload } from "@/lib/compare/build-compare";
 import type {
   ActiveJobLeaseHeartbeatResult,
   AgentRegistrationCreated,
+  AutomationAgentRegistrationCreated,
   ApplyAgentHeartbeatResult,
   CollectionJobSummary,
   ListNextQueuedJobsResult,
@@ -81,6 +83,9 @@ export interface SourceView {
   attributes: Record<string, unknown>;
   labels: Record<string, string>;
   default_collection_scope: CollectionScope | null;
+  automation_enabled: boolean;
+  auto_fix_enabled: boolean;
+  allowed_fix_policy_ids: string[];
   enabled: boolean;
   last_seen_at: string | null;
   health_status: string;
@@ -119,6 +124,7 @@ export interface CollectionJobView {
   finished_at: string | null;
   result_analysis_status: string | null;
   collection_scope: CollectionScope | null;
+  trigger_signal_id: string | null;
 }
 
 export interface AgentRegistrationView {
@@ -132,6 +138,13 @@ export interface AgentRegistrationView {
   last_instance_id?: string | null;
 }
 
+export interface AutomationAgentRegistrationView {
+  id: string;
+  source_id: string;
+  display_name: string | null;
+  created_at: string;
+}
+
 export interface CreateSourceInput {
   display_name: string;
   target_identifier: string;
@@ -143,6 +156,9 @@ export interface CreateSourceInput {
   attributes?: Record<string, unknown>;
   labels?: Record<string, string>;
   default_collection_scope?: CollectionScope | null;
+  automation_enabled?: boolean;
+  auto_fix_enabled?: boolean;
+  allowed_fix_policy_ids?: string[];
   enabled?: boolean;
 }
 
@@ -151,6 +167,146 @@ export interface CreateCollectionJobInput {
   priority?: number;
   idempotency_key?: string | null;
   collection_scope?: CollectionScope | null;
+  requested_by?: string | null;
+  trigger_signal_id?: string | null;
+}
+
+export interface AutomationSignalView {
+  id: string;
+  source_id: string;
+  run_id: string;
+  artifact_type: string;
+  finding_id: string;
+  finding_title: string;
+  severity: string;
+  category: string;
+  signal_type: "top_finding" | "evidence_drift";
+  status: string;
+  dedupe_key: string;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+}
+
+export interface FixActionRunView {
+  id: string;
+  source_id: string;
+  automation_signal_id: string;
+  diagnostic_request_id: string;
+  pre_fix_run_id: string;
+  post_fix_run_id: string | null;
+  finding_id: string;
+  policy_id: string;
+  action_kind: string;
+  action_payload: KubernetesFixActionPayload;
+  status: string;
+  requested_by: string;
+  idempotency_key: string | null;
+  lease_owner_id: string | null;
+  lease_owner_instance_id: string | null;
+  lease_expires_at: string | null;
+  dry_run_summary: Record<string, unknown> | null;
+  apply_summary: Record<string, unknown> | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  queued_at: string | null;
+  claimed_at: string | null;
+  started_at: string | null;
+  dry_run_at: string | null;
+  applied_at: string | null;
+  finished_at: string | null;
+}
+
+export interface AutomationSignalsStore {
+  listNextForSource(sourceId: string, limit: number): Promise<AutomationSignalView[]>;
+  getById(id: string): Promise<AutomationSignalView | null>;
+  markDiagnosticRequested(id: string, sourceId: string): Promise<AutomationSignalView | null>;
+  upsertFromRun(input: {
+    sourceId: string;
+    runId: string;
+    artifactType: string;
+    findings: Finding[];
+  }): Promise<AutomationSignalView[]>;
+  markActionQueued(id: string, sourceId: string): Promise<AutomationSignalView | null>;
+  markResolvedIfFindingAbsent(input: {
+    signalId: string;
+    sourceId: string;
+    runId: string;
+    findings: Finding[];
+  }): Promise<AutomationSignalView | null>;
+}
+
+export interface CreateFixActionRunInput {
+  sourceId: string;
+  signalId: string;
+  diagnosticRequestId: string;
+  preFixRunId: string;
+  findingId: string;
+  policyId: string;
+  actionKind: string;
+  actionPayload: KubernetesFixActionPayload;
+  requestedBy: string;
+  idempotencyKey?: string | null;
+}
+
+export interface FixActionRunsStore {
+  getById(id: string): Promise<FixActionRunView | null>;
+  listForSource(sourceId: string, limit: number): Promise<FixActionRunView[]>;
+  create(input: CreateFixActionRunInput): Promise<{ row: FixActionRunView; inserted: boolean }>;
+  listNextForAgent(
+    sourceId: string,
+    registrationId: string,
+    limit: number
+  ): Promise<{ actions: FixActionRunView[]; gate: "source_disabled" | "heartbeat_required" | "capabilities_empty" | "capability_mismatch" | null }>;
+  claimForAgent(
+    actionRunId: string,
+    sourceId: string,
+    registrationId: string,
+    instanceId: string,
+    leaseTtlSeconds: number
+  ): Promise<
+    | { ok: true; row: FixActionRunView }
+    | { ok: false; code: "not_found" | "not_queued" | "wrong_source" }
+  >;
+  startForAgent(
+    actionRunId: string,
+    sourceId: string,
+    registrationId: string,
+    instanceId: string
+  ): Promise<
+    | { ok: true; row: FixActionRunView }
+    | { ok: false; code: "wrong_action" | "not_claimed" | "lease_expired" | "wrong_lease" }
+  >;
+  recordDryRun(input: {
+    actionRunId: string;
+    sourceId: string;
+    registrationId: string;
+    instanceId: string;
+    status: "passed" | "failed";
+    summary: Record<string, unknown>;
+  }): Promise<
+    | { ok: true; row: FixActionRunView }
+    | { ok: false; code: "wrong_action" | "bad_state" | "lease_expired" | "wrong_lease" }
+  >;
+  recordApply(input: {
+    actionRunId: string;
+    sourceId: string;
+    registrationId: string;
+    instanceId: string;
+    status: "applied" | "failed";
+    summary: Record<string, unknown>;
+  }): Promise<
+    | { ok: true; row: FixActionRunView; postFixJob: CollectionJobView | null }
+    | { ok: false; code: "wrong_action" | "bad_state" | "lease_expired" | "wrong_lease" }
+  >;
+  linkPostFixRun(input: {
+    actionRunId: string;
+    sourceId: string;
+    runId: string;
+    findings: Finding[];
+  }): Promise<FixActionRunView | null>;
 }
 
 export type DeleteSourceResult =
@@ -324,11 +480,26 @@ export interface AgentsStore {
   >;
 }
 
+export interface AutomationAgentsStore {
+  getRegistrationBySourceId(sourceId: string): Promise<AutomationAgentRegistrationView | null>;
+  resolveRequestContextByTokenHash(tokenHash: string): Promise<{
+    registration: AutomationAgentRegistrationView;
+    source: SourceView;
+  } | null>;
+  createRegistration(
+    sourceId: string,
+    displayName?: string | null
+  ): Promise<AutomationAgentRegistrationCreated>;
+}
+
 export interface StorageTx {
   runs: RunsStore;
   sources: SourcesStore;
   jobs: JobsStore;
   agents: AgentsStore;
+  automationAgents: AutomationAgentsStore;
+  automationSignals: AutomationSignalsStore;
+  fixActionRuns: FixActionRunsStore;
 }
 
 export interface Storage extends StorageTx {

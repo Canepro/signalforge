@@ -165,6 +165,10 @@ This model is preferred because it:
 - removes dependence on a human login session, terminal, or mutable shell environment
 - is easier to audit and harden than laptop-driven or ad hoc execution
 
+The tradeoff is cost. If SignalForge is hosted on an ACA app with `minReplicas=0`, an always-on agent that heartbeats and polls can still keep the app warm through normal API traffic. For low-use operator environments, prefer an explicit pause/resume posture instead of silently paying for always-warm collection.
+
+For the current OKE helper deployment, the safe pause path is documented in [`aca-app-runbook.md`](./aca-app-runbook.md#cost-saving-idle-mode). Pause only the helper agent deployment, verify no helper pods remain, and resume it before expecting queued jobs to be claimed.
+
 ## Not the preferred model
 
 These may be useful for smoke tests or debugging, but they are not the normal production story:

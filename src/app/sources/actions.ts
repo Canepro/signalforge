@@ -256,12 +256,21 @@ export async function updateSourceAction(formData: FormData): Promise<void> {
   const enabledValues = formData.getAll("enabled");
   const enabledChecked = enabledValues.includes("1");
   const default_collector_version = formData.get("default_collector_version");
+  const automation_enabled = formData.getAll("automation_enabled").includes("1");
+  const auto_fix_enabled = formData.getAll("auto_fix_enabled").includes("1");
+  const allowed_fix_policy_ids = formData
+    .getAll("allowed_fix_policy_ids")
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
 
   const patch: Record<string, unknown> = {};
   if (typeof display_name === "string" && display_name.trim()) {
     patch.display_name = display_name.trim();
   }
   patch.enabled = enabledChecked;
+  patch.automation_enabled = automation_enabled;
+  patch.auto_fix_enabled = auto_fix_enabled;
+  patch.allowed_fix_policy_ids = allowed_fix_policy_ids;
   if (typeof default_collector_version === "string") {
     patch.default_collector_version = default_collector_version.trim() || null;
   }

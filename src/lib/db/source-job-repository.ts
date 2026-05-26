@@ -53,6 +53,9 @@ export interface SourceRow {
   attributes_json: string;
   labels_json: string;
   default_collection_scope_json?: string | null;
+  automation_enabled?: number;
+  auto_fix_enabled?: number;
+  allowed_fix_policy_ids_json?: string;
   enabled: number;
   last_seen_at: string | null;
   health_status: string;
@@ -87,6 +90,7 @@ export interface CollectionJobRow {
   /** Run `status` after artifact submit (`complete` \| `error`, …). Null for jobs not yet submitted or legacy rows. */
   result_analysis_status?: string | null;
   collection_scope_json?: string | null;
+  trigger_signal_id?: string | null;
 }
 
 export interface AgentRegistrationRow {
@@ -101,6 +105,14 @@ export interface AgentRegistrationRow {
   last_agent_version?: string | null;
   /** Set on successful claim — used to validate heartbeat lease extension. */
   last_instance_id?: string | null;
+}
+
+export interface AutomationAgentRegistrationRow {
+  id: string;
+  source_id: string;
+  token_hash: string;
+  display_name: string | null;
+  created_at: string;
 }
 
 function allRows<T>(db: Database, sql: string, params: unknown[] = []): T[] {
@@ -151,6 +163,9 @@ export interface CreateSourceInput {
   attributes?: Record<string, unknown>;
   labels?: Record<string, string>;
   default_collection_scope?: CollectionScope | null;
+  automation_enabled?: boolean;
+  auto_fix_enabled?: boolean;
+  allowed_fix_policy_ids?: string[];
   enabled?: boolean;
 }
 
@@ -183,9 +198,10 @@ export function insertSource(db: Database, input: CreateSourceInput): SourceRow 
     `INSERT INTO sources (
       id, display_name, target_identifier, target_identifier_norm, source_type, expected_artifact_type,
       default_collector_type, default_collector_version,
-      capabilities_json, attributes_json, labels_json, default_collection_scope_json, enabled,
+      capabilities_json, attributes_json, labels_json, default_collection_scope_json,
+      automation_enabled, auto_fix_enabled, allowed_fix_policy_ids_json, enabled,
       last_seen_at, health_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'unknown', ?, ?)`,
     [
       id,
       input.display_name.trim(),
@@ -199,6 +215,9 @@ export function insertSource(db: Database, input: CreateSourceInput): SourceRow 
       JSON.stringify(input.attributes ?? {}),
       JSON.stringify(input.labels ?? {}),
       defaultCollectionScope ? JSON.stringify(defaultCollectionScope) : null,
+      input.automation_enabled === true ? 1 : 0,
+      input.auto_fix_enabled === true ? 1 : 0,
+      JSON.stringify(input.allowed_fix_policy_ids ?? []),
       input.enabled === false ? 0 : 1,
       now,
       now,
@@ -245,6 +264,9 @@ export interface PatchSourceInput {
   labels?: Record<string, string>;
   attributes?: Record<string, unknown>;
   default_collection_scope?: CollectionScope | null;
+  automation_enabled?: boolean;
+  auto_fix_enabled?: boolean;
+  allowed_fix_policy_ids?: string[];
   enabled?: boolean;
 }
 
@@ -260,6 +282,9 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
   let labels_json = row.labels_json;
   let attributes_json = row.attributes_json;
   let default_collection_scope_json = row.default_collection_scope_json ?? null;
+  let automation_enabled = row.automation_enabled ?? 0;
+  let auto_fix_enabled = row.auto_fix_enabled ?? 0;
+  let allowed_fix_policy_ids_json = row.allowed_fix_policy_ids_json ?? "[]";
   let enabled = row.enabled;
 
   if (patch.display_name !== undefined) display_name = patch.display_name.trim();
@@ -289,11 +314,17 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
       patch.default_collection_scope ? JSON.stringify(patch.default_collection_scope) : null;
   }
   if (patch.enabled !== undefined) enabled = patch.enabled ? 1 : 0;
+  if (patch.automation_enabled !== undefined) automation_enabled = patch.automation_enabled ? 1 : 0;
+  if (patch.auto_fix_enabled !== undefined) auto_fix_enabled = patch.auto_fix_enabled ? 1 : 0;
+  if (patch.allowed_fix_policy_ids !== undefined)
+    allowed_fix_policy_ids_json = JSON.stringify(patch.allowed_fix_policy_ids);
 
   db.run(
     `UPDATE sources SET
       display_name = ?, default_collector_type = ?, default_collector_version = ?,
-      capabilities_json = ?, labels_json = ?, attributes_json = ?, default_collection_scope_json = ?, enabled = ?, updated_at = ?
+      capabilities_json = ?, labels_json = ?, attributes_json = ?, default_collection_scope_json = ?,
+      automation_enabled = ?, auto_fix_enabled = ?, allowed_fix_policy_ids_json = ?,
+      enabled = ?, updated_at = ?
     WHERE id = ?`,
     [
       display_name,
@@ -303,6 +334,9 @@ export function updateSource(db: Database, id: string, patch: PatchSourceInput):
       labels_json,
       attributes_json,
       default_collection_scope_json,
+      automation_enabled,
+      auto_fix_enabled,
+      allowed_fix_policy_ids_json,
       enabled,
       now,
       id,
@@ -333,6 +367,9 @@ export function deleteSource(db: Database, id: string): DeleteSourceResult {
   }
 
   db.run("DELETE FROM agent_registrations WHERE source_id = ?", [id]);
+  db.run("DELETE FROM automation_agent_registrations WHERE source_id = ?", [id]);
+  db.run("DELETE FROM fix_action_runs WHERE source_id = ?", [id]);
+  db.run("DELETE FROM automation_signals WHERE source_id = ?", [id]);
   db.run("DELETE FROM collection_jobs WHERE source_id = ?", [id]);
   db.run("DELETE FROM sources WHERE id = ?", [id]);
 
@@ -350,6 +387,8 @@ export interface CreateCollectionJobInput {
   priority?: number;
   idempotency_key?: string | null;
   collection_scope?: CollectionScope | null;
+  requested_by?: string | null;
+  trigger_signal_id?: string | null;
 }
 
 export function findRecentJobByIdempotencyKey(
@@ -406,12 +445,14 @@ export function insertCollectionJob(
       id, source_id, artifact_type, status, requested_by, request_reason, priority,
       idempotency_key, lease_owner_id, lease_owner_instance_id, lease_expires_at, last_heartbeat_at,
       result_artifact_id, result_run_id, error_code, error_message,
-      created_at, updated_at, queued_at, claimed_at, started_at, submitted_at, finished_at, collection_scope_json
-    ) VALUES (?, ?, ?, 'queued', 'operator', ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?)`,
+      created_at, updated_at, queued_at, claimed_at, started_at, submitted_at, finished_at,
+      collection_scope_json, trigger_signal_id
+    ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)`,
     [
       id,
       source.id,
       artifactType,
+      input.requested_by?.trim() || "operator",
       input.request_reason?.trim() ?? null,
       input.priority ?? 0,
       input.idempotency_key?.trim() ?? null,
@@ -419,6 +460,7 @@ export function insertCollectionJob(
       now,
       now,
       collectionScope ? JSON.stringify(collectionScope) : null,
+      input.trigger_signal_id?.trim() ?? null,
     ]
   );
 
@@ -505,6 +547,28 @@ export function getAgentRegistrationByTokenHash(
   return getOne<AgentRegistrationRow>(
     db,
     "SELECT * FROM agent_registrations WHERE token_hash = ?",
+    [tokenHash]
+  );
+}
+
+export function getAutomationAgentRegistrationBySourceId(
+  db: Database,
+  sourceId: string
+): AutomationAgentRegistrationRow | null {
+  return getOne<AutomationAgentRegistrationRow>(
+    db,
+    "SELECT * FROM automation_agent_registrations WHERE source_id = ?",
+    [sourceId]
+  );
+}
+
+export function getAutomationAgentRegistrationByTokenHash(
+  db: Database,
+  tokenHash: string
+): AutomationAgentRegistrationRow | null {
+  return getOne<AutomationAgentRegistrationRow>(
+    db,
+    "SELECT * FROM automation_agent_registrations WHERE token_hash = ?",
     [tokenHash]
   );
 }
@@ -947,6 +1011,12 @@ export interface AgentRegistrationCreated {
   token_prefix: string;
 }
 
+export interface AutomationAgentRegistrationCreated {
+  row: AutomationAgentRegistrationRow;
+  plainToken: string;
+  token_prefix: string;
+}
+
 function issueAgentToken() {
   const plainToken = generateAgentToken();
   return {
@@ -1022,6 +1092,42 @@ export function rotateAgentRegistrationToken(
   return { row, plainToken, token_prefix };
 }
 
+export function createAutomationAgentRegistration(
+  db: Database,
+  sourceId: string,
+  displayName?: string | null
+): AutomationAgentRegistrationCreated {
+  const source = getSourceById(db, sourceId);
+  if (!source) {
+    const err = new Error("source_not_found");
+    (err as Error & { code: string }).code = "source_not_found";
+    throw err;
+  }
+  if (getAutomationAgentRegistrationBySourceId(db, sourceId)) {
+    const err = new Error("already_registered");
+    (err as Error & { code: string }).code = "automation_agent_already_registered";
+    throw err;
+  }
+
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const { plainToken, tokenHash, token_prefix } = issueAgentToken();
+
+  db.run(
+    `INSERT INTO automation_agent_registrations (id, source_id, token_hash, display_name, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, sourceId, tokenHash, displayName?.trim() ?? null, now]
+  );
+
+  const row = getOne<AutomationAgentRegistrationRow>(
+    db,
+    "SELECT * FROM automation_agent_registrations WHERE id = ?",
+    [id]
+  )!;
+
+  return { row, plainToken, token_prefix };
+}
+
 /** Reap expired leases: `claimed` → `queued`, `running` → `expired`. Returns number of rows updated. */
 export function reapExpiredCollectionJobLeases(db: Database): number {
   const now = new Date().toISOString();
@@ -1083,6 +1189,7 @@ export function sourceToJson(row: SourceRow) {
   let capabilities: string[] = [];
   let attributes: Record<string, unknown> = {};
   let labels: Record<string, string> = {};
+  let allowed_fix_policy_ids: string[] = [];
   try {
     capabilities = JSON.parse(row.capabilities_json) as string[];
   } catch {
@@ -1098,6 +1205,11 @@ export function sourceToJson(row: SourceRow) {
   } catch {
     labels = {};
   }
+  try {
+    allowed_fix_policy_ids = JSON.parse(row.allowed_fix_policy_ids_json ?? "[]") as string[];
+  } catch {
+    allowed_fix_policy_ids = [];
+  }
   const defaultCollectionScope = parseCollectionScopeJson(row.default_collection_scope_json);
 
   return {
@@ -1112,6 +1224,9 @@ export function sourceToJson(row: SourceRow) {
     attributes,
     labels,
     default_collection_scope: defaultCollectionScope,
+    automation_enabled: row.automation_enabled === 1,
+    auto_fix_enabled: row.auto_fix_enabled === 1,
+    allowed_fix_policy_ids,
     enabled: row.enabled === 1,
     last_seen_at: row.last_seen_at,
     health_status: row.health_status,
@@ -1147,5 +1262,6 @@ export function collectionJobToJson(row: CollectionJobRow) {
     finished_at: row.finished_at,
     result_analysis_status: row.result_analysis_status ?? null,
     collection_scope: parseCollectionScopeJson(row.collection_scope_json),
+    trigger_signal_id: row.trigger_signal_id ?? null,
   };
 }

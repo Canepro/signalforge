@@ -1,4 +1,5 @@
 import type { Database } from "sql.js";
+import { randomUUID } from "node:crypto";
 import { getDb, reloadDbFromDisk, saveDb, withDbFileLock } from "@/lib/db/client";
 import {
   deleteArtifactIfUnreferenced,
@@ -15,6 +16,12 @@ import { buildCompareDriftPayload } from "@/lib/compare/build-compare";
 import { buildRunDetail, toRunDetailJson } from "@/lib/api/run-detail-json";
 import type {
   AgentsStore,
+  AutomationSignalsStore,
+  AutomationAgentsStore,
+  AutomationSignalView,
+  CollectionJobView,
+  FixActionRunsStore,
+  FixActionRunView,
   JobsStore,
   PersistAnalyzedRunInput,
   PersistAnalyzedRunResult,
@@ -24,6 +31,8 @@ import type {
   Storage,
   StorageTx,
 } from "./contract";
+import type { Finding } from "@/lib/analyzer/schema";
+import { KUBERNETES_SAFE_FIX_CAPABILITY } from "@/lib/automation/fix-policy";
 import {
   mapRunSummaryRow,
   parseFindingsFromReportJson,
@@ -39,10 +48,13 @@ import {
   cancelCollectionJob,
   collectionJobToJson,
   createAgentRegistration,
+  createAutomationAgentRegistration,
   deleteSource,
   failCollectionJobForAgent,
   getAgentRegistrationBySourceId,
   getAgentRegistrationByTokenHash,
+  getAutomationAgentRegistrationBySourceId,
+  getAutomationAgentRegistrationByTokenHash,
   getCollectionJobById,
   getSourceById,
   insertCollectionJob,
@@ -57,6 +69,75 @@ import {
   sourceToJson,
   updateSource,
 } from "@/lib/db/source-job-repository";
+
+function parseJson<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function getOne<T>(db: Database, sql: string, params: unknown[] = []): T | null {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  if (!stmt.step()) {
+    stmt.free();
+    return null;
+  }
+  const row = stmt.getAsObject() as unknown as T;
+  stmt.free();
+  return row;
+}
+
+function allRows<T>(db: Database, sql: string, params: unknown[] = []): T[] {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const rows: T[] = [];
+  while (stmt.step()) rows.push(stmt.getAsObject() as unknown as T);
+  stmt.free();
+  return rows;
+}
+
+type AutomationSignalRow = AutomationSignalView;
+
+type FixActionRunRow = Omit<FixActionRunView, "action_payload" | "dry_run_summary" | "apply_summary"> & {
+  action_payload_json: string;
+  dry_run_summary_json: string | null;
+  apply_summary_json: string | null;
+};
+
+function signalToView(row: AutomationSignalRow): AutomationSignalView {
+  return row;
+}
+
+function fixActionToView(row: FixActionRunRow): FixActionRunView {
+  const { action_payload_json, dry_run_summary_json, apply_summary_json, ...rest } = row;
+  const legacyPayload = { kind: "legacy_unavailable" } as unknown as FixActionRunView["action_payload"];
+  return {
+    ...rest,
+    action_payload: parseJson(action_payload_json, legacyPayload),
+    dry_run_summary: parseJson<Record<string, unknown> | null>(dry_run_summary_json, null),
+    apply_summary: parseJson<Record<string, unknown> | null>(apply_summary_json, null),
+  };
+}
+
+function actionableSignalFindings(findings: Finding[]): Finding[] {
+  return findings.filter(
+    (finding) =>
+      ["critical", "high"].includes(finding.severity) &&
+      finding.title.toLowerCase().includes("automatically mounts service account tokens")
+  );
+}
+
+function signalDedupeKey(sourceId: string, artifactType: string, finding: Finding): string {
+  return [sourceId, artifactType, finding.id, finding.title].join("|");
+}
+
+function isLeaseValid(row: { lease_expires_at: string | null }, nowIso: string): boolean {
+  return Boolean(row.lease_expires_at && row.lease_expires_at > nowIso);
+}
 
 class SqliteRunsStore implements RunsStore {
   constructor(private readonly db: Database) {}
@@ -483,6 +564,25 @@ class SqliteJobsStore implements JobsStore {
       return { ok: false as const, code: "conflict" };
     }
 
+    if (run.status === "complete" && input.artifactType === "kubernetes-bundle") {
+      const findings = input.analysis.report?.findings ?? [];
+      await new SqliteAutomationSignalsStore(this.db).upsertFromRun({
+        sourceId: input.sourceId,
+        runId: run.id,
+        artifactType: input.artifactType,
+        findings,
+      });
+      if (job.requested_by.startsWith("fix_action_run:")) {
+        const actionRunId = job.requested_by.slice("fix_action_run:".length);
+        await new SqliteFixActionRunsStore(this.db).linkPostFixRun({
+          actionRunId,
+          sourceId: input.sourceId,
+          runId: run.id,
+          findings,
+        });
+      }
+    }
+
     return {
       ok: true as const,
       job: collectionJobToJson(submitted),
@@ -565,6 +665,357 @@ class SqliteAgentsStore implements AgentsStore {
   }
 }
 
+class SqliteAutomationAgentsStore implements AutomationAgentsStore {
+  constructor(private readonly db: Database) {}
+
+  async getRegistrationBySourceId(sourceId: string) {
+    return getAutomationAgentRegistrationBySourceId(this.db, sourceId);
+  }
+
+  async resolveRequestContextByTokenHash(tokenHash: string) {
+    const registration = getAutomationAgentRegistrationByTokenHash(this.db, tokenHash);
+    if (!registration) return null;
+    const source = getSourceById(this.db, registration.source_id);
+    if (!source) return null;
+    return { registration, source: sourceToJson(source) };
+  }
+
+  async createRegistration(sourceId: string, displayName?: string | null) {
+    return createAutomationAgentRegistration(this.db, sourceId, displayName);
+  }
+}
+
+class SqliteAutomationSignalsStore implements AutomationSignalsStore {
+  constructor(private readonly db: Database) {}
+
+  async listNextForSource(sourceId: string, limit: number) {
+    return allRows<AutomationSignalRow>(
+      this.db,
+      `SELECT * FROM automation_signals
+       WHERE source_id = ? AND status = 'open'
+       ORDER BY last_seen_at DESC
+       LIMIT ?`,
+      [sourceId, Math.min(50, Math.max(1, Math.floor(limit)))]
+    ).map(signalToView);
+  }
+
+  async getById(id: string) {
+    const row = getOne<AutomationSignalRow>(this.db, "SELECT * FROM automation_signals WHERE id = ?", [id]);
+    return row ? signalToView(row) : null;
+  }
+
+  async markDiagnosticRequested(id: string, sourceId: string) {
+    const now = new Date().toISOString();
+    this.db.run(
+      `UPDATE automation_signals
+       SET status = 'diagnostic_requested', updated_at = ?
+       WHERE id = ? AND source_id = ? AND status = 'open'`,
+      [now, id, sourceId]
+    );
+    return this.getById(id);
+  }
+
+  async upsertFromRun(input: {
+    sourceId: string;
+    runId: string;
+    artifactType: string;
+    findings: Finding[];
+  }) {
+    const now = new Date().toISOString();
+    const out: AutomationSignalView[] = [];
+    for (const finding of actionableSignalFindings(input.findings)) {
+      const dedupeKey = signalDedupeKey(input.sourceId, input.artifactType, finding);
+      const existing = getOne<AutomationSignalRow>(
+        this.db,
+        "SELECT * FROM automation_signals WHERE dedupe_key = ?",
+        [dedupeKey]
+      );
+      if (existing) {
+        this.db.run(
+          `UPDATE automation_signals
+           SET run_id = ?, severity = ?, category = ?, status = CASE WHEN status = 'resolved' THEN 'open' ELSE status END,
+               updated_at = ?, last_seen_at = ?
+           WHERE id = ?`,
+          [input.runId, finding.severity, finding.category, now, now, existing.id]
+        );
+        const updated = await this.getById(existing.id);
+        if (updated) out.push(updated);
+        continue;
+      }
+      const id = randomUUID();
+      this.db.run(
+        `INSERT INTO automation_signals (
+          id, source_id, run_id, artifact_type, finding_id, finding_title, severity, category,
+          signal_type, status, dedupe_key, created_at, updated_at, last_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'top_finding', 'open', ?, ?, ?, ?)`,
+        [
+          id,
+          input.sourceId,
+          input.runId,
+          input.artifactType,
+          finding.id,
+          finding.title,
+          finding.severity,
+          finding.category,
+          dedupeKey,
+          now,
+          now,
+          now,
+        ]
+      );
+      const inserted = await this.getById(id);
+      if (inserted) out.push(inserted);
+    }
+    return out;
+  }
+
+  async markActionQueued(id: string, sourceId: string) {
+    const now = new Date().toISOString();
+    this.db.run(
+      `UPDATE automation_signals
+       SET status = 'action_queued', updated_at = ?
+       WHERE id = ? AND source_id = ?`,
+      [now, id, sourceId]
+    );
+    return this.getById(id);
+  }
+
+  async markResolvedIfFindingAbsent(input: {
+    signalId: string;
+    sourceId: string;
+    runId: string;
+    findings: Finding[];
+  }) {
+    const signal = await this.getById(input.signalId);
+    if (!signal || signal.source_id !== input.sourceId) return null;
+    if (input.findings.some((finding) => finding.id === signal.finding_id)) return signal;
+    const now = new Date().toISOString();
+    this.db.run(
+      `UPDATE automation_signals
+       SET status = 'resolved', run_id = ?, updated_at = ?, last_seen_at = ?
+       WHERE id = ? AND source_id = ?`,
+      [input.runId, now, now, input.signalId, input.sourceId]
+    );
+    return this.getById(input.signalId);
+  }
+}
+
+class SqliteFixActionRunsStore implements FixActionRunsStore {
+  constructor(private readonly db: Database) {}
+
+  async getById(id: string) {
+    const row = getOne<FixActionRunRow>(this.db, "SELECT * FROM fix_action_runs WHERE id = ?", [id]);
+    return row ? fixActionToView(row) : null;
+  }
+
+  async listForSource(sourceId: string, limit: number) {
+    return allRows<FixActionRunRow>(
+      this.db,
+      "SELECT * FROM fix_action_runs WHERE source_id = ? ORDER BY created_at DESC LIMIT ?",
+      [sourceId, Math.min(100, Math.max(1, Math.floor(limit)))]
+    ).map(fixActionToView);
+  }
+
+  async create(input: Parameters<FixActionRunsStore["create"]>[0]) {
+    if (input.idempotencyKey?.trim()) {
+      const existing = getOne<FixActionRunRow>(
+        this.db,
+        `SELECT * FROM fix_action_runs
+         WHERE source_id = ? AND idempotency_key = ?
+         ORDER BY created_at DESC LIMIT 1`,
+        [input.sourceId, input.idempotencyKey.trim()]
+      );
+      if (existing) return { row: fixActionToView(existing), inserted: false };
+    }
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    this.db.run(
+      `INSERT INTO fix_action_runs (
+        id, source_id, automation_signal_id, diagnostic_request_id, pre_fix_run_id,
+        finding_id, policy_id, action_kind, action_payload_json, status, requested_by, idempotency_key,
+        created_at, updated_at, queued_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.sourceId,
+        input.signalId,
+        input.diagnosticRequestId,
+        input.preFixRunId,
+        input.findingId,
+        input.policyId,
+        input.actionKind,
+        JSON.stringify(input.actionPayload),
+        input.requestedBy,
+        input.idempotencyKey?.trim() ?? null,
+        now,
+        now,
+        now,
+      ]
+    );
+    const row = (await this.getById(id))!;
+    await new SqliteAutomationSignalsStore(this.db).markActionQueued(input.signalId, input.sourceId);
+    return { row, inserted: true };
+  }
+
+  async listNextForAgent(sourceId: string, registrationId: string, limit: number) {
+    const source = getSourceById(this.db, sourceId);
+    const registration = getAgentRegistrationBySourceId(this.db, sourceId);
+    if (!source || !registration || registration.id !== registrationId || !source.enabled) {
+      return { actions: [], gate: "source_disabled" as const };
+    }
+    if (!registration.last_heartbeat_at) return { actions: [], gate: "heartbeat_required" as const };
+    const agentCapabilities = parseJson<string[]>(registration.last_capabilities_json, []);
+    if (agentCapabilities.length === 0) return { actions: [], gate: "capabilities_empty" as const };
+    const sourceCapabilities = parseJson<string[]>(source.capabilities_json, []);
+    if (
+      !agentCapabilities.includes(KUBERNETES_SAFE_FIX_CAPABILITY) ||
+      !sourceCapabilities.includes(KUBERNETES_SAFE_FIX_CAPABILITY)
+    ) {
+      return { actions: [], gate: "capability_mismatch" as const };
+    }
+    const actions = allRows<FixActionRunRow>(
+      this.db,
+      `SELECT * FROM fix_action_runs
+       WHERE source_id = ? AND status = 'queued'
+       ORDER BY created_at ASC
+       LIMIT ?`,
+      [sourceId, Math.min(10, Math.max(1, Math.floor(limit)))]
+    ).map(fixActionToView);
+    return { actions, gate: null };
+  }
+
+  async claimForAgent(
+    actionRunId: string,
+    sourceId: string,
+    registrationId: string,
+    instanceId: string,
+    leaseTtlSeconds: number
+  ) {
+    const row = getOne<FixActionRunRow>(this.db, "SELECT * FROM fix_action_runs WHERE id = ?", [actionRunId]);
+    if (!row) return { ok: false as const, code: "not_found" as const };
+    if (row.source_id !== sourceId) return { ok: false as const, code: "wrong_source" as const };
+    if (row.status !== "queued") return { ok: false as const, code: "not_queued" as const };
+    const now = new Date();
+    const claimedAt = now.toISOString();
+    const leaseExpiresAt = new Date(now.getTime() + leaseTtlSeconds * 1000).toISOString();
+    this.db.run(
+      `UPDATE fix_action_runs
+       SET status = 'claimed', lease_owner_id = ?, lease_owner_instance_id = ?,
+           lease_expires_at = ?, claimed_at = ?, updated_at = ?
+       WHERE id = ? AND source_id = ? AND status = 'queued'`,
+      [registrationId, instanceId, leaseExpiresAt, claimedAt, claimedAt, actionRunId, sourceId]
+    );
+    const claimed = (await this.getById(actionRunId))!;
+    return { ok: true as const, row: claimed };
+  }
+
+  async startForAgent(actionRunId: string, sourceId: string, registrationId: string, instanceId: string) {
+    const row = getOne<FixActionRunRow>(this.db, "SELECT * FROM fix_action_runs WHERE id = ?", [actionRunId]);
+    if (!row || row.source_id !== sourceId) return { ok: false as const, code: "wrong_action" as const };
+    const now = new Date().toISOString();
+    if (row.status !== "claimed") return { ok: false as const, code: "not_claimed" as const };
+    if (row.lease_owner_id !== registrationId || row.lease_owner_instance_id !== instanceId)
+      return { ok: false as const, code: "wrong_lease" as const };
+    if (!isLeaseValid(row, now)) return { ok: false as const, code: "lease_expired" as const };
+    this.db.run(
+      `UPDATE fix_action_runs
+       SET status = 'dry_running', started_at = ?, updated_at = ?
+       WHERE id = ?`,
+      [now, now, actionRunId]
+    );
+    return { ok: true as const, row: (await this.getById(actionRunId))! };
+  }
+
+  async recordDryRun(input: Parameters<FixActionRunsStore["recordDryRun"]>[0]) {
+    const row = getOne<FixActionRunRow>(this.db, "SELECT * FROM fix_action_runs WHERE id = ?", [input.actionRunId]);
+    if (!row || row.source_id !== input.sourceId) return { ok: false as const, code: "wrong_action" as const };
+    const now = new Date().toISOString();
+    if (row.status !== "dry_running") return { ok: false as const, code: "bad_state" as const };
+    if (row.lease_owner_id !== input.registrationId || row.lease_owner_instance_id !== input.instanceId)
+      return { ok: false as const, code: "wrong_lease" as const };
+    if (!isLeaseValid(row, now)) return { ok: false as const, code: "lease_expired" as const };
+    const nextStatus = input.status === "passed" ? "applying" : "failed";
+    this.db.run(
+      `UPDATE fix_action_runs
+       SET status = ?, dry_run_summary_json = ?, dry_run_at = ?, updated_at = ?,
+           error_code = CASE WHEN ? = 'failed' THEN 'dry_run_failed' ELSE error_code END,
+           error_message = CASE WHEN ? = 'failed' THEN 'Dry-run failed' ELSE error_message END,
+           finished_at = CASE WHEN ? = 'failed' THEN ? ELSE finished_at END
+       WHERE id = ?`,
+      [
+        nextStatus,
+        JSON.stringify(input.summary),
+        now,
+        now,
+        input.status,
+        input.status,
+        input.status,
+        now,
+        input.actionRunId,
+      ]
+    );
+    return { ok: true as const, row: (await this.getById(input.actionRunId))! };
+  }
+
+  async recordApply(input: Parameters<FixActionRunsStore["recordApply"]>[0]) {
+    const row = getOne<FixActionRunRow>(this.db, "SELECT * FROM fix_action_runs WHERE id = ?", [input.actionRunId]);
+    if (!row || row.source_id !== input.sourceId) return { ok: false as const, code: "wrong_action" as const };
+    const now = new Date().toISOString();
+    if (row.status !== "applying") return { ok: false as const, code: "bad_state" as const };
+    if (row.lease_owner_id !== input.registrationId || row.lease_owner_instance_id !== input.instanceId)
+      return { ok: false as const, code: "wrong_lease" as const };
+    if (!isLeaseValid(row, now)) return { ok: false as const, code: "lease_expired" as const };
+    const failed = input.status === "failed";
+    this.db.run(
+      `UPDATE fix_action_runs
+       SET status = ?, apply_summary_json = ?, applied_at = ?, updated_at = ?, finished_at = ?,
+           lease_owner_id = NULL, lease_owner_instance_id = NULL, lease_expires_at = NULL,
+           error_code = ?, error_message = ?
+       WHERE id = ?`,
+      [
+        failed ? "failed" : "applied",
+        JSON.stringify(input.summary),
+        now,
+        now,
+        failed ? now : null,
+        failed ? "apply_failed" : null,
+        failed ? "Apply failed" : null,
+        input.actionRunId,
+      ]
+    );
+    let postFixJob: CollectionJobView | null = null;
+    if (!failed) {
+      const source = getSourceById(this.db, input.sourceId)!;
+      const queued = insertCollectionJob(this.db, source, {
+        requested_by: `fix_action_run:${input.actionRunId}`,
+        request_reason: `post-fix verification for ${row.policy_id}`,
+      });
+      postFixJob = collectionJobToJson(queued.row);
+    }
+    return { ok: true as const, row: (await this.getById(input.actionRunId))!, postFixJob };
+  }
+
+  async linkPostFixRun(input: Parameters<FixActionRunsStore["linkPostFixRun"]>[0]) {
+    const row = getOne<FixActionRunRow>(this.db, "SELECT * FROM fix_action_runs WHERE id = ?", [input.actionRunId]);
+    if (!row || row.source_id !== input.sourceId) return null;
+    const signal = await new SqliteAutomationSignalsStore(this.db).markResolvedIfFindingAbsent({
+      signalId: row.automation_signal_id,
+      sourceId: input.sourceId,
+      runId: input.runId,
+      findings: input.findings,
+    });
+    const now = new Date().toISOString();
+    const resolved = signal?.status === "resolved";
+    this.db.run(
+      `UPDATE fix_action_runs
+       SET post_fix_run_id = ?, status = ?, finished_at = ?, updated_at = ?
+       WHERE id = ?`,
+      [input.runId, resolved ? "verified" : "applied", resolved ? now : row.finished_at, now, input.actionRunId]
+    );
+    return this.getById(input.actionRunId);
+  }
+}
+
 class SqliteStorage implements Storage {
   constructor(
     private db: Database,
@@ -585,6 +1036,18 @@ class SqliteStorage implements Storage {
 
   get agents(): AgentsStore {
     return new SqliteAgentsStore(this.db);
+  }
+
+  get automationAgents(): AutomationAgentsStore {
+    return new SqliteAutomationAgentsStore(this.db);
+  }
+
+  get automationSignals(): AutomationSignalsStore {
+    return new SqliteAutomationSignalsStore(this.db);
+  }
+
+  get fixActionRuns(): FixActionRunsStore {
+    return new SqliteFixActionRunsStore(this.db);
   }
 
   async withTransaction<T>(fn: (tx: StorageTx) => Promise<T>): Promise<T> {

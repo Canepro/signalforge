@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/automation-signals-next-response.schema.json",
+  "title": "Automation signals next response",
+  "type": "object",
+  "required": ["signals"],
+  "properties": {
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "source_id",
+          "run_id",
+          "artifact_type",
+          "finding_id",
+          "finding_title",
+          "severity",
+          "category",
+          "signal_type",
+          "status",
+          "created_at",
+          "last_seen_at"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "source_id": { "type": "string" },
+          "run_id": { "type": "string" },
+          "artifact_type": { "type": "string" },
+          "finding_id": { "type": "string" },
+          "finding_title": { "type": "string" },
+          "severity": { "type": "string" },
+          "category": { "type": "string" },
+          "signal_type": { "enum": ["top_finding", "evidence_drift"] },
+          "status": { "type": "string" },
+          "created_at": { "type": "string" },
+          "last_seen_at": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/automation-diagnostic-request-response.schema.json",
+  "title": "Automation diagnostic request response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "source_id": { "type": "string" },
+        "status": { "type": "string" },
+        "requested_by": { "type": "string" },
+        "request_reason": { "type": ["string", "null"] },
+        "artifact_type": { "type": "string" },
+        "created_at": { "type": "string" },
+        "claimed_at": { "type": ["string", "null"] },
+        "started_at": { "type": ["string", "null"] },
+        "submitted_at": { "type": ["string", "null"] },
+        "finished_at": { "type": ["string", "null"] },
+        "result_run_id": { "type": ["string", "null"] },
+        "result_artifact_id": { "type": ["string", "null"] },
+        "result_analysis_status": { "type": ["string", "null"] },
+        "error_code": { "type": ["string", "null"] },
+        "error_message": { "type": ["string", "null"] },
+        "poll_url": { "type": "string" }
+      },
+      "required": [
+        "id",
+        "source_id",
+        "status",
+        "requested_by",
+        "request_reason",
+        "artifact_type",
+        "created_at",
+        "claimed_at",
+        "started_at",
+        "submitted_at",
+        "finished_at",
+        "result_run_id",
+        "result_artifact_id",
+        "result_analysis_status",
+        "error_code",
+        "error_message",
+        "poll_url"
+      ]
+    },
+    "result": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "run_id": { "type": "string" },
+            "artifact_id": { "type": "string" },
+            "artifact_type": { "type": "string" },
+            "target_identifier": { "type": ["string", "null"] },
+            "status": { "type": "string" },
+            "severity_counts": {
+              "type": "object",
+              "additionalProperties": { "type": "integer" }
+            },
+            "summary": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "top_actions_now": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "environment_context": {
+              "anyOf": [
+                { "type": "null" },
+                { "type": "object", "additionalProperties": true }
+              ]
+            },
+            "is_incomplete": { "type": "boolean" },
+            "incomplete_reason": { "type": ["string", "null"] },
+            "analysis_error": { "type": ["string", "null"] },
+            "links": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "run": { "type": "string" },
+                "report": { "type": "string" },
+                "compare_api": { "type": "string" }
+              },
+              "required": ["run", "report", "compare_api"]
+            }
+          },
+          "required": [
+            "run_id",
+            "artifact_id",
+            "artifact_type",
+            "target_identifier",
+            "status",
+            "severity_counts",
+            "summary",
+            "top_actions_now",
+            "findings",
+            "environment_context",
+            "is_incomplete",
+            "incomplete_reason",
+            "analysis_error",
+            "links"
+          ]
+        }
+      ]
+    }
+  },
+  "required": ["request", "result"]
+}

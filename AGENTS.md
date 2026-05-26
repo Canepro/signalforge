@@ -16,12 +16,13 @@ Current product shape:
 - use one LLM call for explanation and prioritization
 - persist artifacts and runs
 - present results in dashboard, run-detail, compare, and CLI flows
+- optional source-opt-in automation: diagnostic requests via automation-agent tokens, and narrowly policy-gated Kubernetes safe-fix actions executed by external agents (not in-app kubectl)
 
 This is not:
 
 - a chatbot
-- a remediation engine in the current product scope
-- a collector/orchestrator
+- a general remediation engine or arbitrary command runner
+- a collector/orchestrator inside this repo
 - a generic observability platform
 
 ## Repo Boundary
@@ -30,7 +31,7 @@ SignalForge lives in its own repo:
 
 - product repo: this repository (your `signalforge` checkout)
 - collector/source repo: [Canepro/signalforge-collectors](https://github.com/Canepro/signalforge-collectors)
-- execution-plane agent: [Canepro/signalforge-agent](https://github.com/Canepro/signalforge-agent) — Bun + TypeScript; heartbeat, poll, claim, run collectors, upload artifacts
+- execution-plane agent: [Canepro/signalforge-agent](https://github.com/Canepro/signalforge-agent) — Bun + TypeScript; heartbeat, poll, claim, run collectors, upload artifacts, and (when enabled) execute approved safe-fix actions via fix-action run APIs
 - reference architecture only: [Canepro/pipelinehealer](https://github.com/Canepro/pipelinehealer)
 
 `signalforge-collectors` produces artifacts. SignalForge consumes them. A **reference push path** lives in that repo as `submit-to-signalforge.sh` (runs `first-audit.sh`, then `POST /api/runs` with ingestion metadata); see that repo’s README. For **job-driven** collection, the **`signalforge-agent`** repo heartbeats, polls `GET /api/agent/jobs/next`, claims jobs, runs `first-audit.sh` from `signalforge-collectors`, and uploads via `POST /api/collection-jobs/{id}/artifact`. See that repo’s README for env config and `once` / `run` modes.
@@ -38,17 +39,10 @@ SignalForge lives in its own repo:
 ## Current Status
 
 **Canonical roadmap:** [`plans/roadmap.md`](plans/roadmap.md).  
-**Current snapshot:** [`plans/current-plan.md`](plans/current-plan.md).
+**Current snapshot:** [`plans/current-plan.md`](plans/current-plan.md).  
+**New auth spike:** [`plans/phase-11-auth-md-agent-registration.md`](plans/phase-11-auth-md-agent-registration.md) tracks the `auth.md` / Infisical agent-registration plan. Start there before implementing agent-auth discovery or registration changes.
 
-Completed on `main` through **Phase 6e** (agent repo + Sources UI polish; see `plans/current-plan.md`): analyzer, API/DB, UI, reanalyze, compare (UI + JSON API), CLI submit + **read** helpers, published API contract, **Sources** + **collection jobs** (`/sources`, operator APIs) behind **`SIGNALFORGE_ADMIN_TOKEN`** (Bearer for HTTP; `/sources/login` sets an httpOnly session cookie — not in the client bundle), agent registration API (one token per source), **agent execution routes** with **strict `instance_id`** on start/fail/artifact and on heartbeat when reporting `active_job_id`, and **strict jobs/next** (must heartbeat first with a **non-empty** capability list that includes the job’s `collect:<artifact_type>` via agent∩source caps). Lease reaper: claimed→queued, running→expired per Phase 6b. **Collection job `submitted`** means the artifact was accepted; **`result_analysis_status`** (and artifact-upload **`run_status`**) reflects whether the linked run succeeded analysis (`complete` vs `error`, etc.). Heartbeat **200** includes **`active_job_lease`** so agents see whether the lease was extended. **`signalforge-agent`** repo (Bun + TypeScript) implements the first thin external agent; validated E2E. Sources UI uses unified sidebar+topbar layout matching dashboard, with health dots, job status badges, inline settings (enable/disable, rename), agent enrollment info, action feedback, and cancel confirmation.
-
-Current branch work has moved into **Phase 8**:
-
-- `container-diagnostics` and `kubernetes-bundle` are both implemented artifact families in this checkout
-- compare now includes deterministic `evidence_delta` output for stable evidence and metadata drift
-- container analysis now covers runtime isolation signals such as privileged mode, host namespaces, writable mounts, writable root filesystem, root execution, capability adds, socket mounts, and secret mounts
-- Kubernetes analysis now covers first-slice exposure, RBAC escalation, token automount, default service-account use, writable root filesystems, secret-backed env injection, `envFrom` Secret imports, probes, and resource-governance signals
-- Kubernetes support in this branch still uses the locked `kubernetes-bundle.v1` UTF-8 JSON manifest shape, not raw support-bundle archive ingestion
+**Canonical implemented state:** see [`plans/current-plan.md`](plans/current-plan.md). Highlights on `main` include multi-artifact analysis (`linux-audit-log`, `container-diagnostics`, `kubernetes-bundle`), compare with `evidence_delta`, **Sources** + collection jobs behind **`SIGNALFORGE_ADMIN_TOKEN`**, source-bound execution-agent registration, strict agent lease/`instance_id` rules, job-scoped collection parameters, Phase 9c operator UI, and optional autonomous Kubernetes safe-fix (automation-agent + fix-action runs). Operator docs: [`docs/operators/automation-agent-integration.md`](docs/operators/automation-agent-integration.md), [`docs/operators/autonomous-kubernetes-actions.md`](docs/operators/autonomous-kubernetes-actions.md).
 
 **Artifacts:** `linux-audit-log`, `container-diagnostics`, `kubernetes-bundle`.
 
@@ -91,7 +85,8 @@ Use these docs in this order unless the task is very narrow:
 3. `docs/README.md` for the docs map
 4. `plans/roadmap.md` for long-term direction
 5. `plans/current-plan.md` for current shipped state
-6. `docs/api-contract.md` and `docs/external-submit.md` for integrations
+6. `plans/phase-11-auth-md-agent-registration.md` for the `auth.md` / Infisical agent-registration spike
+7. `docs/api-contract.md` and `docs/external-submit.md` for integrations
 
 ## Architecture
 
@@ -217,7 +212,7 @@ Do not expand into these without an explicit plan change:
 - auth
 - chat
 - generalized policy engine
-- remediation in the current product scope
+- general remediation, arbitrary shell/YAML execution, or LLM-authored patches (narrow policy-gated safe-fix is opt-in and documented separately)
 - multi-tenant/fleet management
 - broad platform abstraction
 
@@ -284,8 +279,10 @@ bun run typecheck
 Tests:
 
 ```bash
-bun test
+bun run test
 ```
+
+Use `bun run test` (Vitest). Avoid bare `bun test` — Bun's native runner does not fully support Vitest fake timers used by lease-reaping tests.
 
 Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
 

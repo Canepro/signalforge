@@ -12,7 +12,7 @@ import { join } from "path";
 
 export type { Database } from "sql.js";
 
-const SQLITE_SCHEMA_VERSION = 1;
+const SQLITE_SCHEMA_VERSION = 2;
 const SQLITE_LOCK_STALE_MS = 30_000;
 const SQLITE_STALE_DB_CLOSE_DELAY_MS = 30_000;
 
@@ -308,6 +308,9 @@ function migrate(db: Database): void {
     attributes_json TEXT NOT NULL DEFAULT '{}',
     labels_json TEXT NOT NULL DEFAULT '{}',
     default_collection_scope_json TEXT,
+    automation_enabled INTEGER NOT NULL DEFAULT 0,
+    auto_fix_enabled INTEGER NOT NULL DEFAULT 0,
+    allowed_fix_policy_ids_json TEXT NOT NULL DEFAULT '[]',
     enabled INTEGER NOT NULL DEFAULT 1,
     last_seen_at TEXT,
     health_status TEXT NOT NULL DEFAULT 'unknown',
@@ -326,6 +329,15 @@ function migrate(db: Database): void {
   );
   if (!sourceCols.includes("default_collection_scope_json")) {
     db.run(`ALTER TABLE sources ADD COLUMN default_collection_scope_json TEXT`);
+  }
+  if (!sourceCols.includes("automation_enabled")) {
+    db.run(`ALTER TABLE sources ADD COLUMN automation_enabled INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!sourceCols.includes("auto_fix_enabled")) {
+    db.run(`ALTER TABLE sources ADD COLUMN auto_fix_enabled INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!sourceCols.includes("allowed_fix_policy_ids_json")) {
+    db.run(`ALTER TABLE sources ADD COLUMN allowed_fix_policy_ids_json TEXT NOT NULL DEFAULT '[]'`);
   }
 
   db.run(
@@ -360,7 +372,8 @@ function migrate(db: Database): void {
     started_at TEXT,
     submitted_at TEXT,
     finished_at TEXT,
-    collection_scope_json TEXT
+    collection_scope_json TEXT,
+    trigger_signal_id TEXT
   )`);
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_collection_jobs_source ON collection_jobs(source_id)`);
@@ -374,6 +387,66 @@ function migrate(db: Database): void {
   }
   if (!jobCols.includes("collection_scope_json")) {
     db.run(`ALTER TABLE collection_jobs ADD COLUMN collection_scope_json TEXT`);
+  }
+  if (!jobCols.includes("trigger_signal_id")) {
+    db.run(`ALTER TABLE collection_jobs ADD COLUMN trigger_signal_id TEXT`);
+  }
+
+  db.run(`CREATE TABLE IF NOT EXISTS automation_signals (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES sources(id),
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    artifact_type TEXT NOT NULL,
+    finding_id TEXT NOT NULL,
+    finding_title TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    category TEXT NOT NULL,
+    signal_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    dedupe_key TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_automation_signals_source_status ON automation_signals(source_id, status)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS fix_action_runs (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES sources(id),
+    automation_signal_id TEXT NOT NULL REFERENCES automation_signals(id),
+    diagnostic_request_id TEXT NOT NULL REFERENCES collection_jobs(id),
+    pre_fix_run_id TEXT NOT NULL REFERENCES runs(id),
+    post_fix_run_id TEXT REFERENCES runs(id),
+    finding_id TEXT NOT NULL,
+    policy_id TEXT NOT NULL,
+    action_kind TEXT NOT NULL,
+    action_payload_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    idempotency_key TEXT,
+    lease_owner_id TEXT,
+    lease_owner_instance_id TEXT,
+    lease_expires_at TEXT,
+    dry_run_summary_json TEXT,
+    apply_summary_json TEXT,
+    error_code TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    queued_at TEXT,
+    claimed_at TEXT,
+    started_at TEXT,
+    dry_run_at TEXT,
+    applied_at TEXT,
+    finished_at TEXT
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_fix_action_runs_source_status ON fix_action_runs(source_id, status)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_fix_action_runs_idempotency ON fix_action_runs(source_id, idempotency_key)`);
+  const fixActionCols = tableColumnNames(db, "fix_action_runs");
+  if (!fixActionCols.includes("action_payload_json")) {
+    db.run(
+      `ALTER TABLE fix_action_runs ADD COLUMN action_payload_json TEXT NOT NULL DEFAULT '{"kind":"legacy_unavailable"}'`
+    );
   }
 
   db.run(`CREATE TABLE IF NOT EXISTS agent_registrations (
@@ -399,6 +472,14 @@ function migrate(db: Database): void {
   if (!agentRegCols.includes("last_instance_id")) {
     db.run(`ALTER TABLE agent_registrations ADD COLUMN last_instance_id TEXT`);
   }
+
+  db.run(`CREATE TABLE IF NOT EXISTS automation_agent_registrations (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL UNIQUE REFERENCES sources(id),
+    token_hash TEXT NOT NULL,
+    display_name TEXT,
+    created_at TEXT NOT NULL
+  )`);
 
   db.run(`PRAGMA user_version = ${SQLITE_SCHEMA_VERSION}`);
 }

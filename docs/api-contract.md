@@ -20,6 +20,8 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 
 **Auth (Phase 6d agent routes):** `Authorization: Bearer <agent_token>` from `POST /api/agent/registrations` (one registration, one token per source). Invalid or missing token → **401**. Valid token but job belongs to another source, another agent holds the lease, or **`instance_id` does not match the job lease** → **403** (`instance_mismatch` where applicable). Missing required `instance_id` on a mutating call → **400**. Invalid lifecycle / duplicate submit → **409** (see per-route notes).
 
+**Auth (automation-agent routes):** `Authorization: Bearer <automation_agent_token>` from `POST /api/automation-agent/registrations` (one registration, one token per source). Invalid or missing token → **401**. Valid tokens can only create or read diagnostic requests for their bound source; cross-source request reads return **403**.
+
 **Unexpected server failures (selected JSON routes):** **500** responses use a stable body **`{ "error": "Internal server error", "code": "internal_error" }`** without echoing raw exception text. Operators should inspect server logs for the underlying failure.
 
 ## Quick Route Guide
@@ -42,12 +44,15 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | `GET /api/collection-jobs/[id]` | Get one job |
 | `POST /api/collection-jobs/[id]/cancel` | Cancel queued/claimed job |
 | `POST /api/agent/registrations` | Enroll agent for a source (returns token once) |
+| `POST /api/automation-agent/registrations` | Enroll automation agent for a source (returns token once) |
 | `POST /api/agent/heartbeat` | Agent: capabilities, attributes, lease extension for active job |
 | `GET /api/agent/jobs/next` | Agent: next **queued** jobs for bound source (optional `limit`; **no** `source_id` query) |
 | `POST /api/collection-jobs/[id]/claim` | Agent: `queued` → `claimed` |
 | `POST /api/collection-jobs/[id]/start` | Agent: `claimed` → `running` |
 | `POST /api/collection-jobs/[id]/fail` | Agent: `claimed` \| `running` → `failed` |
 | `POST /api/collection-jobs/[id]/artifact` | Agent: multipart artifact → same ingestion/analyzer path as `POST /api/runs`; job → **submitted** |
+| `POST /api/automation-agent/diagnostic-requests` | Automation agent: queue a source-bound diagnostic request |
+| `GET /api/automation-agent/diagnostic-requests/[id]` | Automation agent: poll job status and structured findings |
 
 ## Stability
 
@@ -201,6 +206,8 @@ Most errors use `{ "error": string, "code"?: string }`. Schema: `docs/schemas/er
 
 - Submit: `scripts/analyze.sh`
 - Read: `scripts/signalforge-read.sh` (`run` | `report` | `compare`)
+- Automation-agent bootstrap and polling: `scripts/signalforge-automation-agent.sh` (`register` | `request` | `poll` | `wait`)
+- Local end-to-end smoke: `scripts/smoke-automation-agent-local.sh` or `bun run smoke:automation-agent`
 
 ## Stability Guidance
 
@@ -273,6 +280,8 @@ All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>
 
 **`POST /api/agent/registrations`** — JSON `{ "source_id", "display_name?" }`. **201:** `{ agent_id, source_id, token, token_prefix }` (plaintext `token` once). **409** if source already has a registration.
 
+**`POST /api/automation-agent/registrations`** — JSON `{ "source_id", "display_name?" }`. **201:** `{ automation_agent_id, source_id, token, token_prefix }` (plaintext `token` once). **409** if source already has an automation-agent registration.
+
 Errors are JSON `{ "error": string, "code"?: string }` unless noted.
 
 ### Phase 6d: agent execution (source-bound Bearer)
@@ -296,6 +305,60 @@ All routes below require `Authorization: Bearer <agent_token>` (from registratio
 **Job vs run outcome:** The collection job **`status` stays `submitted`** once the artifact is stored and the run is created (ingest + analyze pipeline ran). **`result_analysis_status`** on the job (and **`run_status`** in the **200** JSON body) copies the linked run’s `status` (e.g. **`complete`** or **`error`**). Operators and agents should treat **`submitted` + `result_analysis_status: "error"`** as “delivered but analysis failed,” not a fully successful outcome.
 
 Design reference: [`plans/phase-6b-source-job-api-contract.md`](../plans/phase-6b-source-job-api-contract.md).
+
+### Automation-agent diagnostics (source-bound Bearer)
+
+All routes below require `Authorization: Bearer <automation_agent_token>` from registrations.
+
+**`POST /api/automation-agent/diagnostic-requests`** — optional JSON body:
+
+- `request_reason?: string`
+- `idempotency_key?: string`
+- `trigger_signal_id?: string`
+
+The token's bound source is always the target. The route does **not** accept `source_id`, `artifact_type`, or `collection_scope` overrides. SignalForge queues a normal `CollectionJob` for that source using its configured artifact family and default collection scope. **201** on insert or **200** on idempotent replay: `{ request_id, collection_job_id, source_id, status, poll_url }`.
+
+When `trigger_signal_id` is provided, it must belong to the token's bound Source. The queued collection job stores that trigger and the signal moves to `diagnostic_requested`.
+
+**`GET /api/automation-agent/diagnostic-requests/[id]`** — read a source-bound diagnostic request and its structured result envelope. **200:** `{ request, result }`.
+
+- `request` includes job lifecycle fields such as `status`, timestamps, linked run or artifact ids, terminal error metadata, and `poll_url`
+- `result` is `null` until a linked run exists
+- once the job is `submitted` with a linked run, `result` includes:
+  - `run_id`, `artifact_id`, `artifact_type`, `target_identifier`, run `status`
+  - `severity_counts`
+  - `summary`, `top_actions_now`, `findings`, and `environment_context`
+  - `is_incomplete`, `incomplete_reason`, `analysis_error`
+  - links to `run`, `report`, and `compare_api`
+
+Lifecycle notes:
+
+- `queued`, `claimed`, `running` → pending, `result: null`
+- `submitted` + run `complete` → terminal success with populated `result`
+- `submitted` + run `error` → terminal result with `analysis_error`
+- `failed`, `cancelled`, `expired` → terminal failure with `result: null`
+
+Cross-source reads with a valid automation-agent token return **403**.
+
+### Autonomous Kubernetes actions
+
+Autonomous action routes are source-bound and deterministic. They do not accept free-form commands or LLM-generated patches.
+
+**`GET /api/automation-agent/signals/next?limit=10`** — returns open automation signals for the token's Source. `source_id` query is rejected. **200:** `{ signals: AutomationSignal[] }`.
+
+**`POST /api/automation-agent/fix-action-runs`** — JSON `{ signal_id, diagnostic_request_id, pre_fix_run_id, idempotency_key? }`. The route validates source ownership, signal/request/run linkage, latest diagnostic state, `kubernetes-bundle`, Source opt-in, execution-agent `fix:kubernetes-safe` capability, and the deterministic allowlist. **201/200:** `{ action_run_id, source_id, status: "queued", policy_id, action_kind, action_payload, poll_url }`. **409** for stale, ineligible, or capability-mismatched requests.
+
+**`GET /api/automation-agent/fix-action-runs/[id]`** — source-bound action status plus dry-run/apply/post-fix evidence.
+
+Execution-agent routes:
+
+- `GET /api/agent/fix-actions/next?limit=1` — source-bound queued fix actions; requires both Source and last heartbeat to include `fix:kubernetes-safe`; each action includes the exact deterministic `action_payload` with target workload, namespace, patch manifest, and changed fields.
+- `POST /api/fix-action-runs/[id]/claim` — JSON `{ instance_id, lease_ttl_seconds? }`; same strict instance lease model as collection jobs.
+- `POST /api/fix-action-runs/[id]/start` — claimed → `dry_running`.
+- `POST /api/fix-action-runs/[id]/dry-run` — JSON `{ instance_id, status: "passed" | "failed", summary }`; failed dry-runs become terminal.
+- `POST /api/fix-action-runs/[id]/apply` — JSON `{ instance_id, status: "applied" | "failed", summary }`; successful apply queues a post-fix collection job.
+
+The first allowlisted policy is `kubernetes.disable-service-account-token-automount.v1`. It maps only the deterministic Kubernetes finding for automatic service-account token mounts to a server-side apply patch template. SignalForge marks the action `verified` only after post-fix diagnostics no longer contain the triggering finding.
 
 ## Related
 

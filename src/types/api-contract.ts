@@ -5,9 +5,10 @@
  * See `docs/api-contract.md` and `docs/schemas/`.
  */
 
-import type { AuditReport } from "@/lib/analyzer/schema";
+import type { AuditReport, EnvironmentContext, Finding } from "@/lib/analyzer/schema";
 import type { CompareDriftPayload } from "@/lib/compare/build-compare";
 import type { CollectionScope } from "@/lib/collection-scope";
+import type { KubernetesFixActionPayload } from "@/lib/automation/fix-policy";
 import type { RunSummary, RunDetail } from "@/types/api";
 
 /** `POST /api/runs` — 200 body (also embeds parsed `report`). */
@@ -63,6 +64,9 @@ export interface SourceResponse {
   attributes: Record<string, unknown>;
   labels: Record<string, string>;
   default_collection_scope: CollectionScope | null;
+  automation_enabled: boolean;
+  auto_fix_enabled: boolean;
+  allowed_fix_policy_ids: string[];
   enabled: boolean;
   last_seen_at: string | null;
   health_status: string;
@@ -97,6 +101,122 @@ export interface CollectionJobResponse {
   finished_at: string | null;
   result_analysis_status: string | null;
   collection_scope: CollectionScope | null;
+  trigger_signal_id: string | null;
+}
+
+/** `POST /api/automation-agent/registrations` — 201 body. */
+export interface AutomationAgentRegistrationResponse {
+  automation_agent_id: string;
+  source_id: string;
+  token: string;
+  token_prefix: string;
+}
+
+/** `POST /api/automation-agent/diagnostic-requests` — 200/201 body. */
+export interface PostAutomationDiagnosticRequestResponse {
+  request_id: string;
+  collection_job_id: string;
+  source_id: string;
+  status: string;
+  poll_url: string;
+}
+
+export interface AutomationSignalResponse {
+  id: string;
+  source_id: string;
+  run_id: string;
+  artifact_type: string;
+  finding_id: string;
+  finding_title: string;
+  severity: string;
+  category: string;
+  signal_type: "top_finding" | "evidence_drift";
+  status: string;
+  created_at: string;
+  last_seen_at: string;
+}
+
+export interface GetAutomationSignalsNextResponse {
+  signals: AutomationSignalResponse[];
+}
+
+export interface PostFixActionRunResponse {
+  action_run_id: string;
+  source_id: string;
+  status: "queued";
+  policy_id: string;
+  action_kind: string;
+  action_payload: KubernetesFixActionPayload;
+  poll_url: string;
+}
+
+export interface FixActionRunResponse {
+  id: string;
+  source_id: string;
+  automation_signal_id: string;
+  diagnostic_request_id: string;
+  pre_fix_run_id: string;
+  post_fix_run_id: string | null;
+  finding_id: string;
+  policy_id: string;
+  action_kind: string;
+  action_payload: KubernetesFixActionPayload;
+  status: string;
+  requested_by: string;
+  dry_run_summary: Record<string, unknown> | null;
+  apply_summary: Record<string, unknown> | null;
+  error_code: string | null;
+  error_message: string | null;
+  poll_url: string;
+}
+
+export interface GetFixActionRunResponse {
+  action_run: FixActionRunResponse;
+}
+
+export interface AutomationDiagnosticRequestResult {
+  run_id: string;
+  artifact_id: string;
+  artifact_type: string;
+  target_identifier: string | null;
+  status: string;
+  severity_counts: Record<string, number>;
+  summary: string[];
+  top_actions_now: string[];
+  findings: Finding[];
+  environment_context: EnvironmentContext | null;
+  is_incomplete: boolean;
+  incomplete_reason: string | null;
+  analysis_error: string | null;
+  links: {
+    run: string;
+    report: string;
+    compare_api: string;
+  };
+}
+
+/** `GET /api/automation-agent/diagnostic-requests/[id]` — 200 body. */
+export interface GetAutomationDiagnosticRequestResponse {
+  request: {
+    id: string;
+    source_id: string;
+    status: string;
+    requested_by: string;
+    request_reason: string | null;
+    artifact_type: string;
+    created_at: string;
+    claimed_at: string | null;
+    started_at: string | null;
+    submitted_at: string | null;
+    finished_at: string | null;
+    result_run_id: string | null;
+    result_artifact_id: string | null;
+    result_analysis_status: string | null;
+    error_code: string | null;
+    error_message: string | null;
+    poll_url: string;
+  };
+  result: AutomationDiagnosticRequestResult | null;
 }
 
 /** `GET /api/agent/jobs/next` successful body. */

@@ -128,6 +128,13 @@ export async function POST(request: NextRequest) {
           capabilities: Array.isArray(body.capabilities) ?
             body.capabilities.filter((x): x is string => typeof x === "string")
           : undefined,
+          automation_enabled:
+            typeof body.automation_enabled === "boolean" ? body.automation_enabled : undefined,
+          auto_fix_enabled:
+            typeof body.auto_fix_enabled === "boolean" ? body.auto_fix_enabled : undefined,
+          allowed_fix_policy_ids: Array.isArray(body.allowed_fix_policy_ids) ?
+            body.allowed_fix_policy_ids.filter((x): x is string => typeof x === "string")
+          : undefined,
           attributes:
             body.attributes && typeof body.attributes === "object" && body.attributes !== null ?
               (body.attributes as Record<string, unknown>)

@@ -91,6 +91,23 @@ Restart the dev server, open **`/sources`**, and sign in at **`/sources/login`**
 
 **External agent (Phase 6d):** after you create a source in **`/sources`**, use **Enroll agent** (or `POST /api/agent/registrations` with the admin Bearer) to get a **source-bound agent token**. That token is used as `Authorization: Bearer <agent_token>` on `POST /api/agent/heartbeat`, `GET /api/agent/jobs/next`, and the collection-job **claim / start / fail / artifact** routes documented in [`api-contract.md`](./api-contract.md).
 
+**External automation agent:** if another AI agent should be able to request diagnostics and read findings back for one monitored Source, enroll a separate **automation-agent token** with `POST /api/automation-agent/registrations`. That actor connects to SignalForge over HTTP, not as an in-process plugin, and it stays separate from the execution-plane agent. The easiest bootstrap path is [`scripts/signalforge-automation-agent.sh`](../scripts/signalforge-automation-agent.sh):
+
+```bash
+./scripts/signalforge-automation-agent.sh register <source-id> --display-name openclaw --print-exports
+./scripts/signalforge-automation-agent.sh request --reason "investigate target drift"
+```
+
+Use [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md) for the full connection model and workflow.
+
+If you want to prove the full automation-agent plus execution-agent loop locally in one command, run:
+
+```bash
+bun run smoke:automation-agent
+```
+
+That smoke script starts a temporary local app by default, drives both actor contracts over HTTP, uploads a real fixture, and prints the resulting `run_id`.
+
 For operators, the preferred deployment is a long-lived agent service near the execution surface. For Linux host collection, that means a `systemd` service on the target VM, not repeated manual `once` runs from a shell session.
 
 Before attempting job-driven collection, make sure the execution environment has:

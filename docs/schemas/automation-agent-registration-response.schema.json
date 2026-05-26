@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/automation-agent-registration-response.schema.json",
+  "title": "Automation-agent registration response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "automation_agent_id": { "type": "string" },
+    "source_id": { "type": "string" },
+    "token": { "type": "string" },
+    "token_prefix": { "type": "string" }
+  },
+  "required": ["automation_agent_id", "source_id", "token", "token_prefix"]
+}

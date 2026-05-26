@@ -15,14 +15,17 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 
 1. [`api-contract.md`](./api-contract.md)
 2. [`external-submit.md`](./external-submit.md)
-3. [`schemas/README.md`](./schemas/README.md)
+3. [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md)
+4. [`schemas/README.md`](./schemas/README.md)
 
 ### I operate Sources, agents, or collection jobs
 
 1. [`operators/README.md`](./operators/README.md)
 2. [`operators/sources-and-agents.md`](./operators/sources-and-agents.md)
-3. [`operators/collection-paths.md`](./operators/collection-paths.md)
-4. [`agent-deployment.md`](./agent-deployment.md)
+3. [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md)
+4. [`operators/autonomous-kubernetes-actions.md`](./operators/autonomous-kubernetes-actions.md)
+5. [`operators/collection-paths.md`](./operators/collection-paths.md)
+6. [`agent-deployment.md`](./agent-deployment.md)
 
 ### I am an agent working in the repo
 
@@ -38,11 +41,16 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`getting-started.md`](./getting-started.md) | Beginner-friendly setup and first successful run |
 | [`operators/README.md`](./operators/README.md) | Operator docs entrypoint for Sources, agents, collection jobs, and current execution guidance |
 | [`operators/sources-and-agents.md`](./operators/sources-and-agents.md) | Sources UI, enrollment, collection-job lifecycle, and the control-plane / execution-plane split |
+| [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md) | Source-bound automation-agent setup, HTTP connection model, and helper-script workflow for external AI agents |
+| [`operators/autonomous-kubernetes-actions.md`](./operators/autonomous-kubernetes-actions.md) | Autonomous Kubernetes signal and safe-fix action model, including trust boundaries and required capabilities |
+| [`../examples/automation_agent_client.py`](../examples/automation_agent_client.py) | Minimal dependency-free example client for Codex- or OpenClaw-style agents consuming the automation-agent API |
+| [`../examples/openclaw_recommendation_handoff.py`](../examples/openclaw_recommendation_handoff.py) | Recommendation-only OpenClaw-style handoff builder that wraps SignalForge summaries without granting execution rights |
 | [`operators/collection-paths.md`](./operators/collection-paths.md) | Honest push-first vs job-driven collection guidance by environment |
 | [`operators/job-scoped-collection.md`](./operators/job-scoped-collection.md) | Typed collection-scope model, source defaults, job overrides, and remaining cross-repo limits |
 | [`agent-deployment.md`](./agent-deployment.md) | Preferred `signalforge-agent` deployment model, trust boundaries, and security baseline |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
+| [`../scripts/smoke-automation-agent-local.sh`](../scripts/smoke-automation-agent-local.sh) | One-command local end-to-end smoke for automation-agent request, execution-agent fulfillment, and findings polling |
 | [`history.md`](./history.md) | Running project history log for milestones, migration triggers, validations, and major operating decisions |
 | [`ui-system-direction.md`](./ui-system-direction.md) | Current UI-system decision, including how SignalForge should treat `shadcn/ui` versus the existing `sf-*` design primitives |
 | [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |

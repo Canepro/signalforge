@@ -169,6 +169,49 @@ Run these checks against the ACA app hostname:
 11. verify the host job reaches `submitted` with `result_analysis_status=complete`
 12. verify the Kubernetes job reaches `submitted` with `result_analysis_status=complete`
 
+## Cost-saving idle mode
+
+The normal ACA cost posture is `minReplicas=0`. That only saves idle compute when nothing is calling the app.
+
+Long-running `signalforge-agent` deployments intentionally keep polling SignalForge for work. That is the right posture when immediate job-driven collection matters, but it can also keep the ACA app warm even when no jobs are queued. Use idle mode when operator responsiveness is less important than lowering baseline ACA spend.
+
+For the current OKE helper deployment:
+
+```bash
+kubectl --context oke-cluster -n signalforge scale deployment/signalforge-agent --replicas=0
+```
+
+Verify that the helper is paused:
+
+```bash
+kubectl --context oke-cluster -n signalforge get deploy signalforge-agent
+kubectl --context oke-cluster -n signalforge get pods
+```
+
+Then watch ACA from the control plane without calling the app URL:
+
+```bash
+az containerapp revision show \
+  -g rg-canepro-ph-dev-eus \
+  -n ca-signalforge \
+  --revision <active-revision> \
+  --query '{replicas:properties.replicas,runningState:properties.runningState,healthState:properties.healthState}' \
+  -o json
+```
+
+Wait at least the app's configured scale cooldown before concluding whether it reached zero replicas. The current app cooldown is 300 seconds.
+
+Do not use the browser, `curl`, `scripts/check-aca-app.sh`, or `az containerapp logs show` during the observation window. Those commands can create app traffic or connect to the running container and make the scale-to-zero result ambiguous.
+
+Resume job-driven collection when needed:
+
+```bash
+kubectl --context oke-cluster -n signalforge scale deployment/signalforge-agent --replicas=1
+kubectl --context oke-cluster -n signalforge rollout status deployment/signalforge-agent
+```
+
+Record the pause time, resume time, active ACA revision, and observed replica samples in the GitHub issue or ops notes. If ACA stays at one replica after the helper is paused and no app traffic has occurred for longer than the cooldown, treat that as evidence of another warm traffic source before changing the ACA min-replica policy.
+
 ## Optional public custom domain
 
 If the operator wants a stable public hostname, bind it directly to the ACA app after the default ACA hostname is healthy.

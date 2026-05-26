@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { updateSourceAction } from "../../actions";
 import { CollectionScopeFields } from "../../collection-scope-fields";
+import { POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT } from "@/lib/automation/fix-policy";
 import type { CollectionScope } from "@/lib/collection-scope";
 import type { ArtifactType } from "@/lib/source-catalog";
 
@@ -12,6 +13,9 @@ interface SourceSettingsFormProps {
   artifactType: ArtifactType;
   collectorVersion: string | null;
   defaultCollectionScope: CollectionScope | null;
+  automationEnabled: boolean;
+  autoFixEnabled: boolean;
+  allowedFixPolicyIds: string[];
   enabled: boolean;
 }
 
@@ -21,6 +25,9 @@ export function SourceSettingsForm({
   artifactType,
   collectorVersion,
   defaultCollectionScope,
+  automationEnabled,
+  autoFixEnabled,
+  allowedFixPolicyIds,
   enabled,
 }: SourceSettingsFormProps) {
   const [isPending, startTransition] = useTransition();
@@ -73,6 +80,53 @@ export function SourceSettingsForm({
         emptyLabel="No default scope"
         caption="Optional. Jobs requested without an explicit override will inherit this scope."
       />
+      {artifactType === "kubernetes-bundle" ? (
+        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3">
+          <p className="sf-field-label">Automation</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-center gap-3">
+              <span className="relative inline-flex items-center">
+                <input type="hidden" name="automation_enabled" value="0" />
+                <input
+                  type="checkbox"
+                  name="automation_enabled"
+                  value="1"
+                  defaultChecked={automationEnabled}
+                  className="peer sr-only"
+                />
+                <span className="block h-5 w-9 rounded-full bg-outline-variant/30 peer-checked:bg-primary transition-colors" />
+                <span className="absolute left-0.5 top-0.5 block h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+              </span>
+              <span className="text-sm font-medium text-on-surface">Signal automation</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-3">
+              <span className="relative inline-flex items-center">
+                <input type="hidden" name="auto_fix_enabled" value="0" />
+                <input
+                  type="checkbox"
+                  name="auto_fix_enabled"
+                  value="1"
+                  defaultChecked={autoFixEnabled}
+                  className="peer sr-only"
+                />
+                <span className="block h-5 w-9 rounded-full bg-outline-variant/30 peer-checked:bg-primary transition-colors" />
+                <span className="absolute left-0.5 top-0.5 block h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+              </span>
+              <span className="text-sm font-medium text-on-surface">Autonomous safe fixes</span>
+            </label>
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-sm text-on-surface-variant">
+            <input
+              type="checkbox"
+              name="allowed_fix_policy_ids"
+              value={POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT}
+              defaultChecked={allowedFixPolicyIds.includes(POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT)}
+              className="h-4 w-4 rounded border-outline-variant text-primary"
+            />
+            Disable service-account token automount
+          </label>
+        </div>
+      ) : null}
       <div className="flex items-center justify-between">
         <label className="flex cursor-pointer items-center gap-3">
           <span className="relative inline-flex items-center">

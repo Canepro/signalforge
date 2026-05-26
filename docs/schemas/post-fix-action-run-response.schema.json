@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/post-fix-action-run-response.schema.json",
+  "title": "Fix action run accepted response",
+  "type": "object",
+  "required": ["action_run_id", "source_id", "status", "policy_id", "action_kind", "action_payload", "poll_url"],
+  "properties": {
+    "action_run_id": { "type": "string" },
+    "source_id": { "type": "string" },
+    "status": { "const": "queued" },
+    "policy_id": { "type": "string" },
+    "action_kind": { "type": "string" },
+    "action_payload": { "$ref": "#/$defs/kubernetesFixActionPayload" },
+    "poll_url": { "type": "string" }
+  },
+  "$defs": {
+    "kubernetesFixActionPayload": {
+      "type": "object",
+      "required": ["kind", "policy_id", "action_kind", "target", "patch_template", "changed_fields"],
+      "properties": {
+        "kind": { "const": "kubernetes_safe_patch" },
+        "policy_id": { "type": "string" },
+        "action_kind": { "const": "kubernetes_patch" },
+        "target": {
+          "type": "object",
+          "required": ["api_version", "kind", "namespace", "name", "resource"],
+          "properties": {
+            "api_version": { "type": "string" },
+            "kind": { "type": "string" },
+            "namespace": { "type": "string" },
+            "name": { "type": "string" },
+            "resource": { "type": "string" },
+            "kubectl_context": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "patch_template": {
+          "type": "object",
+          "required": ["kind", "patch_type", "manifest"],
+          "properties": {
+            "kind": { "const": "kubernetes_patch_template" },
+            "patch_type": { "const": "server_side_apply" },
+            "manifest": { "type": "object" }
+          },
+          "additionalProperties": false
+        },
+        "changed_fields": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -34,12 +34,13 @@
         { "$ref": "./collection-scope.schema.json" },
         { "type": "null" }
       ]
-    }
+    },
+    "trigger_signal_id": { "type": ["string", "null"] }
   },
   "required": [
     "id", "source_id", "artifact_type", "status", "requested_by", "request_reason", "priority", "idempotency_key",
     "lease_owner_id", "lease_owner_instance_id", "lease_expires_at", "last_heartbeat_at", "result_artifact_id", "result_run_id",
     "error_code", "error_message", "created_at", "updated_at", "queued_at", "claimed_at", "started_at", "submitted_at",
-    "finished_at", "result_analysis_status", "collection_scope"
+    "finished_at", "result_analysis_status", "collection_scope", "trigger_signal_id"
   ]
 }

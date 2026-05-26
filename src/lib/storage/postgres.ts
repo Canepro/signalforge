@@ -19,7 +19,12 @@ import { compareFindingsDrift, type FindingsDriftResult } from "@/lib/compare/fi
 import { buildEvidenceDelta } from "@/lib/compare/evidence-delta";
 import type {
   AgentsStore,
+  AutomationSignalView,
+  AutomationSignalsStore,
+  AutomationAgentsStore,
   CollectionJobView,
+  FixActionRunView,
+  FixActionRunsStore,
   JobsStore,
   PersistAnalyzedRunInput,
   PersistAnalyzedRunResult,
@@ -30,6 +35,7 @@ import type {
   Storage,
   StorageTx,
 } from "./contract";
+import { KUBERNETES_SAFE_FIX_CAPABILITY } from "@/lib/automation/fix-policy";
 import {
   mapRunSummaryRow,
   parseFindingsFromReportJson,
@@ -58,6 +64,8 @@ import {
   hashAgentToken,
   type AgentRegistrationCreated,
   type AgentRegistrationRow,
+  type AutomationAgentRegistrationCreated,
+  type AutomationAgentRegistrationRow,
   type ApplyAgentHeartbeatResult,
   type ListNextQueuedJobsResult,
   type PatchSourceInput,
@@ -100,6 +108,9 @@ type PgSourceRow = {
   attributes_json: string;
   labels_json: string;
   default_collection_scope_json: string | null;
+  automation_enabled: boolean;
+  auto_fix_enabled: boolean;
+  allowed_fix_policy_ids_json: string;
   enabled: boolean;
   last_seen_at: string | null;
   health_status: string;
@@ -133,6 +144,7 @@ type PgCollectionJobRow = {
   finished_at: string | null;
   result_analysis_status: string | null;
   collection_scope_json: string | null;
+  trigger_signal_id: string | null;
 };
 
 type PgAgentRegistrationRow = {
@@ -145,6 +157,22 @@ type PgAgentRegistrationRow = {
   last_heartbeat_at: string | null;
   last_agent_version: string | null;
   last_instance_id: string | null;
+};
+
+type PgAutomationAgentRegistrationRow = {
+  id: string;
+  source_id: string;
+  token_hash: string;
+  display_name: string | null;
+  created_at: string;
+};
+
+type PgAutomationSignalRow = AutomationSignalView;
+
+type PgFixActionRunRow = Omit<FixActionRunView, "action_payload" | "dry_run_summary" | "apply_summary"> & {
+  action_payload_json: string;
+  dry_run_summary_json: string | null;
+  apply_summary_json: string | null;
 };
 
 function parseJson<T>(raw: string | null, fallback: T): T {
@@ -187,6 +215,9 @@ function sourceToView(row: PgSourceRow): SourceView {
     attributes: parseJson<Record<string, unknown>>(row.attributes_json, {}),
     labels: parseJson<Record<string, string>>(row.labels_json, {}),
     default_collection_scope: parseCollectionScopeJson(row.default_collection_scope_json),
+    automation_enabled: Boolean(row.automation_enabled),
+    auto_fix_enabled: Boolean(row.auto_fix_enabled),
+    allowed_fix_policy_ids: parseJson<string[]>(row.allowed_fix_policy_ids_json, []),
     enabled: Boolean(row.enabled),
     last_seen_at: row.last_seen_at,
     health_status: row.health_status,
@@ -209,6 +240,9 @@ function sourceToHeartbeatRow(row: PgSourceRow): SourceRow {
     attributes_json: row.attributes_json,
     labels_json: row.labels_json,
     default_collection_scope_json: row.default_collection_scope_json,
+    automation_enabled: row.automation_enabled ? 1 : 0,
+    auto_fix_enabled: row.auto_fix_enabled ? 1 : 0,
+    allowed_fix_policy_ids_json: row.allowed_fix_policy_ids_json,
     enabled: row.enabled ? 1 : 0,
     last_seen_at: row.last_seen_at,
     health_status: row.health_status,
@@ -258,7 +292,35 @@ function jobToView(row: PgCollectionJobRow): CollectionJobView {
     finished_at: row.finished_at,
     result_analysis_status: row.result_analysis_status,
     collection_scope: parseCollectionScopeJson(row.collection_scope_json),
+    trigger_signal_id: row.trigger_signal_id,
   };
+}
+
+function fixActionToView(row: PgFixActionRunRow): FixActionRunView {
+  const { action_payload_json, dry_run_summary_json, apply_summary_json, ...rest } = row;
+  const legacyPayload = { kind: "legacy_unavailable" } as unknown as FixActionRunView["action_payload"];
+  return {
+    ...rest,
+    action_payload: parseJson(action_payload_json, legacyPayload),
+    dry_run_summary: parseJson<Record<string, unknown> | null>(dry_run_summary_json, null),
+    apply_summary: parseJson<Record<string, unknown> | null>(apply_summary_json, null),
+  };
+}
+
+function actionableSignalFindings(findings: Finding[]): Finding[] {
+  return findings.filter(
+    (finding) =>
+      ["critical", "high"].includes(finding.severity) &&
+      finding.title.toLowerCase().includes("automatically mounts service account tokens")
+  );
+}
+
+function signalDedupeKey(sourceId: string, artifactType: string, finding: Finding): string {
+  return [sourceId, artifactType, finding.id, finding.title].join("|");
+}
+
+function isLeaseValid(row: { lease_expires_at: string | null }, nowIso: string): boolean {
+  return Boolean(row.lease_expires_at && row.lease_expires_at > nowIso);
 }
 
 function emptyDrift(): FindingsDriftResult {
@@ -762,11 +824,12 @@ class PostgresSourcesStore implements SourcesStore {
       `INSERT INTO sources (
         id, display_name, target_identifier, target_identifier_norm, source_type, expected_artifact_type,
         default_collector_type, default_collector_version, capabilities_json, attributes_json, labels_json,
-        default_collection_scope_json, enabled, last_seen_at, health_status, created_at, updated_at
+        default_collection_scope_json, automation_enabled, auto_fix_enabled, allowed_fix_policy_ids_json,
+        enabled, last_seen_at, health_status, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
-        $12, $13, NULL, 'unknown', $14, $15
+        $12, $13, $14, $15, $16, NULL, 'unknown', $17, $18
       )`,
       [
         id,
@@ -781,6 +844,9 @@ class PostgresSourcesStore implements SourcesStore {
         JSON.stringify(input.attributes ?? {}),
         JSON.stringify(input.labels ?? {}),
         defaultCollectionScope ? JSON.stringify(defaultCollectionScope) : null,
+        input.automation_enabled === true,
+        input.auto_fix_enabled === true,
+        JSON.stringify(input.allowed_fix_policy_ids ?? []),
         input.enabled !== false,
         now,
         now,
@@ -817,6 +883,14 @@ class PostgresSourcesStore implements SourcesStore {
         patch.default_collection_scope !== undefined ?
           patch.default_collection_scope ? JSON.stringify(patch.default_collection_scope) : null
         : row.default_collection_scope_json,
+      automation_enabled:
+        patch.automation_enabled !== undefined ? patch.automation_enabled : Boolean(row.automation_enabled),
+      auto_fix_enabled:
+        patch.auto_fix_enabled !== undefined ? patch.auto_fix_enabled : Boolean(row.auto_fix_enabled),
+      allowed_fix_policy_ids_json:
+        patch.allowed_fix_policy_ids !== undefined ?
+          JSON.stringify(patch.allowed_fix_policy_ids)
+        : row.allowed_fix_policy_ids_json,
       enabled:
         patch.enabled !== undefined ? patch.enabled : Boolean(row.enabled),
     };
@@ -840,9 +914,12 @@ class PostgresSourcesStore implements SourcesStore {
         labels_json = $5,
         attributes_json = $6,
         default_collection_scope_json = $7,
-        enabled = $8,
-        updated_at = $9
-       WHERE id = $10`,
+        automation_enabled = $8,
+        auto_fix_enabled = $9,
+        allowed_fix_policy_ids_json = $10,
+        enabled = $11,
+        updated_at = $12
+       WHERE id = $13`,
       [
         next.display_name,
         next.default_collector_type,
@@ -851,6 +928,9 @@ class PostgresSourcesStore implements SourcesStore {
         next.labels_json,
         next.attributes_json,
         next.default_collection_scope_json,
+        next.automation_enabled,
+        next.auto_fix_enabled,
+        next.allowed_fix_policy_ids_json,
         next.enabled,
         now,
         id,
@@ -878,6 +958,9 @@ class PostgresSourcesStore implements SourcesStore {
     }
 
     await this.q.query("DELETE FROM agent_registrations WHERE source_id = $1", [id]);
+    await this.q.query("DELETE FROM automation_agent_registrations WHERE source_id = $1", [id]);
+    await this.q.query("DELETE FROM fix_action_runs WHERE source_id = $1", [id]);
+    await this.q.query("DELETE FROM automation_signals WHERE source_id = $1", [id]);
     await this.q.query("DELETE FROM collection_jobs WHERE source_id = $1", [id]);
     await this.q.query("DELETE FROM sources WHERE id = $1", [id]);
 
@@ -916,6 +999,8 @@ class PostgresJobsStore implements JobsStore {
       priority?: number;
       idempotency_key?: string | null;
       collection_scope?: CollectionScope | null;
+      requested_by?: string | null;
+      trigger_signal_id?: string | null;
     }
   ) {
     const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
@@ -961,12 +1046,13 @@ class PostgresJobsStore implements JobsStore {
     await this.q.query(
       `INSERT INTO collection_jobs (
         id, source_id, artifact_type, status, requested_by, request_reason, priority,
-        idempotency_key, created_at, updated_at, queued_at, collection_scope_json
-      ) VALUES ($1, $2, $3, 'queued', 'operator', $4, $5, $6, $7, $8, $9, $10)`,
+        idempotency_key, created_at, updated_at, queued_at, collection_scope_json, trigger_signal_id
+      ) VALUES ($1, $2, $3, 'queued', $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         id,
         sourceId,
         source.expected_artifact_type,
+        input.requested_by?.trim() || "operator",
         input.request_reason?.trim() ?? null,
         input.priority ?? 0,
         input.idempotency_key?.trim() ?? null,
@@ -974,6 +1060,7 @@ class PostgresJobsStore implements JobsStore {
         now,
         now,
         collectionScope ? JSON.stringify(collectionScope) : null,
+        input.trigger_signal_id?.trim() ?? null,
       ]
     );
     const row = (await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [id]))!;
@@ -1273,6 +1360,24 @@ class PostgresJobsStore implements JobsStore {
       return { ok: false as const, code: "conflict" };
     }
     emitDomainEvent("collection_job.submitted", { job_id: input.jobId, artifact_id: artifact.id, run_id: run.id, occurred_at: nowIso });
+    if (run.status === "complete" && input.artifactType === "kubernetes-bundle") {
+      const findings = input.analysis.report?.findings ?? [];
+      await new PostgresAutomationSignalsStore(this.q).upsertFromRun({
+        sourceId: input.sourceId,
+        runId: run.id,
+        artifactType: input.artifactType,
+        findings,
+      });
+      if (job.requested_by.startsWith("fix_action_run:")) {
+        const actionRunId = job.requested_by.slice("fix_action_run:".length);
+        await new PostgresFixActionRunsStore(this.q).linkPostFixRun({
+          actionRunId,
+          sourceId: input.sourceId,
+          runId: run.id,
+          findings,
+        });
+      }
+    }
     const submitted = await one<PgCollectionJobRow>(this.q, "SELECT * FROM collection_jobs WHERE id = $1", [input.jobId]);
     return { ok: true as const, job: jobToView(submitted!), run_id: run.id, artifact_id: artifact.id, run_status: run.status };
   }
@@ -1442,6 +1547,396 @@ class PostgresAgentsStore implements AgentsStore {
   }
 }
 
+class PostgresAutomationAgentsStore implements AutomationAgentsStore {
+  constructor(private readonly q: Queryable) {}
+
+  async getRegistrationBySourceId(sourceId: string) {
+    return one<PgAutomationAgentRegistrationRow>(
+      this.q,
+      "SELECT * FROM automation_agent_registrations WHERE source_id = $1",
+      [sourceId]
+    );
+  }
+
+  async resolveRequestContextByTokenHash(tokenHash: string) {
+    const registration = await one<PgAutomationAgentRegistrationRow>(
+      this.q,
+      "SELECT * FROM automation_agent_registrations WHERE token_hash = $1",
+      [tokenHash]
+    );
+    if (!registration) return null;
+    const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [
+      registration.source_id,
+    ]);
+    if (!source) return null;
+    return { registration, source: sourceToView(source) };
+  }
+
+  async createRegistration(
+    sourceId: string,
+    displayName?: string | null
+  ): Promise<AutomationAgentRegistrationCreated> {
+    const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
+    if (!source) {
+      const err = new Error("source_not_found");
+      (err as Error & { code: string }).code = "source_not_found";
+      throw err;
+    }
+    const existing = await one<PgAutomationAgentRegistrationRow>(
+      this.q,
+      "SELECT * FROM automation_agent_registrations WHERE source_id = $1",
+      [sourceId]
+    );
+    if (existing) {
+      const err = new Error("already_registered");
+      (err as Error & { code: string }).code = "automation_agent_already_registered";
+      throw err;
+    }
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const plainToken = generateAgentToken();
+    const tokenHash = hashAgentToken(plainToken);
+    const token_prefix = plainToken.slice(0, 8);
+    await this.q.query(
+      `INSERT INTO automation_agent_registrations (id, source_id, token_hash, display_name, created_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, sourceId, tokenHash, displayName?.trim() ?? null, now]
+    );
+    return {
+      row: (await one<PgAutomationAgentRegistrationRow>(
+        this.q,
+        "SELECT * FROM automation_agent_registrations WHERE id = $1",
+        [id]
+      ))!,
+      plainToken,
+      token_prefix,
+    };
+  }
+}
+
+class PostgresAutomationSignalsStore implements AutomationSignalsStore {
+  constructor(private readonly q: Queryable) {}
+
+  async listNextForSource(sourceId: string, limit: number) {
+    return many<PgAutomationSignalRow>(
+      this.q,
+      `SELECT * FROM automation_signals
+       WHERE source_id = $1 AND status = 'open'
+       ORDER BY last_seen_at DESC
+       LIMIT $2`,
+      [sourceId, Math.min(50, Math.max(1, Math.floor(limit)))]
+    );
+  }
+
+  async getById(id: string) {
+    return one<PgAutomationSignalRow>(this.q, "SELECT * FROM automation_signals WHERE id = $1", [id]);
+  }
+
+  async markDiagnosticRequested(id: string, sourceId: string) {
+    const now = new Date().toISOString();
+    await this.q.query(
+      `UPDATE automation_signals
+       SET status = 'diagnostic_requested', updated_at = $1
+       WHERE id = $2 AND source_id = $3 AND status = 'open'`,
+      [now, id, sourceId]
+    );
+    return this.getById(id);
+  }
+
+  async upsertFromRun(input: {
+    sourceId: string;
+    runId: string;
+    artifactType: string;
+    findings: Finding[];
+  }) {
+    const now = new Date().toISOString();
+    const out: AutomationSignalView[] = [];
+    for (const finding of actionableSignalFindings(input.findings)) {
+      const dedupeKey = signalDedupeKey(input.sourceId, input.artifactType, finding);
+      const existing = await one<PgAutomationSignalRow>(
+        this.q,
+        "SELECT * FROM automation_signals WHERE dedupe_key = $1",
+        [dedupeKey]
+      );
+      if (existing) {
+        await this.q.query(
+          `UPDATE automation_signals
+           SET run_id = $1, severity = $2, category = $3,
+               status = CASE WHEN status = 'resolved' THEN 'open' ELSE status END,
+               updated_at = $4, last_seen_at = $5
+           WHERE id = $6`,
+          [input.runId, finding.severity, finding.category, now, now, existing.id]
+        );
+        const updated = await this.getById(existing.id);
+        if (updated) out.push(updated);
+        continue;
+      }
+      const id = randomUUID();
+      await this.q.query(
+        `INSERT INTO automation_signals (
+          id, source_id, run_id, artifact_type, finding_id, finding_title, severity, category,
+          signal_type, status, dedupe_key, created_at, updated_at, last_seen_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'top_finding', 'open', $9, $10, $11, $12)`,
+        [
+          id,
+          input.sourceId,
+          input.runId,
+          input.artifactType,
+          finding.id,
+          finding.title,
+          finding.severity,
+          finding.category,
+          dedupeKey,
+          now,
+          now,
+          now,
+        ]
+      );
+      const inserted = await this.getById(id);
+      if (inserted) out.push(inserted);
+    }
+    return out;
+  }
+
+  async markActionQueued(id: string, sourceId: string) {
+    const now = new Date().toISOString();
+    await this.q.query(
+      `UPDATE automation_signals SET status = 'action_queued', updated_at = $1
+       WHERE id = $2 AND source_id = $3`,
+      [now, id, sourceId]
+    );
+    return this.getById(id);
+  }
+
+  async markResolvedIfFindingAbsent(input: {
+    signalId: string;
+    sourceId: string;
+    runId: string;
+    findings: Finding[];
+  }) {
+    const signal = await this.getById(input.signalId);
+    if (!signal || signal.source_id !== input.sourceId) return null;
+    if (input.findings.some((finding) => finding.id === signal.finding_id)) return signal;
+    const now = new Date().toISOString();
+    await this.q.query(
+      `UPDATE automation_signals
+       SET status = 'resolved', run_id = $1, updated_at = $2, last_seen_at = $3
+       WHERE id = $4 AND source_id = $5`,
+      [input.runId, now, now, input.signalId, input.sourceId]
+    );
+    return this.getById(input.signalId);
+  }
+}
+
+class PostgresFixActionRunsStore implements FixActionRunsStore {
+  constructor(private readonly q: Queryable) {}
+
+  async getById(id: string) {
+    const row = await one<PgFixActionRunRow>(this.q, "SELECT * FROM fix_action_runs WHERE id = $1", [id]);
+    return row ? fixActionToView(row) : null;
+  }
+
+  async listForSource(sourceId: string, limit: number) {
+    const rows = await many<PgFixActionRunRow>(
+      this.q,
+      "SELECT * FROM fix_action_runs WHERE source_id = $1 ORDER BY created_at DESC LIMIT $2",
+      [sourceId, Math.min(100, Math.max(1, Math.floor(limit)))]
+    );
+    return rows.map(fixActionToView);
+  }
+
+  async create(input: Parameters<FixActionRunsStore["create"]>[0]) {
+    if (input.idempotencyKey?.trim()) {
+      const existing = await one<PgFixActionRunRow>(
+        this.q,
+        `SELECT * FROM fix_action_runs
+         WHERE source_id = $1 AND idempotency_key = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [input.sourceId, input.idempotencyKey.trim()]
+      );
+      if (existing) return { row: fixActionToView(existing), inserted: false };
+    }
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    await this.q.query(
+      `INSERT INTO fix_action_runs (
+        id, source_id, automation_signal_id, diagnostic_request_id, pre_fix_run_id,
+        finding_id, policy_id, action_kind, action_payload_json, status, requested_by, idempotency_key,
+        created_at, updated_at, queued_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'queued', $10, $11, $12, $13, $14)`,
+      [
+        id,
+        input.sourceId,
+        input.signalId,
+        input.diagnosticRequestId,
+        input.preFixRunId,
+        input.findingId,
+        input.policyId,
+        input.actionKind,
+        JSON.stringify(input.actionPayload),
+        input.requestedBy,
+        input.idempotencyKey?.trim() ?? null,
+        now,
+        now,
+        now,
+      ]
+    );
+    await new PostgresAutomationSignalsStore(this.q).markActionQueued(input.signalId, input.sourceId);
+    return { row: (await this.getById(id))!, inserted: true };
+  }
+
+  async listNextForAgent(sourceId: string, registrationId: string, limit: number) {
+    const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
+    const registration = await one<PgAgentRegistrationRow>(this.q, "SELECT * FROM agent_registrations WHERE source_id = $1", [sourceId]);
+    if (!source || !registration || registration.id !== registrationId || !source.enabled) {
+      return { actions: [], gate: "source_disabled" as const };
+    }
+    if (!registration.last_heartbeat_at) return { actions: [], gate: "heartbeat_required" as const };
+    const agentCapabilities = parseJson<string[]>(registration.last_capabilities_json, []);
+    if (agentCapabilities.length === 0) return { actions: [], gate: "capabilities_empty" as const };
+    const sourceCapabilities = parseJson<string[]>(source.capabilities_json, []);
+    if (
+      !agentCapabilities.includes(KUBERNETES_SAFE_FIX_CAPABILITY) ||
+      !sourceCapabilities.includes(KUBERNETES_SAFE_FIX_CAPABILITY)
+    ) {
+      return { actions: [], gate: "capability_mismatch" as const };
+    }
+    const rows = await many<PgFixActionRunRow>(
+      this.q,
+      `SELECT * FROM fix_action_runs
+       WHERE source_id = $1 AND status = 'queued'
+       ORDER BY created_at ASC
+       LIMIT $2`,
+      [sourceId, Math.min(10, Math.max(1, Math.floor(limit)))]
+    );
+    return { actions: rows.map(fixActionToView), gate: null };
+  }
+
+  async claimForAgent(
+    actionRunId: string,
+    sourceId: string,
+    registrationId: string,
+    instanceId: string,
+    leaseTtlSeconds: number
+  ) {
+    const row = await one<PgFixActionRunRow>(this.q, "SELECT * FROM fix_action_runs WHERE id = $1", [actionRunId]);
+    if (!row) return { ok: false as const, code: "not_found" as const };
+    if (row.source_id !== sourceId) return { ok: false as const, code: "wrong_source" as const };
+    if (row.status !== "queued") return { ok: false as const, code: "not_queued" as const };
+    const now = new Date();
+    const claimedAt = now.toISOString();
+    const leaseExpiresAt = new Date(now.getTime() + leaseTtlSeconds * 1000).toISOString();
+    await this.q.query(
+      `UPDATE fix_action_runs
+       SET status = 'claimed', lease_owner_id = $1, lease_owner_instance_id = $2,
+           lease_expires_at = $3, claimed_at = $4, updated_at = $5
+       WHERE id = $6 AND source_id = $7 AND status = 'queued'`,
+      [registrationId, instanceId, leaseExpiresAt, claimedAt, claimedAt, actionRunId, sourceId]
+    );
+    return { ok: true as const, row: (await this.getById(actionRunId))! };
+  }
+
+  async startForAgent(actionRunId: string, sourceId: string, registrationId: string, instanceId: string) {
+    const row = await one<PgFixActionRunRow>(this.q, "SELECT * FROM fix_action_runs WHERE id = $1", [actionRunId]);
+    if (!row || row.source_id !== sourceId) return { ok: false as const, code: "wrong_action" as const };
+    const now = new Date().toISOString();
+    if (row.status !== "claimed") return { ok: false as const, code: "not_claimed" as const };
+    if (row.lease_owner_id !== registrationId || row.lease_owner_instance_id !== instanceId)
+      return { ok: false as const, code: "wrong_lease" as const };
+    if (!isLeaseValid(row, now)) return { ok: false as const, code: "lease_expired" as const };
+    await this.q.query(
+      "UPDATE fix_action_runs SET status = 'dry_running', started_at = $1, updated_at = $2 WHERE id = $3",
+      [now, now, actionRunId]
+    );
+    return { ok: true as const, row: (await this.getById(actionRunId))! };
+  }
+
+  async recordDryRun(input: Parameters<FixActionRunsStore["recordDryRun"]>[0]) {
+    const row = await one<PgFixActionRunRow>(this.q, "SELECT * FROM fix_action_runs WHERE id = $1", [input.actionRunId]);
+    if (!row || row.source_id !== input.sourceId) return { ok: false as const, code: "wrong_action" as const };
+    const now = new Date().toISOString();
+    if (row.status !== "dry_running") return { ok: false as const, code: "bad_state" as const };
+    if (row.lease_owner_id !== input.registrationId || row.lease_owner_instance_id !== input.instanceId)
+      return { ok: false as const, code: "wrong_lease" as const };
+    if (!isLeaseValid(row, now)) return { ok: false as const, code: "lease_expired" as const };
+    const failed = input.status === "failed";
+    await this.q.query(
+      `UPDATE fix_action_runs
+       SET status = $1, dry_run_summary_json = $2, dry_run_at = $3, updated_at = $4,
+           error_code = $5, error_message = $6, finished_at = $7
+       WHERE id = $8`,
+      [
+        failed ? "failed" : "applying",
+        JSON.stringify(input.summary),
+        now,
+        now,
+        failed ? "dry_run_failed" : null,
+        failed ? "Dry-run failed" : null,
+        failed ? now : null,
+        input.actionRunId,
+      ]
+    );
+    return { ok: true as const, row: (await this.getById(input.actionRunId))! };
+  }
+
+  async recordApply(input: Parameters<FixActionRunsStore["recordApply"]>[0]) {
+    const row = await one<PgFixActionRunRow>(this.q, "SELECT * FROM fix_action_runs WHERE id = $1", [input.actionRunId]);
+    if (!row || row.source_id !== input.sourceId) return { ok: false as const, code: "wrong_action" as const };
+    const now = new Date().toISOString();
+    if (row.status !== "applying") return { ok: false as const, code: "bad_state" as const };
+    if (row.lease_owner_id !== input.registrationId || row.lease_owner_instance_id !== input.instanceId)
+      return { ok: false as const, code: "wrong_lease" as const };
+    if (!isLeaseValid(row, now)) return { ok: false as const, code: "lease_expired" as const };
+    const failed = input.status === "failed";
+    await this.q.query(
+      `UPDATE fix_action_runs
+       SET status = $1, apply_summary_json = $2, applied_at = $3, updated_at = $4, finished_at = $5,
+           lease_owner_id = NULL, lease_owner_instance_id = NULL, lease_expires_at = NULL,
+           error_code = $6, error_message = $7
+       WHERE id = $8`,
+      [
+        failed ? "failed" : "applied",
+        JSON.stringify(input.summary),
+        now,
+        now,
+        failed ? now : null,
+        failed ? "apply_failed" : null,
+        failed ? "Apply failed" : null,
+        input.actionRunId,
+      ]
+    );
+    let postFixJob: CollectionJobView | null = null;
+    if (!failed) {
+      const queued = await new PostgresJobsStore(this.q).queueForSource(input.sourceId, {
+        requested_by: `fix_action_run:${input.actionRunId}`,
+        request_reason: `post-fix verification for ${row.policy_id}`,
+      });
+      postFixJob = queued.row;
+    }
+    return { ok: true as const, row: (await this.getById(input.actionRunId))!, postFixJob };
+  }
+
+  async linkPostFixRun(input: Parameters<FixActionRunsStore["linkPostFixRun"]>[0]) {
+    const row = await one<PgFixActionRunRow>(this.q, "SELECT * FROM fix_action_runs WHERE id = $1", [input.actionRunId]);
+    if (!row || row.source_id !== input.sourceId) return null;
+    const signal = await new PostgresAutomationSignalsStore(this.q).markResolvedIfFindingAbsent({
+      signalId: row.automation_signal_id,
+      sourceId: input.sourceId,
+      runId: input.runId,
+      findings: input.findings,
+    });
+    const now = new Date().toISOString();
+    const resolved = signal?.status === "resolved";
+    await this.q.query(
+      `UPDATE fix_action_runs
+       SET post_fix_run_id = $1, status = $2, finished_at = $3, updated_at = $4
+       WHERE id = $5`,
+      [input.runId, resolved ? "verified" : "applied", resolved ? now : row.finished_at, now, input.actionRunId]
+    );
+    return this.getById(input.actionRunId);
+  }
+}
+
 let pool: Pool | null = null;
 
 function getPool() {
@@ -1457,6 +1952,9 @@ class PostgresStorage implements Storage {
   readonly sources: SourcesStore;
   readonly jobs: JobsStore;
   readonly agents: AgentsStore;
+  readonly automationAgents: AutomationAgentsStore;
+  readonly automationSignals: AutomationSignalsStore;
+  readonly fixActionRuns: FixActionRunsStore;
   private readonly pool: Pool;
 
   constructor(q: Queryable, poolOverride?: Pool) {
@@ -1464,6 +1962,9 @@ class PostgresStorage implements Storage {
     this.sources = new PostgresSourcesStore(q);
     this.jobs = new PostgresJobsStore(q);
     this.agents = new PostgresAgentsStore(q);
+    this.automationAgents = new PostgresAutomationAgentsStore(q);
+    this.automationSignals = new PostgresAutomationSignalsStore(q);
+    this.fixActionRuns = new PostgresFixActionRunsStore(q);
     this.pool = poolOverride ?? (q as Pool);
   }
 

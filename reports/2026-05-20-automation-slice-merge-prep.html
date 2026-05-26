@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Automation Slice Merge Prep — SignalForge</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --paper: #171a20;
+      --line: #343843;
+      --ink: #f3f1e8;
+      --muted: #b9b5aa;
+      --accent: #d1a85b;
+      --good: #8fcf91;
+      --warn: #e2b15e;
+      --bad: #e07b73;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.55; }
+    .shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 56px; }
+    .status { display: inline-block; padding: 4px 10px; border: 1px solid var(--warn); color: var(--warn); border-radius: 999px; font-size: 0.85rem; font-weight: 650; }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); margin: 12px 0 8px; line-height: 1.1; }
+    h2 { margin: 28px 0 10px; font-size: 1.25rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    p, li { color: var(--muted); }
+    .lede { font-size: 1.05rem; max-width: 820px; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin: 16px 0; }
+    .verdict { border-left: 3px solid var(--accent); padding-left: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--line); padding: 9px 11px; text-align: left; vertical-align: top; }
+    th { background: #121419; color: var(--ink); }
+    code, pre { font-family: var(--mono); font-size: 0.88rem; }
+    pre { background: #121419; border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; color: #ddd; white-space: pre-wrap; }
+    .pass { color: var(--good); font-weight: 650; }
+    .warn { color: var(--warn); font-weight: 650; }
+    .fail { color: var(--bad); font-weight: 650; }
+    ul.checklist { list-style: none; padding: 0; }
+    ul.checklist li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    ul.checklist li:last-child { border-bottom: 0; }
+    a { color: var(--accent); }
+    .meta { font-size: 0.9rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="meta">2026-05-20 · implementation-closeout · SignalForge</div>
+    <span class="status">Partial — ready to commit after Postgres parity</span>
+    <h1>Autonomous Kubernetes actions — merge prep</h1>
+    <p class="lede">Validation and documentation pass for the uncommitted automation / safe-fix slice on <code>main</code>. Code tests green locally; boundary docs updated; Postgres parity still needs a local database before merge.</p>
+
+    <div class="card verdict">
+      <strong>Outcome:</strong> Slice is functionally validated (443 tests, build, automation smoke). Contract and operator docs are present. <code>AGENTS.md</code> and <code>README.md</code> now describe opt-in safe-fix vs general remediation. Remaining gate: run Postgres parity with migrations 004–006 before pushing to CI.
+    </div>
+
+    <h2>Verification run</h2>
+    <table>
+      <thead>
+        <tr><th>Check</th><th>Command</th><th>Result</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Typecheck</td><td><code>bun run typecheck</code></td><td class="pass">PASS</td></tr>
+        <tr><td>Tests</td><td><code>bun run test</code></td><td class="pass">PASS — 443/443 (53 files)</td></tr>
+        <tr><td>Build</td><td><code>bun run build</code></td><td class="pass">PASS</td></tr>
+        <tr><td>Automation E2E smoke</td><td><code>bun run smoke:automation-agent</code></td><td class="pass">PASS — register → request → claim → artifact → complete</td></tr>
+        <tr><td>Postgres parity</td><td><code>bash scripts/run-postgres-parity-local.sh</code></td><td class="warn">NOT RUN — no local Postgres URL / Podman <code>signalforge-pg</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Documentation updates (this pass)</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Change</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AGENTS.md</code></td><td>Product boundary: opt-in automation + safe-fix; refreshed status pointer; non-goals nuance; <code>bun run test</code> footnote</td></tr>
+        <tr><td><code>README.md</code></td><td>Safe-fix vs general remediation; link to operator doc</td></tr>
+      </tbody>
+    </table>
+    <p>Pre-existing operator/API docs already cover the slice: <code>docs/api-contract.md</code>, <code>docs/operators/automation-agent-integration.md</code>, <code>docs/operators/autonomous-kubernetes-actions.md</code>, and schemas under <code>docs/schemas/</code>.</p>
+
+    <h2>Slice inventory (uncommitted)</h2>
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Key paths</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Automation-agent API</td>
+          <td><code>src/app/api/automation-agent/*</code></td>
+        </tr>
+        <tr>
+          <td>Fix-action execution API</td>
+          <td><code>src/app/api/fix-action-runs/*</code>, <code>src/app/api/agent/fix-actions/next</code></td>
+        </tr>
+        <tr>
+          <td>Policy + auth</td>
+          <td><code>src/lib/automation/fix-policy.ts</code>, <code>src/lib/api/automation-agent-auth.ts</code></td>
+        </tr>
+        <tr>
+          <td>Storage + migrations</td>
+          <td><code>src/lib/storage/*</code>, <code>migrations/postgres/004–006</code></td>
+        </tr>
+        <tr>
+          <td>Sources UI</td>
+          <td><code>src/app/sources/(manage)/[id]/*</code>, settings form automation fields</td>
+        </tr>
+        <tr>
+          <td>Scripts + tests</td>
+          <td><code>scripts/signalforge-automation-agent.sh</code>, <code>scripts/smoke-automation-agent-local.sh</code>, <code>tests/api/automation-agent-routes.test.ts</code>, <code>tests/api/autonomous-kubernetes-actions.test.ts</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Git diff stat at prep time: ~30 tracked files changed, ~2143 insertions (plus untracked new routes/docs/migrations).</p>
+
+    <h2>Three-actor model (for merge message / PR)</h2>
+    <table>
+      <thead>
+        <tr><th>Actor</th><th>Token</th><th>Does</th><th>Does not</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Operator/admin</td>
+          <td><code>SIGNALFORGE_ADMIN_TOKEN</code></td>
+          <td>Sources, enroll tokens, enable automation/safe-fix flags</td>
+          <td>Run collectors or kubectl from app</td>
+        </tr>
+        <tr>
+          <td>Execution agent</td>
+          <td>Source-bound agent token</td>
+          <td>Heartbeat, claim jobs, collect, upload; optional fix-action dry-run/apply</td>
+          <td>Decide policy eligibility</td>
+        </tr>
+        <tr>
+          <td>Automation agent</td>
+          <td>Source-bound automation token</td>
+          <td>Request diagnostics, read signals, queue fix actions</td>
+          <td>Claim collection jobs or patch cluster directly</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Merge gate checklist</h2>
+    <ul class="checklist">
+      <li class="pass">✓ <code>bun run typecheck</code></li>
+      <li class="pass">✓ <code>bun run test</code> (443 tests)</li>
+      <li class="pass">✓ <code>bun run build</code></li>
+      <li class="pass">✓ <code>bun run smoke:automation-agent</code></li>
+      <li class="pass">✓ Boundary docs updated (<code>AGENTS.md</code>, <code>README.md</code>)</li>
+      <li class="pass">✓ API contract + JSON schemas present for automation/fix routes</li>
+      <li class="warn">○ Postgres parity with migrations 004–006 (CI will run this on push)</li>
+      <li>○ Stage all untracked files and commit (user action)</li>
+      <li>○ Push + open PR (user action)</li>
+    </ul>
+
+    <h2>Postgres parity — run before push</h2>
+    <pre># Option A: local Podman Postgres (see script docs)
+bash scripts/run-postgres-parity-local.sh
+
+# Option B: explicit URL
+DATABASE_URL_TEST=postgres://... bash scripts/run-postgres-parity-local.sh</pre>
+
+    <h2>Risks / notes</h2>
+    <ul>
+      <li><strong>CI Postgres job</strong> will apply migrations 004–006 on fresh <code>postgres:16-alpine</code>; local parity not verified on this workstation.</li>
+      <li><strong>One registration per source</strong> still applies to both agent types — document in PR if operators hit 409.</li>
+      <li><strong>First policy only:</strong> <code>kubernetes.disable-service-account-token-automount.v1</code> — not a general remediation engine.</li>
+      <li>Use <code>bun run test</code>, not bare <code>bun test</code>, for Vitest fake timers.</li>
+    </ul>
+
+    <h2>Suggested commit scope</h2>
+    <p>Single commit or PR titled around autonomous Kubernetes safe-fix + automation-agent integration. Include migrations, routes, storage, UI, docs, scripts, and tests together so CI parity stays coherent.</p>
+
+    <h2>What you should do next</h2>
+    <ol>
+      <li>Start local Postgres (or use CI as first parity proof if acceptable).</li>
+      <li><code>git add</code> all modified and untracked slice files.</li>
+      <li>Commit with a message focused on opt-in safe-fix + automation-agent control plane.</li>
+      <li>Push and confirm CI parity job green.</li>
+      <li>Then begin Phase 11 implementation per amended plan.</li>
+    </ol>
+  </div>
+</body>
+</html>

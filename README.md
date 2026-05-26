@@ -40,15 +40,16 @@ It currently does these things well:
 - stores immutable artifacts and per-analysis runs
 - exposes results through UI, APIs, and CLI helpers
 - supports job-driven collection through external agents and collectors
+- supports optional source-opt-in automation: external automation agents can request diagnostics; approved Kubernetes safe-fix actions run through external execution agents under deterministic policy gates
 
 It does **not** currently:
 
 - SSH into servers
 - run `kubectl` from inside the app
 - execute collectors inside the app
-- perform remediation from the current product
+- perform general remediation, accept arbitrary commands, or apply LLM-generated patches
 
-Collection stays external by design. Remediation remains deferred and would require a separate higher-trust model if introduced later.
+Collection and fix execution stay external by design. Broad remediation remains out of scope; the current safe-fix slice is narrow, source-opt-in, and policy-bounded. See [`docs/operators/autonomous-kubernetes-actions.md`](docs/operators/autonomous-kubernetes-actions.md).
 
 ## Why this matters for operators
 
@@ -112,7 +113,11 @@ If you are integrating with SignalForge:
 
 - [docs/api-contract.md](docs/api-contract.md)
 - [docs/external-submit.md](docs/external-submit.md)
+- [docs/operators/automation-agent-integration.md](docs/operators/automation-agent-integration.md)
+- [examples/automation_agent_client.py](examples/automation_agent_client.py)
+- [examples/openclaw_recommendation_handoff.py](examples/openclaw_recommendation_handoff.py)
 - [docs/schemas/README.md](docs/schemas/README.md)
+- `bun run smoke:automation-agent` for a local end-to-end automation-agent proof
 
 If you are operating Sources, agents, or collection jobs:
 
@@ -176,6 +181,8 @@ SignalForge currently supports:
 - run detail, compare, and reanalyze
 - CLI and HTTP consumption
 - Sources, collection jobs, and agent enrollment
+- source-bound automation-agent diagnostics for external AI agents over HTTP
+- autonomous Kubernetes signals and tightly allowlisted safe-fix action runs
 - external job-driven collection via `signalforge-agent`
 
 Related operator docs:
@@ -183,6 +190,7 @@ Related operator docs:
 - [docs/operators/collection-paths.md](docs/operators/collection-paths.md)
 - [docs/operators/sources-and-agents.md](docs/operators/sources-and-agents.md)
 - [docs/operators/job-scoped-collection.md](docs/operators/job-scoped-collection.md)
+- [docs/operators/autonomous-kubernetes-actions.md](docs/operators/autonomous-kubernetes-actions.md)
 - [docs/agent-deployment.md](docs/agent-deployment.md)
 
 ## LLM Provider Support

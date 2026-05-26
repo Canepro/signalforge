@@ -33,6 +33,7 @@ function baseJob(overrides: Partial<CollectionJobView> = {}): CollectionJobView 
     finished_at: null,
     result_analysis_status: null,
     collection_scope: null,
+    trigger_signal_id: null,
     ...overrides,
   };
 }

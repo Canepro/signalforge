@@ -39,12 +39,13 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 | 8d | Kubernetes findings-quality expansion: exposure, RBAC, secret, hardening, host-escape, compare normalization, deterministic platform noise, and exposure-plus-identity joins | Done |
 | 9 (repo-local) | Typed job-scoped collection parameters in SignalForge: source defaults, per-job overrides, resolved `collection_scope` in `jobs/next`, published schemas, Sources UI visibility, and contract tests | Done |
 | 9c | Frontend operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources | Done |
+| Autonomous Kubernetes actions | Source-owned automation signals, source-bound diagnostic triggers, deterministic safe-fix policy gate, fix action runs, execution-agent dry-run/apply APIs, post-fix verification, and Sources UI visibility | Done |
 
 ## Product snapshot
 
 - **Artifacts:** `linux-audit-log` (`first-audit.sh`-style host audit output), `container-diagnostics` (text-based container diagnostics for a single container or workload), and `kubernetes-bundle` (UTF-8 JSON manifest for cluster- or namespace-scoped Kubernetes evidence).
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
-- **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload).
+- **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload), and autonomous Kubernetes safe-fix actions behind explicit Source opt-in.
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations, and the committed ACA contract keeps Neon Postgres as the durable app backend.
 - **Deployment surfaces:** the repo supports local Next.js development, the committed ACA app path (`Dockerfile` + `infra/aca/main.bicep`), and optional manual Vercel previews when explicitly needed.
 - **ACA hosting:** the app path is the checked-in ACA contract, and the reference instance now runs under the durable app name `ca-signalforge`.

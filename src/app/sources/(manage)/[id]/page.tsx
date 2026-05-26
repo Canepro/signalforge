@@ -92,15 +92,17 @@ export default async function SourceDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const storage = await getStorage();
-  const { source, jobs, registration } = await storage.withTransaction(async (tx) => {
+  const { source, jobs, registration, signals, fixActions } = await storage.withTransaction(async (tx) => {
     const source = await tx.sources.getById(id);
     if (!source) {
-      return { source: null, jobs: [], registration: null };
+      return { source: null, jobs: [], registration: null, signals: [], fixActions: [] };
     }
 
     const jobs = await tx.jobs.listForSource(id);
     const registration = await tx.agents.getRegistrationBySourceId(id);
-    return { source, jobs, registration };
+    const signals = await tx.automationSignals.listNextForSource(id, 10);
+    const fixActions = await tx.fixActionRuns.listForSource(id, 10);
+    return { source, jobs, registration, signals, fixActions };
   });
   if (!source) {
     return (
@@ -370,6 +372,70 @@ export default async function SourceDetailPage({
         )}
       </section>
 
+      {source.expected_artifact_type === "kubernetes-bundle" ? (
+        <section className="sf-panel space-y-4 p-6">
+          <div>
+            <p className="sf-kicker">Autonomous actions</p>
+            <h2 className="font-headline text-lg font-bold tracking-tight text-on-surface">Signals and safe fixes</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl bg-surface-container-low px-3 py-2.5">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Signals</dt>
+              <dd className="mt-1 text-sm font-medium text-on-surface">{source.automation_enabled ? "enabled" : "disabled"}</dd>
+            </div>
+            <div className="rounded-xl bg-surface-container-low px-3 py-2.5">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Auto fix</dt>
+              <dd className="mt-1 text-sm font-medium text-on-surface">{source.auto_fix_enabled ? "enabled" : "disabled"}</dd>
+            </div>
+            <div className="rounded-xl bg-surface-container-low px-3 py-2.5">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Policies</dt>
+              <dd className="mt-1 text-sm font-medium text-on-surface">{source.allowed_fix_policy_ids.length}</dd>
+            </div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <h3 className="text-sm font-semibold text-on-surface">Open signals</h3>
+              {signals.length === 0 ? (
+                <p className="mt-2 text-sm text-on-surface-variant">No open automation signals.</p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {signals.map((signal) => (
+                    <li key={signal.id} className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-3">
+                      <p className="text-sm font-medium text-on-surface">{signal.finding_title}</p>
+                      <p className="mt-1 text-xs text-on-surface-variant">{signal.severity} · {relativeTime(signal.last_seen_at)}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-on-surface">Recent fix actions</h3>
+              {fixActions.length === 0 ? (
+                <p className="mt-2 text-sm text-on-surface-variant">No fix actions yet.</p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {fixActions.map((action) => (
+                    <li key={action.id} className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-on-surface">{action.policy_id}</p>
+                        <span className="rounded-lg bg-surface-container px-2 py-1 text-[11px] font-semibold uppercase text-on-surface-variant">
+                          {action.status}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-on-surface-variant">
+                        <span>{relativeTime(action.created_at)}</span>
+                        {action.pre_fix_run_id ? <Link href={`/runs/${action.pre_fix_run_id}`} className="font-semibold text-primary hover:underline">pre-fix run</Link> : null}
+                        {action.post_fix_run_id ? <Link href={`/runs/${action.post_fix_run_id}`} className="font-semibold text-primary hover:underline">post-fix run</Link> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* Source settings */}
       <section className="relative rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm space-y-4 overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-outline-variant/40 via-outline-variant/20 to-transparent" />
@@ -380,6 +446,9 @@ export default async function SourceDetailPage({
           artifactType={source.expected_artifact_type as ArtifactType}
           collectorVersion={source.default_collector_version ?? null}
           defaultCollectionScope={source.default_collection_scope}
+          automationEnabled={source.automation_enabled}
+          autoFixEnabled={source.auto_fix_enabled}
+          allowedFixPolicyIds={source.allowed_fix_policy_ids}
           enabled={source.enabled}
         />
         <div className="border-t border-outline-variant/15 pt-4">

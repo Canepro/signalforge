@@ -67,6 +67,17 @@ export async function PATCH(
     if (Array.isArray(body.capabilities)) {
       patch.capabilities = body.capabilities.filter((x): x is string => typeof x === "string");
     }
+    if (typeof body.automation_enabled === "boolean") {
+      patch.automation_enabled = body.automation_enabled;
+    }
+    if (typeof body.auto_fix_enabled === "boolean") {
+      patch.auto_fix_enabled = body.auto_fix_enabled;
+    }
+    if (Array.isArray(body.allowed_fix_policy_ids)) {
+      patch.allowed_fix_policy_ids = body.allowed_fix_policy_ids.filter(
+        (x): x is string => typeof x === "string"
+      );
+    }
     if (body.labels && typeof body.labels === "object" && body.labels !== null) {
       patch.labels = Object.fromEntries(
         Object.entries(body.labels as Record<string, unknown>).filter(

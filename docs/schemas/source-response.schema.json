@@ -21,6 +21,9 @@
         { "type": "null" }
       ]
     },
+    "automation_enabled": { "type": "boolean" },
+    "auto_fix_enabled": { "type": "boolean" },
+    "allowed_fix_policy_ids": { "type": "array", "items": { "type": "string" } },
     "enabled": { "type": "boolean" },
     "last_seen_at": { "type": ["string", "null"] },
     "health_status": { "type": "string" },
@@ -39,6 +42,9 @@
     "attributes",
     "labels",
     "default_collection_scope",
+    "automation_enabled",
+    "auto_fix_enabled",
+    "allowed_fix_policy_ids",
     "enabled",
     "last_seen_at",
     "health_status",

@@ -20,6 +20,8 @@ SignalForge stores and exposes:
 - queued, claimed, running, submitted, failed, cancelled, and expired collection jobs
 - resolved typed `collection_scope` on queued jobs
 - uploaded artifacts and resulting analysis runs
+- source opt-in settings for automation signals and autonomous Kubernetes safe fixes
+- automation signals and fix action runs tied back to runs, jobs, policies, and execution evidence
 
 SignalForge does not run collectors on the host or in the cluster. That execution stays external.
 
@@ -57,6 +59,18 @@ The split is intentional:
 - **signalforge-collectors**: collector scripts only
 
 This keeps SignalForge from becoming a privileged SSH, `kubectl`, or runtime-execution service.
+
+## Autonomous Kubernetes Actions
+
+Kubernetes Sources can opt in to autonomous action handling, but the execution boundary stays narrow:
+
+- SignalForge derives automation signals from deterministic high/critical Kubernetes findings.
+- An automation agent can request a fresh diagnostic run for a signal.
+- SignalForge creates a fix action only when Source automation is enabled, auto-fix is enabled, the policy id is allowlisted, and the execution agent has heartbeated with `fix:kubernetes-safe`.
+- The execution agent must dry-run first, then submit apply evidence.
+- SignalForge queues post-fix diagnostics and marks the signal resolved only when the triggering finding disappears.
+
+The first safe-fix policy is `kubernetes.disable-service-account-token-automount.v1`. It does not allow arbitrary shell, arbitrary YAML, RBAC deletion, Service exposure changes, scaling, restarts, or LLM-generated fixes.
 
 ## Normal Lifecycle
 

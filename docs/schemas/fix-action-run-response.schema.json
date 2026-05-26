@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalforge.dev/schemas/fix-action-run-response.schema.json",
+  "title": "Fix action run response",
+  "type": "object",
+  "required": ["action_run"],
+  "properties": {
+    "action_run": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_id",
+        "automation_signal_id",
+        "diagnostic_request_id",
+        "pre_fix_run_id",
+        "post_fix_run_id",
+        "finding_id",
+        "policy_id",
+        "action_kind",
+        "action_payload",
+        "status",
+        "requested_by",
+        "dry_run_summary",
+        "apply_summary",
+        "error_code",
+        "error_message",
+        "poll_url"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "source_id": { "type": "string" },
+        "automation_signal_id": { "type": "string" },
+        "diagnostic_request_id": { "type": "string" },
+        "pre_fix_run_id": { "type": "string" },
+        "post_fix_run_id": { "type": ["string", "null"] },
+        "finding_id": { "type": "string" },
+        "policy_id": { "type": "string" },
+        "action_kind": { "type": "string" },
+        "action_payload": { "$ref": "#/$defs/kubernetesFixActionPayload" },
+        "status": { "type": "string" },
+        "requested_by": { "type": "string" },
+        "dry_run_summary": { "type": ["object", "null"] },
+        "apply_summary": { "type": ["object", "null"] },
+        "error_code": { "type": ["string", "null"] },
+        "error_message": { "type": ["string", "null"] },
+        "poll_url": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "kubernetesFixActionPayload": {
+      "type": "object",
+      "required": ["kind", "policy_id", "action_kind", "target", "patch_template", "changed_fields"],
+      "properties": {
+        "kind": { "const": "kubernetes_safe_patch" },
+        "policy_id": { "type": "string" },
+        "action_kind": { "const": "kubernetes_patch" },
+        "target": {
+          "type": "object",
+          "required": ["api_version", "kind", "namespace", "name", "resource"],
+          "properties": {
+            "api_version": { "type": "string" },
+            "kind": { "type": "string" },
+            "namespace": { "type": "string" },
+            "name": { "type": "string" },
+            "resource": { "type": "string" },
+            "kubectl_context": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "patch_template": {
+          "type": "object",
+          "required": ["kind", "patch_type", "manifest"],
+          "properties": {
+            "kind": { "const": "kubernetes_patch_template" },
+            "patch_type": { "const": "server_side_apply" },
+            "manifest": { "type": "object" }
+          },
+          "additionalProperties": false
+        },
+        "changed_fields": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

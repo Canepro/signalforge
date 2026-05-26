@@ -17,11 +17,22 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Storage } from "@/lib/storage/contract";
 import { getTestSqliteStorage } from "@/lib/storage/sqlite";
+import { POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT } from "@/lib/automation/fix-policy";
 import { Pool, type PoolClient } from "pg";
 
 const FIXTURES = join(__dirname, "../fixtures");
 const SAMPLE_LOG = readFileSync(join(FIXTURES, "sample-prod-server.log"), "utf-8");
 const POSTGRES_MIGRATIONS_DIR = join(process.cwd(), "migrations", "postgres");
+const KUBE_ENVIRONMENT = {
+  hostname: "payments-cluster",
+  os: "kubernetes",
+  kernel: "n/a",
+  is_wsl: false,
+  is_container: false,
+  is_virtual_machine: false,
+  ran_as_root: false,
+  uptime: "n/a",
+};
 
 type BackendSetup = {
   name: string;
@@ -147,64 +158,62 @@ async function capturePostgresSchemaSnapshot(
 ): Promise<PostgresSchemaSnapshot> {
   await client.query(`SET search_path TO "${schema}"`);
 
-  const [tables, columns, indexes, constraints, appliedMigrations] = await Promise.all([
-    client.query<{ table_name: string }>(
-      `
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = $1 AND table_type = 'BASE TABLE'
-        ORDER BY table_name
-      `,
-      [schema]
-    ),
-    client.query<{
-      table_name: string;
-      column_name: string;
-      data_type: string;
-      is_nullable: string;
-      column_default: string | null;
-    }>(
-      `
-        SELECT table_name, column_name, data_type, is_nullable, column_default
-        FROM information_schema.columns
-        WHERE table_schema = $1
-        ORDER BY table_name, ordinal_position
-      `,
-      [schema]
-    ),
-    client.query<{
-      tablename: string;
-      indexname: string;
-      indexdef: string;
-    }>(
-      `
-        SELECT tablename, indexname, indexdef
-        FROM pg_indexes
-        WHERE schemaname = $1
-        ORDER BY tablename, indexname
-      `,
-      [schema]
-    ),
-    client.query<{
-      table_name: string;
-      constraint_name: string;
-      definition: string;
-    }>(
-      `
-        SELECT rel.relname AS table_name, con.conname AS constraint_name, pg_get_constraintdef(con.oid, true) AS definition
-        FROM pg_constraint con
-        JOIN pg_class rel ON rel.oid = con.conrelid
-        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
-        WHERE nsp.nspname = $1
-        ORDER BY rel.relname, con.conname
-      `,
-      [schema]
-    ),
-    client.query<{ filename: string; checksum: string }>(
-      "SELECT filename, checksum FROM schema_migrations ORDER BY filename",
-      []
-    ),
-  ]);
+  const tables = await client.query<{ table_name: string }>(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = $1 AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+    `,
+    [schema]
+  );
+  const columns = await client.query<{
+    table_name: string;
+    column_name: string;
+    data_type: string;
+    is_nullable: string;
+    column_default: string | null;
+  }>(
+    `
+      SELECT table_name, column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_schema = $1
+      ORDER BY table_name, ordinal_position
+    `,
+    [schema]
+  );
+  const indexes = await client.query<{
+    tablename: string;
+    indexname: string;
+    indexdef: string;
+  }>(
+    `
+      SELECT tablename, indexname, indexdef
+      FROM pg_indexes
+      WHERE schemaname = $1
+      ORDER BY tablename, indexname
+    `,
+    [schema]
+  );
+  const constraints = await client.query<{
+    table_name: string;
+    constraint_name: string;
+    definition: string;
+  }>(
+    `
+      SELECT rel.relname AS table_name, con.conname AS constraint_name, pg_get_constraintdef(con.oid, true) AS definition
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+      WHERE nsp.nspname = $1
+      ORDER BY rel.relname, con.conname
+    `,
+    [schema]
+  );
+  const appliedMigrations = await client.query<{ filename: string; checksum: string }>(
+    "SELECT filename, checksum FROM schema_migrations ORDER BY filename",
+    []
+  );
 
   return {
     tables: tables.rows,
@@ -2564,6 +2573,38 @@ for (const backend of backends) {
       ).rejects.toThrow();
     });
 
+    it("enroll automation agent and resolve by token hash", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: "Automation Host",
+          target_identifier: "parity-automation-agent-host",
+          source_type: "linux_host",
+        })
+      );
+      const { row, plainToken, token_prefix } = await storage.withTransaction((tx) =>
+        tx.automationAgents.createRegistration(src.id, "automation-agent")
+      );
+      expect(row.id).toBeTruthy();
+      expect(plainToken.length).toBeGreaterThan(20);
+      expect(token_prefix.length).toBe(8);
+
+      const { hashAgentToken } = await import("@/lib/db/source-job-repository");
+      const resolved = await storage.automationAgents.resolveRequestContextByTokenHash(
+        hashAgentToken(plainToken)
+      );
+      expect(resolved).not.toBeNull();
+      expect(resolved!.registration.id).toBe(row.id);
+      expect(resolved!.source.id).toBe(src.id);
+    });
+
+    it("duplicate automation-agent enrollment throws", async () => {
+      const list = await storage.sources.list();
+      const src = list.find((s) => s.target_identifier === "parity-automation-agent-host")!;
+      await expect(
+        storage.withTransaction((tx) => tx.automationAgents.createRegistration(src.id))
+      ).rejects.toThrow();
+    });
+
     it("reissues an existing agent token and invalidates the old one", async () => {
       const list = await storage.sources.list();
       const src = list.find((s) => s.target_identifier === "parity-agent-host")!;
@@ -2594,6 +2635,223 @@ for (const backend of backends) {
       expect(newResolved).not.toBeNull();
       expect(newResolved!.registration.id).toBe(initial.row.id);
       expect(newResolved!.source.id).toBe(src.id);
+    });
+
+    it("queueForSource persists automation-agent requested_by", async () => {
+      const list = await storage.sources.list();
+      const src = list.find((s) => s.target_identifier === "parity-automation-agent-host")!;
+      const automation = await storage.automationAgents.getRegistrationBySourceId(src.id);
+      expect(automation).not.toBeNull();
+
+      const queued = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, {
+          request_reason: "automation request",
+          requested_by: `automation_agent:${automation!.id}`,
+        })
+      );
+
+      expect(queued.row.requested_by).toBe(`automation_agent:${automation!.id}`);
+    });
+
+    it("stores automation signals and fix action dry-run/apply evidence", async () => {
+      const src = await storage.withTransaction((tx) =>
+        tx.sources.create({
+          display_name: `Automation Kube ${backend.name}`,
+          target_identifier: `parity-automation-kube-${backend.name}`,
+          source_type: "linux_host",
+          expected_artifact_type: "kubernetes-bundle",
+          capabilities: ["collect:kubernetes-bundle", "fix:kubernetes-safe"],
+          automation_enabled: true,
+          auto_fix_enabled: true,
+          allowed_fix_policy_ids: [POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT],
+        })
+      );
+      const { row: reg } = await storage.withTransaction((tx) => tx.agents.createRegistration(src.id));
+      await storage.withTransaction((tx) =>
+        tx.agents.applyHeartbeat({
+          sourceId: src.id,
+          registrationId: reg.id,
+          capabilities: ["collect:kubernetes-bundle", "fix:kubernetes-safe"],
+          attributes: {},
+          agentVersion: "0.1.0",
+          activeJobId: null,
+          instanceId: null,
+        })
+      );
+      const run = await storage.runs.persistAnalyzedRun({
+        artifactType: "kubernetes-bundle",
+        sourceType: "agent",
+        filename: "bundle.json",
+        content: "{}",
+        ingestion: {
+          target_identifier: src.target_identifier,
+          source_label: null,
+          collector_type: null,
+          collector_version: null,
+          collected_at: null,
+        },
+        analysis: {
+          report: {
+            summary: ["kube"],
+            findings: [
+              {
+                id: "KUBE_TOKEN_AUTOMOUNT",
+                title: "Workload automatically mounts service account tokens",
+                severity: "high",
+                category: "identity",
+                section_source: "workloads",
+                evidence: JSON.stringify({
+                  namespace: "payments",
+                  name: "payments-api",
+                  kind: "Deployment",
+                  pod_spec: { automountServiceAccountToken: true },
+                }),
+                why_it_matters: "token exposure",
+                recommended_action: "disable automount",
+              },
+            ],
+            environment_context: KUBE_ENVIRONMENT,
+            noise_or_expected: [],
+            top_actions_now: ["disable token automount"],
+          },
+          environment: KUBE_ENVIRONMENT,
+          noise: [],
+          pre_findings: [],
+          is_incomplete: false,
+          meta: { model_used: "test", tokens_used: 0, duration_ms: 1, llm_succeeded: false },
+        },
+      });
+      const signals = await storage.withTransaction((tx) =>
+        tx.automationSignals.upsertFromRun({
+          sourceId: src.id,
+          runId: run.run_id,
+          artifactType: "kubernetes-bundle",
+          findings: run.report!.findings,
+        })
+      );
+      expect(signals).toHaveLength(1);
+
+      const diagnostic = await storage.withTransaction((tx) =>
+        tx.jobs.queueForSource(src.id, {
+          requested_by: "automation_agent:test",
+          trigger_signal_id: signals[0].id,
+        })
+      );
+      await storage.withTransaction((tx) =>
+        tx.automationSignals.markDiagnosticRequested(signals[0].id, src.id)
+      );
+      const created = await storage.withTransaction((tx) =>
+        tx.fixActionRuns.create({
+          sourceId: src.id,
+          signalId: signals[0].id,
+          diagnosticRequestId: diagnostic.row.id,
+          preFixRunId: run.run_id,
+          findingId: signals[0].finding_id,
+          policyId: POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT,
+          actionKind: "kubernetes_patch",
+          actionPayload: {
+            kind: "kubernetes_safe_patch",
+            policy_id: POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT,
+            action_kind: "kubernetes_patch",
+            target: {
+              api_version: "apps/v1",
+              kind: "Deployment",
+              namespace: "payments",
+              name: "payments-api",
+              resource: "deployment/payments-api",
+            },
+            patch_template: {
+              kind: "kubernetes_patch_template",
+              patch_type: "server_side_apply",
+              manifest: {
+                apiVersion: "apps/v1",
+                kind: "Deployment",
+                metadata: { name: "payments-api", namespace: "payments" },
+                spec: { template: { spec: { automountServiceAccountToken: false } } },
+              },
+            },
+            changed_fields: ["spec.template.spec.automountServiceAccountToken"],
+          },
+          requestedBy: "automation_agent:test",
+          idempotencyKey: "parity-action",
+        })
+      );
+      expect(created.inserted).toBe(true);
+
+      const next = await storage.fixActionRuns.listNextForAgent(src.id, reg.id, 1);
+      expect(next.gate).toBeNull();
+      expect(next.actions[0].id).toBe(created.row.id);
+
+      const claimed = await storage.withTransaction((tx) =>
+        tx.fixActionRuns.claimForAgent(created.row.id, src.id, reg.id, "fix-inst", 300)
+      );
+      expect(claimed.ok).toBe(true);
+      const started = await storage.withTransaction((tx) =>
+        tx.fixActionRuns.startForAgent(created.row.id, src.id, reg.id, "fix-inst")
+      );
+      expect(started.ok).toBe(true);
+      const dryRun = await storage.withTransaction((tx) =>
+        tx.fixActionRuns.recordDryRun({
+          actionRunId: created.row.id,
+          sourceId: src.id,
+          registrationId: reg.id,
+          instanceId: "fix-inst",
+          status: "passed",
+          summary: { resource: "deployment/payments-api" },
+        })
+      );
+      expect(dryRun.ok && dryRun.row.status).toBe("applying");
+      const applied = await storage.withTransaction((tx) =>
+        tx.fixActionRuns.recordApply({
+          actionRunId: created.row.id,
+          sourceId: src.id,
+          registrationId: reg.id,
+          instanceId: "fix-inst",
+          status: "applied",
+          summary: { server_side_apply: true },
+        })
+      );
+      expect(applied.ok && applied.row.status).toBe("applied");
+      expect(applied.ok && applied.postFixJob?.requested_by).toBe(`fix_action_run:${created.row.id}`);
+
+      const postRun = await storage.runs.persistAnalyzedRun({
+        artifactType: "kubernetes-bundle",
+        sourceType: "agent",
+        filename: "bundle-after.json",
+        content: "{}",
+        ingestion: {
+          target_identifier: src.target_identifier,
+          source_label: null,
+          collector_type: null,
+          collector_version: null,
+          collected_at: null,
+        },
+        analysis: {
+          report: {
+            summary: ["fixed"],
+            findings: [],
+            environment_context: KUBE_ENVIRONMENT,
+            noise_or_expected: [],
+            top_actions_now: ["watch"],
+          },
+          environment: KUBE_ENVIRONMENT,
+          noise: [],
+          pre_findings: [],
+          is_incomplete: false,
+          meta: { model_used: "test", tokens_used: 0, duration_ms: 1, llm_succeeded: false },
+        },
+      });
+      const linked = await storage.withTransaction((tx) =>
+        tx.fixActionRuns.linkPostFixRun({
+          actionRunId: created.row.id,
+          sourceId: src.id,
+          runId: postRun.run_id,
+          findings: [],
+        })
+      );
+      expect(linked?.status).toBe("verified");
+      const signal = await storage.automationSignals.getById(signals[0].id);
+      expect(signal?.status).toBe("resolved");
     });
 
     // --- FULL AGENT LIFECYCLE ---
