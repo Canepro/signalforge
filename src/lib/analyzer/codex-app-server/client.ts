@@ -185,7 +185,7 @@ export class CodexAppServerSession {
       });
 
       this.turnPayloads.push(turnResult);
-      await this.waitForTurnCompletion();
+      await this.waitForTurnCompletion(config.turnTimeoutMs);
 
       const report = extractAuditReportFromCodexTurnPayload({
         turnResult,

@@ -57,13 +57,24 @@ describe("codex app-server config", () => {
     });
     expect(r.ready).toBe(true);
     if (r.ready) {
-      expect(r.config.transport).toBe("stdio");
-      if (r.config.transport === "stdio") {
-        expect(r.config.command).toEqual(["codex", "app-server"]);
+        expect(r.config.transport).toBe("stdio");
+        if (r.config.transport === "stdio") {
+          expect(r.config.command).toEqual(["codex", "app-server"]);
+          expect(r.config.turnTimeoutMs).toBe(120000);
+        }
       }
-    }
+    });
   });
-});
+
+  it("honors CODEX_APP_SERVER_TURN_TIMEOUT_MS", () => {
+    const r = resolveCodexAppServerConfig({
+      ...process.env,
+      CODEX_APP_SERVER_TRANSPORT: "stdio",
+      CODEX_APP_SERVER_TURN_TIMEOUT_MS: "30000",
+    });
+    expect(r.ready).toBe(true);
+    if (r.ready) expect(r.config.turnTimeoutMs).toBe(30000);
+  });
 
 describe("extractAuditReportFromCodexTurnPayload", () => {
   it("parses structured output embedded in turn/completed notifications", () => {
