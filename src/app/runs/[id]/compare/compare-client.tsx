@@ -151,7 +151,8 @@ export function CompareClient({
   const [compareExportPending, setCompareExportPending] = useState(false);
 
   async function fetchComparePayload(): Promise<Record<string, unknown>> {
-    const path = buildCompareApiPath(current.id, baseline?.id ?? null);
+    const explicitBaselineId = baselineSelection === "explicit" ? baseline?.id : null;
+    const path = buildCompareApiPath(current.id, explicitBaselineId);
     const res = await fetch(path);
     const body = (await res.json()) as Record<string, unknown> & { error?: string };
     if (!res.ok) {
@@ -175,7 +176,7 @@ export function CompareClient({
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       window.alert(message);

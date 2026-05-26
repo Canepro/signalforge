@@ -25,5 +25,8 @@ describe("compare export helpers", () => {
     expect(buildCompareApiPath("run-a", "run-b")).toBe(
       "/api/runs/run-a/compare?against=run-b"
     );
+    expect(buildCompareApiPath("run-a", " run-b ")).toBe(
+      "/api/runs/run-a/compare?against=run-b"
+    );
   });
 });

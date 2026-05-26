@@ -22,6 +22,7 @@ export function buildCompareExportFilename(
 
 export function buildCompareApiPath(currentRunId: string, againstRunId?: string | null): string {
   const base = `/api/runs/${currentRunId}/compare`;
-  if (!againstRunId?.trim()) return base;
-  return `${base}?against=${encodeURIComponent(againstRunId)}`;
+  const trimmedAgainstRunId = againstRunId?.trim();
+  if (!trimmedAgainstRunId) return base;
+  return `${base}?against=${encodeURIComponent(trimmedAgainstRunId)}`;
 }
