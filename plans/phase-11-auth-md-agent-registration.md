@@ -1,7 +1,9 @@
 # Phase 11: auth.md Agent Registration Spike
 
-Status: proposed spike (plan amended 2026-05-20)  
+Status: slice 1 implemented (discovery + `/agent/auth` alias); claim/OTP follow-ons deferred  
 Created: 2026-05-26  
+Amended: 2026-05-20  
+Implemented slice 1: 2026-05-20  
 Primary repo: `signalforge`  
 Related repos: `signalforge-agent`, `pipelinehealer`  
 Related services: Infisical, Codex App Server

@@ -40,7 +40,7 @@ SignalForge lives in its own repo:
 
 **Canonical roadmap:** [`plans/roadmap.md`](plans/roadmap.md).  
 **Current snapshot:** [`plans/current-plan.md`](plans/current-plan.md).  
-**New auth spike:** [`plans/phase-11-auth-md-agent-registration.md`](plans/phase-11-auth-md-agent-registration.md) tracks the `auth.md` / Infisical agent-registration plan. Start there before implementing agent-auth discovery or registration changes.
+**New auth spike:** [`plans/phase-11-auth-md-agent-registration.md`](plans/phase-11-auth-md-agent-registration.md) tracks the `auth.md` / Infisical agent-registration plan. Slice 1 (discovery + `/agent/auth` alias) is implemented; claim/OTP/ID-JAG and automation-agent discovery remain follow-ons.
 
 **Canonical implemented state:** see [`plans/current-plan.md`](plans/current-plan.md). Highlights on `main` include multi-artifact analysis (`linux-audit-log`, `container-diagnostics`, `kubernetes-bundle`), compare with `evidence_delta`, **Sources** + collection jobs behind **`SIGNALFORGE_ADMIN_TOKEN`**, source-bound execution-agent registration, strict agent lease/`instance_id` rules, job-scoped collection parameters, Phase 9c operator UI, and optional autonomous Kubernetes safe-fix (automation-agent + fix-action runs). Operator docs: [`docs/operators/automation-agent-integration.md`](docs/operators/automation-agent-integration.md), [`docs/operators/autonomous-kubernetes-actions.md`](docs/operators/autonomous-kubernetes-actions.md).
 

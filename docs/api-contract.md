@@ -53,6 +53,10 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | `POST /api/collection-jobs/[id]/artifact` | Agent: multipart artifact → same ingestion/analyzer path as `POST /api/runs`; job → **submitted** |
 | `POST /api/automation-agent/diagnostic-requests` | Automation agent: queue a source-bound diagnostic request |
 | `GET /api/automation-agent/diagnostic-requests/[id]` | Automation agent: poll job status and structured findings |
+| `GET /auth.md` | Agent discovery: prose registration guide (auth.md slice 1) |
+| `GET /.well-known/oauth-protected-resource` | Agent discovery: Protected Resource Metadata (RFC 9728 shape) |
+| `GET /.well-known/oauth-authorization-server` | Agent discovery: Authorization Server metadata with `agent_auth` block |
+| `POST /agent/auth` | auth.md registration alias for collection execution agents (admin Bearer; same storage as `/api/agent/registrations` plus scope metadata) |
 
 ## Stability
 
@@ -279,6 +283,16 @@ All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>
 **`POST /api/collection-jobs/[id]/cancel`** — **200** cancelled job. **409** if `running` or already terminal.
 
 **`POST /api/agent/registrations`** — JSON `{ "source_id", "display_name?" }`. **201:** `{ agent_id, source_id, token, token_prefix }` (plaintext `token` once). **409** if source already has a registration.
+
+**Agent discovery (auth.md slice 1):** unauthenticated routes at the site root:
+
+- **`GET /auth.md`** — Markdown prose guide; PRM is authoritative on conflict.
+- **`GET /.well-known/oauth-protected-resource`** — JSON PRM with `resource_name`, `authorization_servers`, `scopes_supported`.
+- **`GET /.well-known/oauth-authorization-server`** — JSON with `agent_auth.register_uri`, compatibility pointers, and `claim_implemented: false`.
+
+Optional env: `SIGNALFORGE_PUBLIC_BASE_URL` overrides absolute URLs in discovery documents (useful behind reverse proxies).
+
+**`POST /agent/auth`** — auth.md registration alias for **collection execution agents**. Same admin Bearer auth and storage as `POST /api/agent/registrations`. **201:** `{ agent_id, source_id, token, token_prefix, scopes, rotation_guidance, compatibility }`. Scopes are discovery metadata in slice 1; runtime jobs/next still gates on capability strings such as `collect:<artifact_type>`. **409** on duplicate enroll.
 
 **`POST /api/automation-agent/registrations`** — JSON `{ "source_id", "display_name?" }`. **201:** `{ automation_agent_id, source_id, token, token_prefix }` (plaintext `token` once). **409** if source already has an automation-agent registration.
 

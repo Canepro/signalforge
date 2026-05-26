@@ -40,6 +40,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 | 9 (repo-local) | Typed job-scoped collection parameters in SignalForge: source defaults, per-job overrides, resolved `collection_scope` in `jobs/next`, published schemas, Sources UI visibility, and contract tests | Done |
 | 9c | Frontend operator-workstation redesign and interaction polish across dashboard, run detail, compare, shell, and Sources | Done |
 | Autonomous Kubernetes actions | Source-owned automation signals, source-bound diagnostic triggers, deterministic safe-fix policy gate, fix action runs, execution-agent dry-run/apply APIs, post-fix verification, and Sources UI visibility | Done |
+| 11a (auth.md slice 1) | Static agent discovery (`/auth.md`, `/.well-known/*`), scope vocabulary, `POST /agent/auth` alias for collection-agent registration | Done |
 
 ## Product snapshot
 

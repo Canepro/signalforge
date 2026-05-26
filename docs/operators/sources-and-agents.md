@@ -42,7 +42,12 @@ The `/sources/login` page stores this value as an httpOnly session cookie. For r
 
 ### Source-bound agent token
 
-Each enrolled agent receives a source-bound token from `POST /api/agent/registrations`.
+Each enrolled collection execution agent receives a source-bound token from:
+
+- `POST /api/agent/registrations` (legacy stable path), or
+- `POST /agent/auth` (auth.md alias — same storage, adds scope metadata in the response)
+
+Agents can discover registration instructions at `GET /auth.md` and structured metadata at `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-authorization-server`. Automation-agent enrollment remains separate at `POST /api/automation-agent/registrations` (see [`automation-agent-integration.md`](./automation-agent-integration.md)).
 
 That token is only for the execution-plane agent. It is used on:
 

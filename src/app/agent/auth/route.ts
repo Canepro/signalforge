@@ -15,8 +15,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    return createCollectionAgentRegistration(body, "POST /api/agent/registrations");
+    return createCollectionAgentRegistration(body, "POST /agent/auth", {
+      includeScopes: true,
+    });
   } catch (err) {
-    return internalServerErrorResponse(err, "POST /api/agent/registrations");
+    return internalServerErrorResponse(err, "POST /agent/auth");
   }
 }
