@@ -674,6 +674,48 @@ describe("KubernetesBundleAdapter", () => {
     ).toBe(true);
   });
 
+  it("classifies steady zero-restart rollout status snapshots as Kubernetes noise", () => {
+    const adapter = new KubernetesBundleAdapter();
+    const noise = adapter.classifyNoise(
+      adapter.parseSections(
+        JSON.stringify({
+          schema_version: "kubernetes-bundle.v1",
+          cluster: { name: "aks-prod-eu-1", provider: "aks" },
+          scope: { level: "namespace", namespace: "payments" },
+          documents: [
+            {
+              path: "workloads/status.json",
+              kind: "workload-status",
+              media_type: "application/json",
+              content: JSON.stringify([
+                {
+                  namespace: "payments",
+                  name: "payments-api",
+                  status: "Available",
+                  restarts: 0,
+                },
+              ]),
+            },
+          ],
+        })
+      ),
+      {
+        hostname: "aks-prod-eu-1",
+        os: "Kubernetes (aks)",
+        kernel: "namespace:payments",
+        is_wsl: false,
+        is_container: false,
+        is_virtual_machine: false,
+        ran_as_root: false,
+        uptime: "unknown",
+      }
+    );
+
+    expect(
+      noise.some((item) => item.observation.includes("Kubernetes workload steady"))
+    ).toBe(true);
+  });
+
   it("rejects manifests with unsupported scope levels", () => {
     expect(
       parseKubernetesBundle(

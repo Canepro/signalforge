@@ -78,6 +78,7 @@ Before merge or release signoff, validate a real browser session against the cho
 - [ ] automatic baseline selection is understandable without query-string knowledge
 - [ ] explicit baseline switching is discoverable
 - [ ] missing-baseline state is useful and not a dead end
+- [x] export and copy compare JSON actions work with explicit-baseline pinning (PR #19)
 - [ ] evidence delta remains legible even when findings drift is small
 
 ### Sources

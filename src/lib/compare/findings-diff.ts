@@ -105,6 +105,31 @@ function normalizeKubernetesCountStableTitle(normalized: string): string | null 
     if (match) return match[1];
   }
 
+  const warningEvents = normalized.match(
+    /^(kubernetes warning events indicate .+?) \(\d+ events\)$/
+  );
+  if (warningEvents) return warningEvents[1];
+
+  const nodeMemory = normalized.match(
+    /^(kubernetes node memory usage is elevated: .+?) \([\d.]+%\)$/
+  );
+  if (nodeMemory) return nodeMemory[1];
+
+  const nodeCpu = normalized.match(
+    /^(kubernetes node cpu usage is elevated: .+?) \([\d.]+%\)$/
+  );
+  if (nodeCpu) return nodeCpu[1];
+
+  const rolloutIncomplete = normalized.match(
+    /^(kubernetes rollout incomplete: .+?) \(ready \d+\/\d+, updated \d+\/\d+\)$/
+  );
+  if (rolloutIncomplete) return rolloutIncomplete[1];
+
+  const resourceQuota = normalized.match(
+    /^(kubernetes resourcequota is near exhaustion: .+?) \((.+?) at [\d.]+%\)$/
+  );
+  if (resourceQuota) return `${resourceQuota[1]} (${resourceQuota[2]})`;
+
   return null;
 }
 

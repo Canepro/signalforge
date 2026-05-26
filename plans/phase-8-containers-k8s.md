@@ -457,8 +457,8 @@ Guardrails for execution:
 
 Current branch status:
 - public exposure, namespace isolation gaps, workload health, secret handling, workload hardening, host-escape settings, RBAC over-breadth, workload-to-identity joins, and exposed-workload-to-identity joins are already implemented
-- deterministic platform noise now suppresses clearly healthy zero-restart workload status records instead of treating them as actionable findings
-- compare normalization now keeps several Kubernetes workload findings stable when only trailing counts change across bundle exports
+- deterministic platform noise now suppresses clearly healthy or steady zero-restart workload status records instead of treating them as actionable findings
+- compare normalization now keeps Kubernetes workload and operational findings stable when only trailing counts, utilization percentages, or rollout replica progress change across bundle exports
 
 ---
 
