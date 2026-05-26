@@ -20,6 +20,7 @@
     "test:integration": "vitest run tests/analyzer",
     "smoke:automation-agent": "bash scripts/smoke-automation-agent-local.sh",
     "smoke:codex-brain": "bash scripts/smoke-codex-app-server-brain.sh",
+    "smoke:codex-brain:fixtures": "bash scripts/smoke-codex-brain-fixture-suite.sh",
     "analyze": "bun src/lib/analyzer/cli.ts",
     "db:migrate:postgres": "bun scripts/db-migrate-postgres.ts",
     "db:backfill:collected-at": "bun scripts/backfill-collected-at.ts"
