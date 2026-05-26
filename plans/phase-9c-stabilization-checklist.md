@@ -20,9 +20,10 @@ Freeze the redesign into a controlled ship gate:
 
 These checks must stay green after any Phase 9c follow-up:
 
-- [ ] `bun run typecheck`
-- [ ] `bun run build`
-- [ ] targeted browser verification against local dev or preview
+- [x] `bun run typecheck` (automation on `main` + follow-on branches)
+- [x] `bun run test` (full Vitest suite)
+- [x] `bun run build`
+- [ ] targeted browser verification against local dev or preview — see [`docs/operators/phase-9c-stabilization-pass.md`](../docs/operators/phase-9c-stabilization-pass.md) for the post-9d/18 pass script
 
 Local browser script currently used during implementation:
 
