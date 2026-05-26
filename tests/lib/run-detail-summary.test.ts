@@ -232,6 +232,32 @@ describe("run-detail-summary", () => {
     expect(modules.find((module) => module.id === "run-health-summary")).toMatchObject({
       prominence: "supporting",
     });
+    expect(modules.find((module) => module.id === "priority-callouts")).toMatchObject({
+      kind: "callout-list",
+      callouts: expect.arrayContaining([
+        expect.objectContaining({
+          title: "Kubernetes warning events indicate scheduling failures (1 events)",
+          tone: "critical",
+        }),
+      ]),
+    });
+  });
+
+  it("omits priority callouts when the run has no findings", () => {
+    const modules = buildRunDetailSummaryModules(
+      mkRun({
+        artifact_type: "container-diagnostics",
+        report: {
+          summary: ["Summary"],
+          findings: [],
+          environment_context: mkRun().environment!,
+          noise_or_expected: [],
+          top_actions_now: [],
+        },
+      }),
+      "=== container-diagnostics ===\nruntime: podman"
+    );
+    expect(modules.some((module) => module.id === "priority-callouts")).toBe(false);
   });
 
   it("builds container runtime and resource modules from raw diagnostics", () => {

@@ -17,7 +17,7 @@ import {
 } from "@/lib/adapter/kubernetes-bundle/parse";
 import { parseSections as parseLinuxSections } from "@/lib/adapter/linux-audit-log/sections";
 import { classifyFindingSignal } from "@/lib/findings-presentation";
-import type { Finding } from "@/lib/analyzer/schema";
+import type { Finding, Severity } from "@/lib/analyzer/schema";
 import type {
   RunDetail,
   RunDetailSummaryBar,
@@ -35,26 +35,53 @@ function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function parseFindingEvidenceJson(finding: Finding): Record<string, unknown> | null {
-  try {
-    return asRecord(JSON.parse(finding.evidence));
-  } catch {
-    return null;
-  }
-}
-
 function severityCount(run: RunDetail, key: string) {
   return run.severity_counts[key] ?? 0;
 }
 
 function summarizeSignalCount(findings: Finding[], signal: ReturnType<typeof classifyFindingSignal>) {
   return findings.filter((finding) => classifyFindingSignal(finding) === signal).length;
+}
+
+
+const SEVERITY_RANK: Record<Severity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+function calloutToneForSeverity(severity: Severity): RunDetailSummaryTone {
+  if (severity === "critical" || severity === "high") return "critical";
+  if (severity === "medium") return "warning";
+  return "neutral";
+}
+
+function buildPriorityCallouts(run: RunDetail): RunDetailSummaryModule | null {
+  const findings = run.report?.findings ?? [];
+  if (findings.length === 0) return null;
+
+  const callouts = [...findings]
+    .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
+    .slice(0, 3)
+    .map((finding) => ({
+      title: finding.title,
+      body: finding.recommended_action.trim() || finding.why_it_matters,
+      tone: calloutToneForSeverity(finding.severity),
+    }));
+
+  const hasCritical = callouts.some((callout) => callout.tone === "critical");
+
+  return {
+    id: "priority-callouts",
+    title: "Priority Callouts",
+    summary:
+      "Top evidence-backed conditions to inspect before the findings table, ordered by deterministic severity.",
+    tone: hasCritical ? "critical" : "warning",
+    prominence: "supporting",
+    kind: "callout-list",
+    callouts,
+  };
 }
 
 function sharedSummaryModules(run: RunDetail): RunDetailSummaryModule[] {
@@ -850,6 +877,11 @@ export function buildRunDetailSummaryModules(
     modules.push(...buildContainerModules(run, artifactContent));
   } else if (artifactContent && run.artifact_type === "linux-audit-log") {
     modules.push(...buildLinuxModules(run, artifactContent));
+  }
+
+  const priorityCallouts = buildPriorityCallouts(run);
+  if (priorityCallouts) {
+    modules.push(priorityCallouts);
   }
 
   modules.push(...sharedSummaryModules(run));
