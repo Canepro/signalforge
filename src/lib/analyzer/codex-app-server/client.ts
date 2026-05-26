@@ -34,6 +34,7 @@ export type CodexAppServerLineTransport = {
   writeLine: (line: string) => void;
   close: () => void;
   onLine: (handler: (line: string) => void) => void;
+  onError?: (handler: (error: Error) => void) => void;
 };
 
 type PendingRequest = {
@@ -49,6 +50,7 @@ export class CodexAppServerSession {
 
   private constructor(private readonly transport: CodexAppServerLineTransport) {
     transport.onLine((line) => this.handleLine(line));
+    transport.onError?.((error) => this.closeWithError(error));
   }
 
   static fromTransport(transport: CodexAppServerLineTransport): CodexAppServerSession {
@@ -67,21 +69,23 @@ export class CodexAppServerSession {
 
     const rl = createInterface({ input: child.stdout });
     let lineHandler: ((line: string) => void) | null = null;
+    let errorHandler: ((error: Error) => void) | null = null;
 
     rl.on("line", (line) => {
       lineHandler?.(line);
     });
 
+    child.on("error", (err) => {
+      errorHandler?.(
+        err instanceof Error
+          ? err
+          : new Error(`codex app-server process error: ${String(err)}`)
+      );
+    });
+
     child.on("exit", (code) => {
-      if (!lineHandler) return;
-      lineHandler(
-        JSON.stringify({
-          id: -1,
-          error: {
-            code: -32000,
-            message: `codex app-server exited with code ${code ?? "unknown"}`,
-          },
-        })
+      errorHandler?.(
+        new Error(`codex app-server exited with code ${code ?? "unknown"}`)
       );
     });
 
@@ -91,11 +95,22 @@ export class CodexAppServerSession {
       },
       close: () => {
         rl.close();
-        child.stdin.end();
-        child.kill();
+        try {
+          child.stdin.end();
+        } catch {
+          // Process may already be unavailable after spawn/stdio failures.
+        }
+        try {
+          child.kill();
+        } catch {
+          // Process may already have exited.
+        }
       },
       onLine: (handler) => {
         lineHandler = handler;
+      },
+      onError: (handler) => {
+        errorHandler = handler;
       },
     };
 
@@ -110,6 +125,17 @@ export class CodexAppServerSession {
       pending.reject(new Error("Codex App Server session closed"));
     }
     this.pending.clear();
+  }
+
+  private closeWithError(error: Error): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.transport.close();
+    for (const pending of this.pending.values()) {
+      pending.reject(error);
+    }
+    this.pending.clear();
+    this.turnCompleteReject?.(error);
   }
 
   async analyzeArtifactTurn(
@@ -232,6 +258,7 @@ export class CodexAppServerSession {
   }
 
   private turnCompleteResolve: (() => void) | null = null;
+  private turnCompleteReject: ((error: Error) => void) | null = null;
 
   private waitForTurnCompletion(timeoutMs = 120_000): Promise<void> {
     const alreadyCompleted = this.turnPayloads.some(
@@ -245,13 +272,21 @@ export class CodexAppServerSession {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.turnCompleteResolve = null;
+        this.turnCompleteReject = null;
         reject(new Error("Codex App Server turn timed out waiting for turn/completed"));
       }, timeoutMs);
 
       this.turnCompleteResolve = () => {
         clearTimeout(timer);
         this.turnCompleteResolve = null;
+        this.turnCompleteReject = null;
         resolve();
+      };
+      this.turnCompleteReject = (error) => {
+        clearTimeout(timer);
+        this.turnCompleteResolve = null;
+        this.turnCompleteReject = null;
+        reject(error);
       };
     });
   }

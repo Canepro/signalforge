@@ -154,6 +154,21 @@ describe("analyzeArtifact with codex_app_server", () => {
     expect(result.analysis_error).toMatch(/WS_TOKEN_FILE|SHARED_SECRET_FILE/i);
   });
 
+  it("falls back when the stdio command cannot be spawned", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    process.env.LLM_PROVIDER = "codex_app_server";
+    process.env.CODEX_APP_SERVER_TRANSPORT = "stdio";
+    process.env.CODEX_APP_SERVER_COMMAND = "/definitely/missing-codex-app-server";
+    const raw = readFileSync(join(FIXTURES, "wsl-nov2025-truncated.log"), "utf-8");
+
+    const result = await analyzeArtifact(raw);
+
+    expect(result.meta.llm_succeeded).toBe(false);
+    expect(result.meta.model_used).toBe("codex-app-server:gpt-5.4");
+    expect(result.analysis_error).toMatch(/missing-codex-app-server|ENOENT/i);
+    expect(result.report).not.toBeNull();
+  });
+
   it("does not change OpenAI provider resolution", async () => {
     const { resolveBrainProvider } = await import("@/lib/analyzer/brain-provider");
     process.env.LLM_PROVIDER = "openai";
