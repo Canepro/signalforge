@@ -20,6 +20,11 @@ import {
 } from "@/lib/compare/evidence-delta-presentation";
 import { RunEvidenceSections } from "@/components/run-evidence-sections";
 import type { BaselineSelection } from "@/lib/compare/build-compare";
+import {
+  buildCompareApiPath,
+  buildCompareExportFilename,
+} from "@/lib/compare/export-compare";
+import { copyWithPromptFallback } from "@/lib/copy-text";
 
 export interface CompareRunHeader {
   id: string;
@@ -143,6 +148,55 @@ export function CompareClient({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
   const [activeMetricFocus, setActiveMetricFocus] = useState<EvidenceMetricFocus>("all");
+  const [compareExportPending, setCompareExportPending] = useState(false);
+
+  async function fetchComparePayload(): Promise<Record<string, unknown>> {
+    const path = buildCompareApiPath(current.id, baseline?.id ?? null);
+    const res = await fetch(path);
+    const body = (await res.json()) as Record<string, unknown> & { error?: string };
+    if (!res.ok) {
+      throw new Error(
+        typeof body.error === "string" ? body.error : `Compare export failed (${res.status})`
+      );
+    }
+    return body;
+  }
+
+  async function handleExportCompareJson() {
+    setCompareExportPending(true);
+    try {
+      const payload = await fetchComparePayload();
+      const text = JSON.stringify(payload, null, 2);
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = buildCompareExportFilename(current.filename, baseline?.filename);
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      window.alert(message);
+    } finally {
+      setCompareExportPending(false);
+    }
+  }
+
+  async function handleCopyCompareJson() {
+    setCompareExportPending(true);
+    try {
+      const payload = await fetchComparePayload();
+      const text = JSON.stringify(payload, null, 2);
+      await copyWithPromptFallback(text, "Copy compare JSON:");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      window.alert(message);
+    } finally {
+      setCompareExportPending(false);
+    }
+  }
 
   const title = useMemo(
     () =>
@@ -229,6 +283,22 @@ export function CompareClient({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="sf-btn-secondary"
+                    disabled={compareExportPending || baselineMissing}
+                    onClick={() => void handleExportCompareJson()}
+                  >
+                    {compareExportPending ? "Exporting…" : "Export compare JSON"}
+                  </button>
+                  <button
+                    type="button"
+                    className="sf-btn-secondary"
+                    disabled={compareExportPending || baselineMissing}
+                    onClick={() => void handleCopyCompareJson()}
+                  >
+                    Copy compare JSON
+                  </button>
                   <Link href={`/runs/${current.id}`} className="sf-btn-secondary">
                     Open current run
                   </Link>

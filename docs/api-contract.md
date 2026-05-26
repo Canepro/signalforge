@@ -182,7 +182,9 @@ Deterministic finding drift using the same logic as the UI compare page. No LLM.
 
 **Implicit baseline (omit `against`):** the latest older run for the same logical target as the current run. That baseline is **not guaranteed** to be the reanalyze parent (`parent_run_id`) on a newer run. If you need an exact baseline, use `against=` explicitly.
 
-**200:** `CompareDriftPayload` — `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `against_requested`, `drift` (`summary` + `rows`), and `evidence_delta`.  
+**200:** `CompareDriftPayload` — `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `against_requested`, `drift` (`summary` + `rows`), and `evidence_delta`.
+
+The compare UI also offers **Export compare JSON** and **Copy compare JSON**, which fetch this same endpoint payload for operator handoff (filename helpers in `src/lib/compare/export-compare.ts`).  
 Each non-null run snapshot includes both `id` and `run_id` with the same UUID, so clients can use `run_id` consistently with `POST /api/runs` and `POST .../reanalyze` bodies.  
 **400:** `against` equals current id.  
 **404:** Run not found or explicit `against` not found.
