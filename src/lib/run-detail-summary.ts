@@ -84,7 +84,13 @@ function buildPriorityCallouts(run: RunDetail): RunDetailSummaryModule | null {
   };
 }
 
-function sharedSummaryModules(run: RunDetail): RunDetailSummaryModule[] {
+function sharedSummaryModules(
+  run: RunDetail,
+  options?: { includeHealthSummary?: boolean }
+): RunDetailSummaryModule[] {
+  if (options?.includeHealthSummary === false) {
+    return [];
+  }
   const findings = run.report?.findings ?? [];
   const criticalHigh = severityCount(run, "critical") + severityCount(run, "high");
   const stabilityCount = summarizeSignalCount(findings, "stability");
@@ -151,6 +157,32 @@ function parseCpuToMilli(cpu: string | null | undefined): number {
   if (!text) return 0;
   if (text.endsWith("m")) return Number.parseFloat(text.slice(0, -1)) || 0;
   return (Number.parseFloat(text) || 0) * 1000;
+}
+
+function describeKubernetesSchedulingPressure(
+  schedulingWarnings: KubernetesWarningEvent[]
+): { summary: string; detail: string } | null {
+  if (schedulingWarnings.length === 0) return null;
+  const message = (schedulingWarnings[0]?.message ?? "").trim();
+  if (!message) {
+    return {
+      summary: "Scheduling pressure detected",
+      detail: "FailedScheduling events indicate pods could not be placed on available nodes.",
+    };
+  }
+  const insufficientCpu = /insufficient cpu/i.test(message);
+  const insufficientMemory = /insufficient memory/i.test(message);
+  const resourceParts: string[] = [];
+  if (insufficientCpu) resourceParts.push("CPU");
+  if (insufficientMemory) resourceParts.push("memory");
+  const resourceHint =
+    resourceParts.length > 0
+      ? `insufficient ${resourceParts.join(" and ")} on schedulable nodes`
+      : "insufficient schedulable capacity";
+  return {
+    summary: `Scheduling blocked (${resourceHint})`,
+    detail: `FailedScheduling: ${message}`,
+  };
 }
 
 function parseMemoryToMi(memory: string | null | undefined): number {
@@ -251,6 +283,11 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
     ) ?? [];
 
   const schedulingWarnings = warningEvents.filter((event) => event.reason === "FailedScheduling");
+  const schedulingWarningCount = schedulingWarnings.reduce(
+    (sum, event) => sum + (event.count ?? 1),
+    0
+  );
+  const schedulingPressure = describeKubernetesSchedulingPressure(schedulingWarnings);
   const peakMemory = nodeTop.reduce((max, node) => Math.max(max, node.memory_percent ?? 0), 0);
   const peakCpu = nodeTop.reduce((max, node) => Math.max(max, node.cpu_percent ?? 0), 0);
   const nodesWithPressureConditions = nodeHealth.filter(
@@ -275,9 +312,20 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
     {
       label: "Peak CPU",
       value: percentLabel(peakCpu),
-      detail: schedulingWarnings.length > 0 ? "Scheduling warnings present" : "No scheduling warning captured",
-      tone: schedulingWarnings.length > 0 ? "critical" : barTone(peakCpu),
+      detail: peakCpu >= 80 ? "Low CPU headroom on busiest node" : "No node above 80%",
+      tone: barTone(peakCpu),
     },
+    ...(schedulingPressure
+      ? [
+          {
+            label: "Scheduling pressure",
+            value:
+              schedulingWarningCount === 1 ? "1 event" : `${schedulingWarningCount} events`,
+            detail: schedulingPressure.detail,
+            tone: "critical" as const,
+          },
+        ]
+      : []),
     {
       label: "Node pressure",
       value: String(nodesWithPressureConditions),
@@ -286,29 +334,34 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
     },
   ];
 
-  const nodeBars: RunDetailSummaryBar[] = nodeTop
-    .flatMap((node) => {
-      const nodeName = asString(node.name) ?? "unknown-node";
-      return [
-        {
-          label: `${nodeName} memory`,
-          value: node.memory_percent ?? 0,
-          maxValue: 100,
-          value_label: percentLabel(node.memory_percent),
-          detail: asString(node.memory) ?? "Not recorded",
-          tone: barTone(node.memory_percent),
-        },
-        {
-          label: `${nodeName} CPU`,
-          value: node.cpu_percent ?? 0,
-          maxValue: 100,
-          value_label: percentLabel(node.cpu_percent),
-          detail: asString(node.cpu) ?? "Not recorded",
-          tone: barTone(node.cpu_percent),
-        },
-      ];
-    })
-    .slice(0, 6);
+  const topNodesByMemory = [...nodeTop].sort(
+    (a, b) => (b.memory_percent ?? 0) - (a.memory_percent ?? 0)
+  );
+  const topNodesByCpu = [...nodeTop].sort((a, b) => (b.cpu_percent ?? 0) - (a.cpu_percent ?? 0));
+
+  const nodeMemoryBars: RunDetailSummaryBar[] = topNodesByMemory.slice(0, 3).map((node) => {
+    const nodeName = asString(node.name) ?? "unknown-node";
+    return {
+      label: nodeName,
+      value: node.memory_percent ?? 0,
+      maxValue: 100,
+      value_label: percentLabel(node.memory_percent),
+      detail: `Memory ${asString(node.memory) ?? "Not recorded"} · CPU ${percentLabel(node.cpu_percent)}`,
+      tone: barTone(node.memory_percent),
+    };
+  });
+
+  const nodeCpuBars: RunDetailSummaryBar[] = topNodesByCpu.slice(0, 3).map((node) => {
+    const nodeName = asString(node.name) ?? "unknown-node";
+    return {
+      label: nodeName,
+      value: node.cpu_percent ?? 0,
+      maxValue: 100,
+      value_label: percentLabel(node.cpu_percent),
+      detail: `CPU ${asString(node.cpu) ?? "Not recorded"} · Memory ${percentLabel(node.memory_percent)}`,
+      tone: barTone(node.cpu_percent),
+    };
+  });
 
   const maxPodMemory = podTop.reduce((max, pod) => Math.max(max, parseMemoryToMi(pod.memory)), 0);
   const topPodMemory = [...podTop]
@@ -392,6 +445,7 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
 
   const instabilityCallouts: RunDetailSummaryCallout[] = [];
   for (const [category, count] of [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)) {
+    if (category === "Scheduling pressure" && schedulingPressure) continue;
     instabilityCallouts.push({
       title: category,
       body: `${count} warning event${count === 1 ? "" : "s"} captured in the bundle.`,
@@ -422,20 +476,21 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
     });
   }
 
-  if (schedulingWarnings.length > 0) {
-    const first = schedulingWarnings[0];
+  if (schedulingPressure) {
     instabilityCallouts.unshift({
       title: "Scheduling pressure",
-      body: first.message ?? "Pods could not be scheduled because the cluster lacked capacity.",
+      body: schedulingPressure.detail,
       tone: "critical",
     });
   }
 
-  return [
+  const modules: RunDetailSummaryModule[] = [
     {
       id: "kubernetes-capacity-snapshot",
       title: "Cluster Capacity Snapshot",
-      summary: "Quantitative node-capacity signals and scheduling headroom captured directly from the Kubernetes bundle.",
+      summary: schedulingPressure
+        ? "Node utilization and explicit FailedScheduling evidence from the bundle — read this before the findings table when pods cannot land."
+        : "Quantitative node-capacity signals and scheduling headroom captured directly from the Kubernetes bundle.",
       tone:
         schedulingWarnings.length > 0 || peakMemory >= 90
           ? "critical"
@@ -446,29 +501,55 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
       kind: "stat-grid",
       stats: capacityStats,
     },
-    ...(nodeBars.length > 0
+    ...(nodeMemoryBars.length > 0
       ? [
           {
-            id: "kubernetes-node-capacity-bars",
-            title: "Node Capacity Bars",
-            summary: "Compact CPU and memory bars so operators can see which nodes are carrying the most pressure without reading raw metrics.",
-            tone: moduleTone(peakMemory >= 75 || peakCpu >= 75, "warning", "neutral"),
+            id: "kubernetes-top-node-consumers",
+            title: "Top Node Consumers",
+            summary: "Highest node memory utilization captured by kubectl top — use this to see where cluster pressure is concentrated.",
+            tone: moduleTone(peakMemory >= 75, "warning", "neutral"),
             prominence: "supporting" as const,
             kind: "bar-list" as const,
-            bars: nodeBars,
+            bars: nodeMemoryBars,
           },
         ]
       : []),
-    ...((topPodMemory.length > 0 || topPodCpu.length > 0)
+    ...(nodeCpuBars.length > 0 && peakCpu >= 70
       ? [
           {
-            id: "kubernetes-top-consumers",
-            title: "Top Workload Consumers",
-            summary: "Highest pod-level CPU and memory consumers captured by `kubectl top` during the run.",
+            id: "kubernetes-top-node-cpu",
+            title: "Top Node CPU",
+            summary: "Busiest nodes by CPU when utilization is high enough to affect scheduling headroom.",
+            tone: moduleTone(peakCpu >= 85, "critical", "warning"),
+            prominence: "supporting" as const,
+            kind: "bar-list" as const,
+            bars: nodeCpuBars,
+          },
+        ]
+      : []),
+    ...(topPodMemory.length > 0
+      ? [
+          {
+            id: "kubernetes-top-pod-memory",
+            title: "Top Pod Memory Consumers",
+            summary: "Highest pod memory consumers from kubectl top during collection.",
             tone: "warning" as const,
             prominence: "supporting" as const,
             kind: "bar-list" as const,
-            bars: [...topPodMemory.slice(0, 3), ...topPodCpu.slice(0, 2)],
+            bars: topPodMemory,
+          },
+        ]
+      : []),
+    ...(topPodCpu.length > 0
+      ? [
+          {
+            id: "kubernetes-top-pod-cpu",
+            title: "Top Pod CPU Consumers",
+            summary: "Highest pod CPU consumers from kubectl top during collection.",
+            tone: "warning" as const,
+            prominence: "supporting" as const,
+            kind: "bar-list" as const,
+            bars: topPodCpu,
           },
         ]
       : []),
@@ -503,6 +584,8 @@ function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDet
         ]
       : []),
   ];
+
+  return modules;
 }
 
 function buildContainerModules(_run: RunDetail, artifactContent: string): RunDetailSummaryModule[] {
@@ -604,6 +687,26 @@ function buildContainerModules(_run: RunDetail, artifactContent: string): RunDet
   ];
 
   const callouts: RunDetailSummaryCallout[] = [];
+  if (memoryPercent !== null && memoryPercent >= 90 && memoryLimitBytes === 0) {
+    callouts.push({
+      title: "Memory pressure without a limit",
+      body: `Runtime memory usage is ${percentLabel(memoryPercent)} with no configured memory limit — OOM risk is elevated.`,
+      tone: "critical",
+    });
+  } else if (memoryPercent !== null && memoryPercent >= 85 && memoryLimitBytes === null) {
+    callouts.push({
+      title: "High memory utilization",
+      body: `One-shot sample shows ${percentLabel(memoryPercent)} memory usage, but the configured memory limit was not recorded.`,
+      tone: "warning",
+    });
+  } else if (memoryPercent !== null && memoryPercent >= 85) {
+    callouts.push({
+      title: "High memory utilization",
+      body: `One-shot sample shows ${percentLabel(memoryPercent)} of the configured limit in use.`,
+      tone: "warning",
+    });
+  }
+
   const failureExcerptJson = sections.failure_log_excerpts_json;
   if (failureExcerptJson) {
     try {
@@ -674,7 +777,11 @@ function buildContainerModules(_run: RunDetail, artifactContent: string): RunDet
       id: "container-failure-callouts",
       title: "Failure Callouts",
       summary: "Short bounded log evidence so the immediate failure mode is visible without expanding the findings table.",
-      tone: "warning",
+      tone: moduleTone(
+        callouts.some((callout) => callout.tone === "critical"),
+        "critical",
+        "warning"
+      ),
       prominence: "supporting",
       kind: "callout-list",
       callouts,
@@ -753,6 +860,51 @@ function extractLoadAverage(sections: Record<string, string>): string | null {
   return match?.[1] ?? null;
 }
 
+interface LinuxProcessSample {
+  user: string;
+  pid: number;
+  cpuPercent: number;
+  memPercent: number;
+  command: string;
+}
+
+function extractLinuxTopProcesses(sections: Record<string, string>): LinuxProcessSample[] {
+  const servicesBlock = sections["RUNNING SERVICES"] ?? "";
+  const markerIndex = servicesBlock.search(/Running Processes/i);
+  const block = markerIndex >= 0 ? servicesBlock.slice(markerIndex) : servicesBlock;
+  const lines = block.split("\n");
+  const headerIndex = lines.findIndex((line) => /USER\s+PID\s+%CPU\s+%MEM/.test(line));
+  if (headerIndex < 0) return [];
+
+  const rows: LinuxProcessSample[] = [];
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const rawLine = lines[i]?.trim() ?? "";
+    if (!rawLine) continue;
+    if (rawLine.includes("→") || rawLine.startsWith("[")) break;
+    const parts = rawLine.split(/\s+/);
+    if (parts.length < 11) continue;
+    const user = parts[0]!;
+    const pid = Number.parseInt(parts[1]!, 10);
+    const cpuPercent = Number.parseFloat(parts[2]!);
+    const memPercent = Number.parseFloat(parts[3]!);
+    if (!Number.isFinite(pid) || !Number.isFinite(memPercent)) continue;
+    rows.push({
+      user,
+      pid,
+      cpuPercent: Number.isFinite(cpuPercent) ? cpuPercent : 0,
+      memPercent,
+      command: parts.slice(10).join(" "),
+    });
+  }
+
+  return rows;
+}
+
+function shortenCommand(command: string, maxLength = 72): string {
+  if (command.length <= maxLength) return command;
+  return `${command.slice(0, maxLength - 1)}…`;
+}
+
 function buildLinuxModules(run: RunDetail, artifactContent: string): RunDetailSummaryModule[] {
   const sections = parseLinuxSections(artifactContent);
   const diskUsage = extractLinuxDiskUsage(sections);
@@ -760,6 +912,7 @@ function buildLinuxModules(run: RunDetail, artifactContent: string): RunDetailSu
   const pendingUpgrades = extractPendingUpgradeCount(sections);
   const recentErrors = extractRecentErrorCount(sections);
   const loadAverage = extractLoadAverage(sections);
+  const topProcesses = extractLinuxTopProcesses(sections);
   const peakDisk = diskUsage[0]?.usagePercent ?? 0;
 
   const stats: RunDetailSummaryStat[] = [
@@ -850,6 +1003,43 @@ function buildLinuxModules(run: RunDetail, artifactContent: string): RunDetailSu
     });
   }
 
+  const topByMemory = [...topProcesses].sort((a, b) => b.memPercent - a.memPercent).slice(0, 5);
+  const topByCpu = [...topProcesses].sort((a, b) => b.cpuPercent - a.cpuPercent).slice(0, 5);
+  const maxMemPercent = topByMemory[0]?.memPercent ?? 0;
+  const maxCpuPercent = topByCpu[0]?.cpuPercent ?? 0;
+
+  if (topByMemory.length > 0) {
+    modules.push({
+      id: "host-top-processes",
+      title: "Top Processes",
+      summary: "Highest memory and CPU consumers from the captured ps snapshot — only shown when the audit includes a process listing.",
+      tone: moduleTone(maxMemPercent >= 50 || maxCpuPercent >= 50, "warning", "neutral"),
+      prominence: "supporting",
+      kind: "bar-list",
+      bars: [
+        ...topByMemory.slice(0, 3).map((process) => ({
+          label: `${process.user} · pid ${process.pid}`,
+          value: process.memPercent,
+          maxValue: maxMemPercent || 1,
+          value_label: `${process.memPercent.toFixed(1)}% mem`,
+          detail: shortenCommand(process.command),
+          tone: barTone(process.memPercent) as RunDetailSummaryTone,
+        })),
+        ...topByCpu
+          .filter((process) => !topByMemory.slice(0, 3).some((top) => top.pid === process.pid))
+          .slice(0, 2)
+          .map((process) => ({
+            label: `${process.user} · pid ${process.pid}`,
+            value: process.cpuPercent,
+            maxValue: maxCpuPercent || 1,
+            value_label: `${process.cpuPercent.toFixed(1)}% cpu`,
+            detail: shortenCommand(process.command),
+            tone: barTone(process.cpuPercent) as RunDetailSummaryTone,
+          })),
+      ],
+    });
+  }
+
   if (callouts.length > 0) {
     modules.push({
       id: "host-pressure-callouts",
@@ -870,21 +1060,24 @@ export function buildRunDetailSummaryModules(
   artifactContent: string | null | undefined
 ): RunDetailSummaryModule[] {
   const modules: RunDetailSummaryModule[] = [];
+  const hasArtifactBytes = Boolean(artifactContent?.trim());
 
-  if (artifactContent && run.artifact_type === "kubernetes-bundle") {
-    modules.push(...buildKubernetesModules(run, artifactContent));
-  } else if (artifactContent && run.artifact_type === "container-diagnostics") {
-    modules.push(...buildContainerModules(run, artifactContent));
-  } else if (artifactContent && run.artifact_type === "linux-audit-log") {
-    modules.push(...buildLinuxModules(run, artifactContent));
+  if (hasArtifactBytes && run.artifact_type === "kubernetes-bundle") {
+    modules.push(...buildKubernetesModules(run, artifactContent!));
+  } else if (hasArtifactBytes && run.artifact_type === "container-diagnostics") {
+    modules.push(...buildContainerModules(run, artifactContent!));
+  } else if (hasArtifactBytes && run.artifact_type === "linux-audit-log") {
+    modules.push(...buildLinuxModules(run, artifactContent!));
   }
+
+  const hasFamilyPrimary = modules.some((module) => module.prominence === "primary");
 
   const priorityCallouts = buildPriorityCallouts(run);
   if (priorityCallouts) {
     modules.push(priorityCallouts);
   }
 
-  modules.push(...sharedSummaryModules(run));
+  modules.push(...sharedSummaryModules(run, { includeHealthSummary: !hasFamilyPrimary }));
 
   if (!modules.some((module) => module.prominence === "primary") && modules[0]) {
     modules[0] = { ...modules[0], prominence: "primary" };

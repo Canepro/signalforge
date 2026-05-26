@@ -62,6 +62,7 @@ describe("toRunDetailJson", () => {
     });
     expect(j.report).not.toBeNull();
     expect(j.severity_counts).toEqual({ critical: 0, high: 0, medium: 0, low: 0 });
+    expect("summary_modules" in j).toBe(false);
   });
 
   it("falls back to null for malformed persisted JSON fields", () => {
