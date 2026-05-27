@@ -42,6 +42,9 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`operators/README.md`](./operators/README.md) | Operator docs entrypoint for Sources, agents, collection jobs, and current execution guidance |
 | [`operators/sources-and-agents.md`](./operators/sources-and-agents.md) | Sources UI, enrollment, collection-job lifecycle, and the control-plane / execution-plane split |
 | [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md) | Source-bound automation-agent setup, HTTP connection model, and helper-script workflow for external AI agents |
+| [`operators/source-inventory-map.md`](./operators/source-inventory-map.md) | Canonical map of every planned and enrolled diagnostic Source: target identifier, artifact family, credential store, and Selene access |
+| [`operators/selene-multi-source-enrollment.md`](./operators/selene-multi-source-enrollment.md) | Per-source automation-agent token naming, Infisical secret names, host file paths, enrollment steps, and discovery model |
+| [`operators/selene-source-wrappers.md`](./operators/selene-source-wrappers.md) | Per-source wrapper contract and template scripts for Selene diagnostic requests |
 | [`operators/selene-codex-app-server-integration.md`](./operators/selene-codex-app-server-integration.md) | Selene automation-agent vs Codex App Server analysis brain roles, scopes, and Infisical secret boundaries |
 | [`operators/codex-brain-artifact-quality-pass.md`](./operators/codex-brain-artifact-quality-pass.md) | Mandatory-fixture Codex brain quality review notes and smoke commands |
 | [`operators/autonomous-kubernetes-actions.md`](./operators/autonomous-kubernetes-actions.md) | Autonomous Kubernetes signal and safe-fix action model, including trust boundaries and required capabilities |
