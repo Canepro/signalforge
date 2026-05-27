@@ -473,6 +473,19 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     return `${finding.title}, which should be reviewed to confirm the exposure matches intent.`;
   }
+  if (finding.category === "security") {
+    const title = finding.title.toLowerCase();
+    if (title.includes("filevault")) {
+      return `${finding.title}, leaving local data exposed if the Mac is lost, stolen, or accessed outside the normal login path.`;
+    }
+    if (title.includes("system integrity protection")) {
+      return `${finding.title}, weakening macOS protections that limit modification of protected system files and processes.`;
+    }
+    if (title.includes("homebrew")) {
+      return `${finding.title}, so workstation tooling may be missing security or stability fixes.`;
+    }
+    return `${finding.title}, which should be reviewed against the workstation security baseline.`;
+  }
   if (finding.category === "logs") {
     return `${finding.title}, indicating recent service or platform errors still warrant review after noise filtering.`;
   }
@@ -707,6 +720,20 @@ function buildActionForFinding(
       return `Identify the process for port ${port ?? "?"} (for example \`ss -ltnp\` / \`sudo lsof -i -P -n\`) and restrict or stop it if remote access is not intended.`;
     }
     return `Review the listener${port ? ` on port ${port}` : ""} and confirm the bound address is intentionally reachable.`;
+  }
+
+  if (finding.category === "security") {
+    const tl = finding.title.toLowerCase();
+    if (tl.includes("filevault")) {
+      return "Enable FileVault or document the approved exception, then confirm recovery-key escrow and restart behavior match the workstation policy.";
+    }
+    if (tl.includes("system integrity protection")) {
+      return "Re-enable System Integrity Protection from macOS Recovery unless this Mac has a documented, time-bounded operational exception.";
+    }
+    if (tl.includes("homebrew")) {
+      return "Review and apply the pending Homebrew upgrades, then rerun the diagnostic to confirm the workstation tooling backlog is clear.";
+    }
+    return "Review the Mac security finding against the workstation baseline and close or document the exception with owner and expiry.";
   }
 
   if (finding.category === "ssh") {

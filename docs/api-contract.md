@@ -131,6 +131,7 @@ Currently supported artifact families:
 - `linux-audit-log`
 - `container-diagnostics`
 - `kubernetes-bundle`
+- `mac-diagnostics`
 
 TypeScript: `PostRunsResponse` in `src/types/api-contract.ts`.  
 Schema: `docs/schemas/post-runs-response.schema.json`, `docs/schemas/ingestion-metadata.schema.json`.
@@ -267,7 +268,7 @@ When no baseline exists, `baseline_missing` is `true` and `evidence_delta` is `n
 
 All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
 
-**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics` and `kubernetes-bundle`), `default_collector_type`, optional typed `default_collection_scope` (`linux_host` / `container_target` / `kubernetes_scope`) validated against `expected_artifact_type`, `capabilities`, `labels`, `enabled`.
+**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `mac_workstation` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics`, `kubernetes-bundle`, and `mac-diagnostics`), `default_collector_type`, optional typed `default_collection_scope` (`linux_host` / `mac_host` / `container_target` / `kubernetes_scope`) validated against `expected_artifact_type`, `capabilities`, `labels`, `enabled`.
 **201:** source object. **400** validation, including `code: "unsupported_artifact_type"` when `expected_artifact_type` is not supported. **409** `duplicate_target_identifier`.
 
 `source_type` is the execution host kind in v1, not a full evidence-target taxonomy. For container and Kubernetes sources, operators should read `expected_artifact_type` plus `default_collection_scope` as the durable description of what evidence the agent will collect.

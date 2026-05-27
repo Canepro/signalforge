@@ -25,6 +25,7 @@ Today, the shipped analyzer supports three artifact families:
 - `linux-audit-log`
 - `container-diagnostics`
 - `kubernetes-bundle`
+- `mac-diagnostics`
 
 That currently means Linux and WSL audit logs generated in the `signalforge-collectors` style, plus text-based container diagnostics and UTF-8 JSON Kubernetes evidence bundles.
 

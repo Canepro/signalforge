@@ -47,7 +47,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 
 ## Product snapshot
 
-- **Artifacts:** `linux-audit-log` (`first-audit.sh`-style host audit output), `container-diagnostics` (text-based container diagnostics for a single container or workload), and `kubernetes-bundle` (UTF-8 JSON manifest for cluster- or namespace-scoped Kubernetes evidence).
+- **Artifacts:** `linux-audit-log` (`first-audit.sh`-style host audit output), `container-diagnostics` (text-based container diagnostics for a single container or workload), `kubernetes-bundle` (UTF-8 JSON manifest for cluster- or namespace-scoped Kubernetes evidence), and `mac-diagnostics` (structured macOS workstation diagnostics).
 - **LLM:** OpenAI direct or Azure OpenAI **Responses** API; deterministic fallback if misconfigured or unavailable.
 - **Workflows:** artifact **upload** (UI/API), **run detail**, **reanalyze** (same artifact, new run), **compare** (deterministic finding drift plus `evidence_delta`), **CLI** upload helper, **Sources** (`/sources`) for registered targets and **queued** collection jobs, **signalforge-agent** for external job-driven collection (heartbeat + poll + claim + collect + upload), and autonomous Kubernetes safe-fix actions behind explicit Source opt-in.
 - **Persistence:** `sqlite` remains the default local backend; `postgres` is available behind `DATABASE_DRIVER=postgres` with checked-in SQL migrations, and the committed ACA contract keeps Neon Postgres as the durable app backend.

@@ -14,12 +14,14 @@ type CollectionScopeFieldsProps = {
 
 function allowedKindForArtifactType(artifactType: ArtifactType): CollectionScope["kind"] {
   if (artifactType === "linux-audit-log") return "linux_host";
+  if (artifactType === "mac-diagnostics") return "mac_host";
   if (artifactType === "container-diagnostics") return "container_target";
   return "kubernetes_scope";
 }
 
 function kindLabel(kind: CollectionScope["kind"]): string {
   if (kind === "linux_host") return "Linux host";
+  if (kind === "mac_host") return "Mac host";
   if (kind === "container_target") return "Container target";
   return "Kubernetes scope";
 }
@@ -65,6 +67,12 @@ export function CollectionScopeFields({
       {kind === "linux_host" && (
         <p className="text-xs leading-relaxed text-on-surface-variant">
           Store an explicit Linux host scope on this record. This keeps the job or source self-describing even though there are no extra target fields.
+        </p>
+      )}
+
+      {kind === "mac_host" && (
+        <p className="text-xs leading-relaxed text-on-surface-variant">
+          Store an explicit Mac host scope on this record. This keeps the job or source self-describing even though there are no extra target fields.
         </p>
       )}
 

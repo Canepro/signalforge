@@ -131,7 +131,7 @@ family, execution agent, or secret path is not decided yet.
 
 | source pattern | common blocker |
 | --- | --- |
-| `mac:<workstation>` | dedicated macOS artifact family or interim Linux-compatible evidence decision |
+| `mac:<workstation>` | `mac-diagnostics` Source enrollment and Mac collector deployment |
 | `aks:<cluster-name>` | cluster identity, kubeconfig path, and read-only RBAC not confirmed |
 | `container-host:<host-label>` | runtime host and Docker/Podman socket access not confirmed |
 

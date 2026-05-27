@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SOURCE_IDENTIFIER="${SIGNALFORGE_SOURCE_IDENTIFIER:-mac:<workstation>}"
-ARTIFACT_FAMILY="${SIGNALFORGE_ARTIFACT_FAMILY:-linux-audit-log}"
+ARTIFACT_FAMILY="${SIGNALFORGE_ARTIFACT_FAMILY:-mac-diagnostics}"
 TOKEN_FILE="${SIGNALFORGE_TOKEN_FILE:-${HOME}/.config/signalforge/automation-agent-token-mac-workstation}"
 SIGNALFORGE_BASE_URL="${SIGNALFORGE_BASE_URL:-}"
 

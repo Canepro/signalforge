@@ -87,6 +87,7 @@ SignalForge currently supports three artifact families in this checkout:
 - `linux-audit-log`
 - `container-diagnostics`
 - `kubernetes-bundle`
+- `mac-diagnostics`
 
 That includes Linux and WSL audit logs in the `signalforge-collectors` style, text-based container diagnostics, and UTF-8 JSON Kubernetes evidence bundles.
 

@@ -1,0 +1,20 @@
+=== mac-diagnostics ===
+hostname: operator-mac.local
+os_name: macOS
+os_version: 26.5
+build_version: 25F71
+kernel: 25.5.0
+architecture: arm64
+uptime: up 4 days, 2:15
+current_user: operator
+ran_as_root: false
+sip_status: System Integrity Protection status: enabled.
+filevault_status: On
+firewall_state: Off
+remote_login: On
+remote_management: Off
+stealth_mode: Off
+listening_tcp_json: [{"command":"sshd","pid":123,"user":"root","protocol":"TCP","address":"0.0.0.0","port":22},{"command":"node","pid":456,"user":"operator","protocol":"TCP","address":"127.0.0.1","port":3000}]
+disk_root_used_percent: 91.2
+brew_outdated_count: 12
+mdm_enrollment: unknown

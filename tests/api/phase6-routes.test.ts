@@ -162,6 +162,27 @@ describe("Phase 6 API routes", () => {
     expect((await res.json()).code).toBe("invalid_default_collection_scope");
   });
 
+  it("POST /api/sources accepts mac-diagnostics with mac_host scope", async () => {
+    const res = await POST_SOURCES(
+      new NextRequest("http://localhost/api/sources", {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({
+          display_name: "Mac workstation",
+          target_identifier: "mac:workstation-primary",
+          source_type: "mac_workstation",
+          expected_artifact_type: "mac-diagnostics",
+          default_collection_scope: { kind: "mac_host" },
+        }),
+      })
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.expected_artifact_type).toBe("mac-diagnostics");
+    expect(body.default_collection_scope).toEqual({ kind: "mac_host" });
+  });
+
   it("PATCH /api/sources rejects immutable fields", async () => {
     const post = await POST_SOURCES(
       new NextRequest("http://localhost/api/sources", {

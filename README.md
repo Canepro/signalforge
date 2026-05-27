@@ -13,6 +13,7 @@ Infrastructure diagnostics control plane. SignalForge ingests external evidence 
 | `linux-audit-log` | Linux host audit logs via `signalforge-collectors` |
 | `container-diagnostics` | Text-based diagnostics for a single container or workload |
 | `kubernetes-bundle` | UTF-8 JSON Kubernetes evidence bundles |
+| `mac-diagnostics` | Structured macOS workstation diagnostics |
 
 ## Ecosystem
 

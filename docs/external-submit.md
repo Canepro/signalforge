@@ -38,7 +38,7 @@ This document describes the current `POST /api/runs` submission contract.
 
 
 If `artifact_type` is omitted, the server infers a type from content.
-Today, the shipped artifact families are `linux-audit-log`, `container-diagnostics`, and `kubernetes-bundle`.
+Today, the shipped artifact families are `linux-audit-log`, `container-diagnostics`, `kubernetes-bundle`, and `mac-diagnostics`.
 If the supplied or inferred `artifact_type` is unsupported, the route returns **400** with `code: "unsupported_artifact_type"`.
 
 For `kubernetes-bundle`, `content` should be a UTF-8 JSON manifest with `schema_version: "kubernetes-bundle.v1"` and a `documents` array of named text documents. Raw archives are not accepted in this v1 contract.
@@ -76,18 +76,19 @@ Length limits and validation follow `src/lib/ingestion/meta.ts` (e.g. `collected
 ## Target Identity vs Hostname
 
 - **Hostname** is still derived from the artifact by the adapter (`linux-audit-log`) when present.
-- `**target_identifier`** is **submission metadata**: use it when you have a fleet id, enrollment id, or stable label that should tie runs together even if hostnames differ or logs are ambiguous.
-- Compare and baseline selection use `**target_identifier` first**, then normalized hostname, then same-artifact history when identity is missing (see `findPreviousRunForSameTarget`).
+- **`target_identifier`** is submission metadata: use it when you have a fleet id, enrollment id, or stable label that should tie runs together even if hostnames differ or logs are ambiguous.
+- Compare and baseline selection use **`target_identifier` first**, then normalized hostname, then same-artifact history when identity is missing (see `findPreviousRunForSameTarget`).
 
 ### Recommended `target_identifier` shapes by artifact family
 
-- `**linux-audit-log`**: use a stable machine or fleet id such as `fleet:prod:web-01` when hostname alone is not trustworthy enough.
-- `**container-diagnostics**`: choose the compare scope deliberately.
+- **`linux-audit-log`**: use a stable machine or fleet id such as `fleet:prod:web-01` when hostname alone is not trustworthy enough.
+- **`container-diagnostics`**: choose the compare scope deliberately.
   - workload-stable compare: `container-workload:<host>:<runtime>:<service>`
   - instance-level compare: `container-instance:<host>:<runtime>:<container-id>`
-- `**kubernetes-bundle**`: make cluster and scope explicit.
+- **`kubernetes-bundle`**: make cluster and scope explicit.
   - cluster-scoped bundle: `cluster:<cluster-name>`
   - namespace-scoped bundle: `cluster:<cluster-name>:namespace:<namespace>`
+- **`mac-diagnostics`**: use a stable workstation id such as `mac:workstation-primary`.
 
 For container and Kubernetes evidence, prefer workload- or scope-stable identifiers over volatile runtime object names when the operator wants meaningful compare history across redeploys.
 
