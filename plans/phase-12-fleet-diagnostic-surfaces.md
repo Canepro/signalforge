@@ -1,6 +1,6 @@
 # Phase 12: Fleet Diagnostic Surfaces
 
-Status: planned
+Status: slice 1 complete; slice 2 in progress
 
 ## Goal
 
@@ -101,6 +101,8 @@ Add a documented operator map for Vincent's real diagnostic surfaces:
 - AKS
 - container/runtime surfaces
 
+Canonical document: [`docs/operators/source-inventory-map.md`](../docs/operators/source-inventory-map.md)
+
 Done when each planned Source has:
 
 - target identifier
@@ -110,6 +112,14 @@ Done when each planned Source has:
 - credential store
 - Selene access decision
 - safe-fix policy decision
+
+**Current state (2026-05-27):**
+
+- `oke:prod-eu1` — live; Selene path confirmed end-to-end
+- `linux:hostinger-prod` — enrolled; end-to-end smoke pending
+- `mac:vincent-primary` — planned; blocked on mac-diagnostics family decision
+- `aks:TODO` — planned; cluster name unknown; do not enroll until resolved
+- `container-host:TODO` — planned; target surface not yet chosen
 
 ### Slice 3: Multi-Source Selene Enrollment
 
