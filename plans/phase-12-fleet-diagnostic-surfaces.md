@@ -1,6 +1,6 @@
 # Phase 12: Fleet Diagnostic Surfaces
 
-Status: slice 1 complete; slice 2 complete; slice 3 in progress; slice 4 in progress
+Status: slice 1 complete; slice 2 complete; slice 3 in progress; slice 4 complete; operational follow-through in progress
 
 ## Goal
 
@@ -229,6 +229,36 @@ Done when wrappers:
 - Linux VPS wrapper: ready; deploy to velora-infra pending smoke test of `linux:hostinger-prod`
 - Mac wrapper: ready; deploy deferred until Source enrollment prerequisites met
 - AKS, container-host: no templates; waiting on slice 2 prerequisites
+
+### Operational follow-through
+
+Deployment checklists and operator verification report template for the
+real Selene/velora-infra lane.
+
+Checklist doc: [`docs/operators/selene-wrapper-deployment-checklist.md`](../docs/operators/selene-wrapper-deployment-checklist.md)
+
+Covers:
+
+- `oke:prod-eu1` token-path cutover: legacy unsuffixed → per-source path,
+  step-by-step with rollback
+- `linux:hostinger-prod` initial wrapper deployment with preflight verification
+- Blocked-sources table (mac, aks, container-host) with explicit blocker reasons
+- Operator verification report template (fillable; stored in velora-infra notes,
+  not committed here)
+
+Done when:
+
+- `oke:prod-eu1` per-source token path and new wrapper deployed and smoke-tested
+  in velora-infra
+- `linux:hostinger-prod` wrapper deployed and smoke-tested end-to-end
+- Slice 3 `linux:hostinger-prod` enrollment verified (prerequisite for above)
+
+**Current blockers (2026-05-27):**
+
+- OKE cutover: requires coordinated velora-infra change; checklist is ready
+- Linux VPS deployment: requires `linux:hostinger-prod` source enrollment smoke
+  test to pass first; checklist is ready
+- Mac/AKS/container-host: blocked on source-creation prerequisites
 
 ### Slice 5: Action Policy Expansion
 
