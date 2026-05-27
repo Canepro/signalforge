@@ -278,6 +278,57 @@ When analysis is available, `result` includes:
 
 That payload is meant to be easy for another agent to consume directly without having to stitch together multiple SignalForge reads.
 
+## Wrapper Integration Pattern
+
+For operators running per-source Bash wrappers around the automation-agent API, a
+normalized summary shape is recommended so every source emits the same structure
+regardless of artifact type.
+
+The recommended normalized output for a `collect-summary` command:
+
+```json
+{
+  "source_slug":       "<source-target-identifier>",
+  "target_identifier": "<target>",
+  "request_id":        "<uuid>",
+  "run_id":            "<uuid>",
+  "artifact_type":     "<kubernetes-bundle|linux-audit-log|container-diagnostics|...>",
+  "status":            "<complete|error|...>",
+  "request_status":    "<submitted|failed|cancelled|expired>",
+  "severity_counts":   {"critical": 0, "high": 0, "medium": 0, "low": 0},
+  "top_findings":      ["<finding title>", "..."],
+  "links":             {
+    "run":     "<base-url>/runs/<run-id>",
+    "report":  "<base-url>/runs/<run-id>/report",
+    "compare": "/api/runs/<run-id>/compare"
+  },
+  "collected_at":      "<ISO-8601 timestamp of request submission>",
+  "completed_at":      "<ISO-8601 timestamp of request completion>"
+}
+```
+
+When the request or analysis failed, include:
+
+```json
+{
+  "error": "<analysis_error or request error_message>"
+}
+```
+
+Field notes:
+
+- `source_slug` — stable source target identifier; set from the wrapper constant, not the API response
+- `status` — run/analysis status from `result.status`; `null` if no result yet
+- `request_status` — request lifecycle status from `request.status`
+- `top_findings` — up to 5 finding titles from `result.findings[].title`; falls back to `result.top_actions_now` if findings are empty
+- `collected_at` — from `request.submitted_at`
+- `completed_at` — from `request.finished_at` when present, otherwise `request.submitted_at`
+- `links.run` — from `result.links.run` or synthesized as `<base-url>/runs/<run-id>`
+
+**Delayed result race:** `request.status` may become `submitted` before `result.run_id`
+is populated. Wrappers should retry polling for `result.run_id` after reaching
+`submitted` before emitting the normalized summary.
+
 ## Minimal Raw HTTP Examples
 
 Register:

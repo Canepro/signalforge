@@ -21,8 +21,8 @@ file. Paths to secret store files are safe to document; values are not.**
 | `oke:prod-eu1`          | live      | `kubernetes-bundle`   | yes           | `kubernetes.disable-service-account-token-automount.v1` only |
 | `linux:hostinger-prod`  | enrolled  | `linux-audit-log`     | yes           | none |
 | `mac:vincent-primary`   | planned   | `linux-audit-log`*    | planned       | none |
-| `aks:TODO`              | planned   | `kubernetes-bundle`   | planned       | none |
-| `container-host:TODO`   | planned   | `container-diagnostics` | planned     | none |
+| `aks:<cluster-name>`    | planned   | `kubernetes-bundle`   | planned       | none |
+| `container-host:<host>` | planned   | `container-diagnostics` | planned     | none |
 
 \* Pending `mac-diagnostics` family decision. See open question in
 [`phase-12-fleet-diagnostic-surfaces.md`](../../plans/phase-12-fleet-diagnostic-surfaces.md).
@@ -32,7 +32,7 @@ file. Paths to secret store files are safe to document; values are not.**
 | value    | meaning |
 |----------|---------|
 | `live`   | Selene automation-agent path tested end-to-end |
-| `enrolled` | Source and execution-agent token exist in the app; automation-agent token issued; not yet smoke-tested end-to-end |
+| `enrolled` | Source and execution-agent token exist in the app; automation-agent token issued; live end-to-end diagnostic not yet confirmed |
 | `planned` | Fields documented; Source not yet created in the app |
 
 ---
@@ -67,10 +67,9 @@ not use `oke-cluster` — that context name does not resolve on the host.
 |-------|-------|
 | **execution form** | Cluster-side `signalforge-agent` Deployment (or wrapper-triggered collection from VPS) |
 | **credential store — execution agent** | `signalforge-agent` service env or Infisical-injected; stored as token hash in app |
-| **credential store — automation agent** | Legacy: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token` (in use); target: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` after slice 4 wrapper update |
+| **credential store — automation agent** | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` |
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
-| **Selene wrapper (current live)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh` |
-| **Selene wrapper (target)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh` |
+| **Selene wrapper (current live)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh` |
 | **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` |
 | **Selene access** | yes — automation-agent token enrolled; Selene can request runs and poll results for this Source |
 | **safe-fix policy** | `kubernetes.disable-service-account-token-automount.v1` only; source automation and auto-fix must be explicitly enabled in the app before any fix action is created |
@@ -103,7 +102,7 @@ not use `oke-cluster` — that context name does not resolve on the host.
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
 | **Selene wrapper (target)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh` |
 | **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` |
-| **Selene access** | yes — automation-agent token issued; end-to-end smoke not yet confirmed for Linux path |
+| **Selene access** | yes — automation-agent token issued; live end-to-end diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run) |
 | **safe-fix policy** | none — no safe-fix policy enabled for Linux host sources |
 | **wrapper preflight** | Confirm `signalforge-agent` is running and heartbeating before requesting collection |
 | **validation proof needed** | Run one `linux-audit-log` collection job through the enrolled agent and confirm the run appears in the app with audit findings |
@@ -145,14 +144,24 @@ family? Do not enroll until this is decided.
 
 ---
 
-### `aks:TODO`
+### `aks:<cluster-name>` (discovery required)
 
-| field | value |
-|-------|-------|
-| **target\_identifier** | `aks:TODO` — exact cluster name unknown; update before enrolling |
-| **display name** | TODO — AKS cluster name |
+The AKS source entry is a placeholder until the target cluster is identified.
+Fill in the discovery fields below, then create the Source in the app.
+
+**Discovery fields (fill in before creating Source)**
+
+| field | to fill in |
+|-------|-----------|
+| **target\_identifier** | `aks:<cluster-name>` — use the cluster's stable short name, e.g. `aks:prod-eu1` |
+| **display name** | `AKS cluster / <cluster-name>` |
 | **artifact family** | `kubernetes-bundle` |
-| **status** | planned |
+| **status** | planned → enrolled after Source creation |
+| **cloud** | Azure |
+| **cluster name** | AKS resource name in Azure |
+| **resource group** | Azure resource group |
+| **kube context** | kubectl context name configured on the operator host |
+| **kubeconfig path** | Per-cluster path following the pattern used for OKE |
 
 **Collection scope** (fill in before enrolling)
 
@@ -160,19 +169,29 @@ family? Do not enroll until this is decided.
 {
   "kind": "kubernetes_scope",
   "scope_level": "cluster",
-  "kubectl_context": "TODO",
-  "cluster_name": "TODO",
+  "kubectl_context": "<aks-context-name>",
+  "cluster_name": "<aks-cluster-name>",
   "provider": "aks"
 }
 ```
 
+**Naming conventions (once cluster name is known)**
+
+| artifact | pattern | example |
+|---|---|---|
+| target\_identifier | `aks:<cluster-name>` | `aks:prod-eu1` |
+| Infisical secret | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_<CLUSTER_NAME_UPPER>` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_PROD_EU1` |
+| token file | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-aks-<cluster-name>` | `…-aks-prod-eu1` |
+| wrapper script | `signalforge-diagnostic-aks-<cluster-name>.sh` | `…-aks-prod-eu1.sh` |
+| kubeconfig | `/etc/velora-infra/selene/kubeconfigs/aks-<cluster-name>.kubeconfig` | `…-aks-prod-eu1.kubeconfig` |
+
 | field | value |
 |-------|-------|
 | **execution form** | Cluster-side `signalforge-agent` Deployment with read-only RBAC |
-| **credential store** | TODO — Infisical AKS path or cluster-side ServiceAccount |
+| **credential store — automation agent** | Token file at per-source host path; Infisical per-source secret name |
 | **Selene access** | planned — decide whether to start with production cluster (read-only diagnostics only) or a lower-risk validation cluster |
 | **safe-fix policy** | none initially; `kubernetes.disable-service-account-token-automount.v1` may be added once diagnostics are reliable |
-| **wrapper/preflight** | TODO — document kubeconfig or workload-identity bootstrap |
+| **wrapper/preflight** | Follow OKE wrapper pattern; adapt for AKS kubeconfig and context |
 | **validation proof needed** | Confirm `kubectl --context=<target> auth can-i list pods --all-namespaces` passes for the agent ServiceAccount before enrolling |
 
 **Prerequisite:** resolve which AKS cluster to target before creating the
@@ -181,35 +200,54 @@ Source in the app. See open question in
 
 ---
 
-### `container-host:TODO`
+### `container-host:<host-label>` (discovery required)
 
-| field | value |
-|-------|-------|
-| **target\_identifier** | `container-host:TODO` — update to a stable host label when ready |
-| **display name** | TODO — container runtime host |
-| **artifact family** | `container-diagnostics` |
-| **status** | planned |
+A container-host source targets a specific host's container runtime. Multiple
+container-host sources may exist, one per distinct runtime host. Fill in the
+discovery fields before creating a Source.
+
+**What qualifies as a container-host source**
+
+A host running Docker or Podman that Selene should have visibility into. The
+host must have `signalforge-agent` installed with runtime socket access. Each
+stable, long-lived container runtime host gets its own Source with a unique
+`host-label`.
+
+**Discovery fields (fill in before creating Source)**
+
+| field | to fill in |
+|-------|-----------|
+| **target\_identifier** | `container-host:<host-label>` — use a stable label for the host, e.g. `container-host:vps-prod-01` |
+| **display name** | `Container host / <host-label>` |
+| **runtime** | `docker` or `podman` |
+| **container\_ref** | Stable workload identifier (not an ephemeral container ID) |
 
 **Collection scope** (fill in before enrolling)
 
 ```json
 {
   "kind": "container_target",
-  "container_ref": "TODO",
-  "runtime": "docker"
+  "container_ref": "<stable-workload-id>",
+  "runtime": "<docker|podman>"
 }
 ```
 
-Replace `"docker"` with `"podman"` if the host uses Podman. Set `container_ref`
-to the stable workload identifier (not an ephemeral container ID).
+**Naming conventions (once host label is known)**
+
+| artifact | pattern | example |
+|---|---|---|
+| target\_identifier | `container-host:<host-label>` | `container-host:vps-prod-01` |
+| Infisical secret | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_<LABEL_UPPER>` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_VPS_PROD_01` |
+| token file | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-container-host-<host-label>` | `…-vps-prod-01` |
+| wrapper script | `signalforge-diagnostic-container-host-<host-label>.sh` | `…-vps-prod-01.sh` |
 
 | field | value |
 |-------|-------|
 | **execution form** | Host agent (`signalforge-agent`) with runtime socket access |
-| **credential store** | TODO — source-local runtime file or Infisical host path |
+| **credential store — automation agent** | Token file at per-source host path; Infisical per-source secret name |
 | **Selene access** | planned |
 | **safe-fix policy** | none |
-| **wrapper/preflight** | TODO — confirm runtime socket access and container target before enrolling |
+| **wrapper/preflight** | Confirm runtime socket access (`docker info` or `podman info`) and container target before enrolling |
 | **validation proof needed** | Run one `container-diagnostics` collection job and confirm container posture findings appear in the app |
 
 ---
