@@ -195,7 +195,7 @@ use that Source's wrapper.
 
 ## Deploying a wrapper to velora-infra
 
-This repo provides templates in `examples/selene-wrappers/`. To deploy:
+This repo provides templates in `examples/selene-wrappers/`. General steps:
 
 1. Copy the template to the production path in velora-infra:
    ```
@@ -212,8 +212,12 @@ This repo provides templates in `examples/selene-wrappers/`. To deploy:
 5. Run a smoke diagnostic request:
    ```bash
    SIGNALFORGE_BASE_URL=https://<host> \
-     /opt/velora-infra/.../signalforge-diagnostic-<source-slug>.sh --reason "slice-4 smoke" --wait
+     /opt/velora-infra/.../signalforge-diagnostic-<source-slug>.sh --reason "smoke" --wait
    ```
+
+For per-source deployment checklists with exact commands, rollback procedures,
+and the operator verification report template, see:
+[`selene-wrapper-deployment-checklist.md`](./selene-wrapper-deployment-checklist.md)
 
 Do not commit production token values or host-specific configuration back to
 this repo. The templates contain no secrets.
@@ -222,6 +226,7 @@ this repo. The templates contain no secrets.
 
 ## Related docs
 
+- [`selene-wrapper-deployment-checklist.md`](./selene-wrapper-deployment-checklist.md)
 - [`source-inventory-map.md`](./source-inventory-map.md)
 - [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md)
 - [`automation-agent-integration.md`](./automation-agent-integration.md)
