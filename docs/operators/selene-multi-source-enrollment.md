@@ -46,8 +46,10 @@ uppercased.
 | `aks:TODO`              | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_TODO` *(do not create until cluster is named)* |
 | `container-host:TODO`   | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_TODO` *(do not create until target is named)* |
 
-Store **only** the plaintext token value in Infisical. SignalForge stores the
-hash. Do not store the same plaintext in both places.
+Store the plaintext token value in Infisical as the durable secret source.
+SignalForge stores only the hash. Runtime hosts may also have a materialized
+token file copied from Infisical so Selene wrappers can run without printing or
+fetching the value interactively.
 
 ---
 
@@ -138,10 +140,13 @@ The OKE automation-agent token is already enrolled. To verify:
 
    ```bash
    # On the VPS host — do not run on a shared or dev machine
-   install -m 600 -o root -g root /dev/null \
+   install -m 0640 -o root -g ubuntu /dev/null \
      /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod
    # Write the token value using your preferred secret injection method
    ```
+
+   Use the group that the Selene runtime belongs to. On the current VPS that is
+   `ubuntu`, matching the live OKE token file contract (`root:ubuntu 0640`).
 
 5. Smoke-test the enrollment:
 
@@ -209,8 +214,9 @@ operate two Sources, she holds two tokens, one per Source.
 
 To rotate an existing automation-agent token for a Source:
 
-1. Re-enroll via `register <source-id> --display-name selene` — this replaces
-   the existing registration for that Source.
+1. Reissue the automation-agent token from the Sources UI or a future
+   operator-admin rotation route. Do not retry `register` in a loop:
+   duplicate registration returns `409 source_already_registered`.
 2. Copy the new token to Infisical under the per-source secret name.
 3. Write the new token to the host file path.
 4. Confirm the wrapper can still request diagnostics before closing the rotation.
@@ -223,13 +229,13 @@ Do not attempt to rotate by editing the database directly.
 
 Run after enrolling or rotating a token for any Source:
 
-- [ ] `register` returned a `registration_id` and a one-time token
+- [ ] `register` returned an `automation_agent_id` and a one-time token
 - [ ] Token stored in Infisical under the correct per-source secret name
-- [ ] Token stored at the correct host file path (permissions `600`, root-owned on Linux)
+- [ ] Token stored at the correct host file path (`root:<selene-runtime-group> 0640` on Linux hosts; `600` for local user-only workstation files)
 - [ ] `request --reason "smoke"` returns a `request_id`
 - [ ] `wait <request-id>` reaches `submitted` with a non-null `result`
 - [ ] Run appears in the SignalForge Sources UI linked to the correct Source
-- [ ] No cross-source access: a token enrolled for Source A must return `401` when used against Source B's requests
+- [ ] No cross-source access: a token enrolled for Source A must return `403` when used against Source B's requests
 
 ---
 
