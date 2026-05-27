@@ -18,6 +18,10 @@ One important vocabulary rule for operators:
 5. [`job-scoped-collection.md`](./job-scoped-collection.md)
 6. [`../agent-deployment.md`](../agent-deployment.md)
 
+For Selene multi-source setup: [`source-inventory-map.md`](./source-inventory-map.md) →
+[`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md) →
+[`selene-source-wrappers.md`](./selene-source-wrappers.md)
+
 ## Documents
 
 | Document | Use it for |
@@ -27,6 +31,10 @@ One important vocabulary rule for operators:
 | [`autonomous-kubernetes-actions.md`](./autonomous-kubernetes-actions.md) | Opt-in Kubernetes automation signals, safe-fix policies, dry-run/apply evidence, and post-fix verification |
 | [`collection-paths.md`](./collection-paths.md) | Honest push-first vs job-driven guidance by environment |
 | [`job-scoped-collection.md`](./job-scoped-collection.md) | Typed collection-scope defaults and overrides, what SignalForge stores today, and what still depends on sibling repos |
+| [`source-inventory-map.md`](./source-inventory-map.md) | Canonical operator map of every planned and enrolled diagnostic Source: target identifier, artifact family, credential store, Selene access, and safe-fix policy |
+| [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md) | Per-source automation-agent token naming, host file paths, Infisical secret names, enrollment steps, and discovery model |
+| [`selene-source-wrappers.md`](./selene-source-wrappers.md) | Per-source wrapper contract: naming convention, interface, token file, health check, and OKE cutover note |
+| [`selene-codex-app-server-integration.md`](./selene-codex-app-server-integration.md) | Selene automation-agent vs Codex App Server analysis-brain role separation |
 | [`../agent-deployment.md`](../agent-deployment.md) | Preferred long-running `signalforge-agent` deployment model and security baseline |
 | [`../api-contract.md`](../api-contract.md) | Route-level operator and agent HTTP contract |
 

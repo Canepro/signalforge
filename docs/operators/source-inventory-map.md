@@ -69,7 +69,9 @@ not use `oke-cluster` — that context name does not resolve on the host.
 | **credential store — execution agent** | `signalforge-agent` service env or Infisical-injected; stored as token hash in app |
 | **credential store — automation agent** | Legacy: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token` (in use); target: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` after slice 4 wrapper update |
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
-| **Selene wrapper** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh` |
+| **Selene wrapper (current live)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh` |
+| **Selene wrapper (target)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh` |
+| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` |
 | **Selene access** | yes — automation-agent token enrolled; Selene can request runs and poll results for this Source |
 | **safe-fix policy** | `kubernetes.disable-service-account-token-automount.v1` only; source automation and auto-fix must be explicitly enabled in the app before any fix action is created |
 | **validation proof** | Selene live path confirmed working via velora-infra; OKE-scope kubernetes-bundle runs appear in the app with Kubernetes findings |
@@ -99,7 +101,8 @@ not use `oke-cluster` — that context name does not resolve on the host.
 | **credential store — execution agent** | Stored at a host-local path under `/etc/velora-infra/` (exact file separate from the Selene automation token; do not mix the two) |
 | **credential store — automation agent** | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod` (per-source naming; separate from OKE token) |
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
-| **Selene wrapper** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh` |
+| **Selene wrapper (target)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh` |
+| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` |
 | **Selene access** | yes — automation-agent token issued; end-to-end smoke not yet confirmed for Linux path |
 | **safe-fix policy** | none — no safe-fix policy enabled for Linux host sources |
 | **wrapper preflight** | Confirm `signalforge-agent` is running and heartbeating before requesting collection |
@@ -132,7 +135,8 @@ not use `oke-cluster` — that context name does not resolve on the host.
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` (add when source is enrolled) |
 | **Selene access** | planned — automation-agent token not yet issued; Selene access makes sense when on the same network or VPN |
 | **safe-fix policy** | none |
-| **wrapper/preflight** | Local `bun run dev` or `signalforge-agent` service; no wrapper script yet |
+| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh` (do not deploy until enrolled) |
+| **wrapper/preflight** | Local `bun run dev` or `signalforge-agent` service |
 | **validation proof needed** | Run one collection job from a local agent on the workstation and confirm the run appears in the app |
 
 **Open question:** Should Mac workstation diagnostics reuse `linux-audit-log`

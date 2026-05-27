@@ -202,11 +202,12 @@ dynamically at runtime. The model is:
 
 1. Each Source has a canonical token file path on the host where Selene's
    wrapper runs (see the host file naming convention above).
-2. The wrapper script (`signalforge-diagnostic.sh`) reads the token for the
-   Source it is bound to. In slice 4, the wrapper will accept a
-   `--source <target_identifier>` argument and read the matching token file.
-   Until slice 4 lands, the OKE wrapper continues to read the legacy single-token
-   path, and the VPS Linux wrapper reads its own per-source path.
+2. Each Source has a dedicated per-source wrapper script that reads its own
+   token file (not a shared multi-source wrapper with a `--source` flag).
+   See [`selene-source-wrappers.md`](./selene-source-wrappers.md) for the
+   per-source script names and deployment contract.
+   Until the OKE wrapper is updated in velora-infra, the live OKE wrapper
+   continues to read the legacy unsuffixed token path.
 3. Infisical is the durable store for all tokens. When a host is reprovisioned
    or the token is rotated, the new value comes from Infisical and is written to
    the host token file path by the provisioning process — not from chat or

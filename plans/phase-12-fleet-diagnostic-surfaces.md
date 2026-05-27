@@ -1,6 +1,6 @@
 # Phase 12: Fleet Diagnostic Surfaces
 
-Status: slice 1 complete; slice 2 complete; slice 3 in progress
+Status: slice 1 complete; slice 2 complete; slice 3 in progress; slice 4 in progress
 
 ## Goal
 
@@ -183,21 +183,52 @@ Done when:
 
 ### Slice 4: Surface-Specific Collect Wrappers
 
-Create or document thin wrappers for each execution form:
+Create or document thin wrappers for each execution form so Selene's per-source
+access is usable without token-path guessing or manual env-var setup.
 
-- Mac/local host diagnostic
-- Linux `systemd` host diagnostic
-- AKS cluster diagnostic window
-- OKE cluster diagnostic window
-- container runtime diagnostic
+Wrapper contract doc: [`docs/operators/selene-source-wrappers.md`](../docs/operators/selene-source-wrappers.md)  
+Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
+
+**Per-source wrappers (one per Source, source-bound by construction):**
+
+| target\_identifier     | template script | status |
+|------------------------|-----------------|--------|
+| `oke:prod-eu1`         | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` | template ready; OKE token-path migration pending velora-infra update |
+| `linux:hostinger-prod` | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` | template ready; deploy pending smoke test |
+| `mac:vincent-primary`  | `examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh` | template ready; deploy blocked on Source enrollment |
+| `aks:TODO`             | *(create when cluster name is confirmed)* | blocked |
+| `container-host:TODO`  | *(create when target is confirmed)* | blocked |
+
+**Wrapper interface contract:**
+
+- `--reason TEXT` — diagnostic request reason
+- `--wait` / `--timeout SECONDS` — poll to terminal state
+- `--health-check` — validate token file and SignalForge reachability; no request
+
+**Exit codes:** 0 success, 1 usage error, 2 config error (token file missing),
+3 health check failed.
+
+**OKE token-path cutover (required in velora-infra, not this repo):**
+
+- Live token: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token` (legacy)
+- Target path: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1`
+- Migration: write token to new path → update deployed wrapper to read new path → confirm live → remove legacy file
 
 Done when wrappers:
 
 - queue or run only the Source they are bound to
-- restore bounded helper state after temporary collection windows
-- do not print secrets
-- produce no-value health checks
-- leave safe-fix disabled unless explicitly opted in
+- do not print token values at any verbosity level
+- produce a no-value health check via `--health-check`
+- leave safe-fix disabled by default (wrappers request diagnostics only)
+- template scripts pass `bash -n`
+
+**Current state (2026-05-27):**
+
+- All three concrete templates written and passing `bash -n`
+- OKE wrapper: ready; velora-infra deployment and token-path migration pending
+- Linux VPS wrapper: ready; deploy to velora-infra pending smoke test of `linux:hostinger-prod`
+- Mac wrapper: ready; deploy deferred until Source enrollment prerequisites met
+- AKS, container-host: no templates; waiting on slice 2 prerequisites
 
 ### Slice 5: Action Policy Expansion
 
