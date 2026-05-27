@@ -71,10 +71,10 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 ## Fleet diagnostic direction
 
 SignalForge's next product direction is a source-bound diagnostics control plane
-for Vincent's real machines and operational surfaces: Mac workstation,
-Linux/VPS hosts, AKS, OKE, container runtimes, and future narrow evidence
-surfaces. Selene should be able to request diagnostics and read results for the
-Sources she is authorized for, while collection and action execution stay in
+for operator-owned machines and operational surfaces: Mac workstation,
+Linux hosts, AKS, Kubernetes clusters, container runtimes, and future narrow evidence
+surfaces. An external automation agent should be able to request diagnostics and read results for the
+Sources it is authorized for, while collection and action execution stay in
 source-local agents or wrappers rather than inside the app. Source of truth:
 [`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
 
@@ -93,13 +93,13 @@ source-local agents or wrappers rather than inside the app. Source of truth:
 - Continue removing personal-environment assumptions from docs, scripts, examples, and adjacent repos so self-hosting remains straightforward for operators outside the reference instance.
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
-- Harden large-run LLM enrichment on real Kubernetes bundles before expanding Selene to more Sources. Source of truth: [`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
-- Start the fleet diagnostic surface map for Mac, Linux/VPS, AKS, OKE, and container/runtime Sources, with stable `target_identifier`, artifact family, execution form, credential store, and Selene scope per Source.
+- Harden large-run LLM enrichment on real Kubernetes bundles before expanding automation-agent access to more Sources. Source of truth: [`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
+- Start the fleet diagnostic surface map for Mac, Linux hosts, AKS, Kubernetes clusters, and container/runtime Sources, with stable `target_identifier`, artifact family, execution form, credential store, and automation-agent scope per Source.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare export is shipped on the compare UI (**Export compare JSON** / **Copy compare JSON**, PR #19); CLI remains `scripts/signalforge-read.sh compare`.
 - Phase 8 next-step prep remains in place in [`phase-8-containers-k8s.md`](./phase-8-containers-k8s.md). The artifact-envelope gate remains locked to the text-carried `kubernetes-bundle.v1` manifest.
 - For Kubernetes specifically, prefer a higher quality bar over the smallest possible demo: use official upstream guidance, relevant local skills, realistic fixtures, and read-only live-cluster inspection when that materially improves rule credibility. Use richer platform examples when helpful, but keep the actual detections and wording anchored in plain Kubernetes primitives so the product still fits operators with simpler clusters.
-- Phase 9 job-scoped collection is now wired across `signalforge`, `signalforge-agent`, and `signalforge-collectors`, with repo-local end-to-end validation for Linux plus shim-backed container and Kubernetes flows. The remaining Phase 9 follow-on is narrower: live Postgres parity for the new scope columns plus production-like host or cluster runtime smoke outside this workstation. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
+- Phase 9 job-scoped collection is now wired across `signalforge`, `signalforge-agent`, and `signalforge-collectors`, with repo-local end-to-end validation for Linux plus shim-backed container and Kubernetes flows. The remaining Phase 9 follow-on is narrower: live Postgres parity for the new scope columns plus production-like host or cluster runtime verification outside this workstation. Source of truth: [`phase-9-job-scoped-collection-parameters.md`](./phase-9-job-scoped-collection-parameters.md).
 - The next follow-on after the scoped job contract is stable should be the documented operational diagnostics tranche:
   - richer Kubernetes runtime diagnostics such as events, `top`, node conditions, rollout state, and bounded failing-workload logs
   - the current implementation already includes the first end-to-end Kubernetes operational tranche beyond events and node pressure: bounded unhealthy-workload log excerpts, HPA, PodDisruptionBudget, ResourceQuota, LimitRange, and PVC/PV signals now feed deterministic findings, compare metrics, and run-detail or dashboard evidence cards
@@ -107,10 +107,10 @@ source-local agents or wrappers rather than inside the app. Source of truth:
   - findings and dashboard presentation that surfaces this evidence instead of burying it
   - source of truth: [`phase-9b-operational-diagnostics-and-rich-presentation.md`](./phase-9b-operational-diagnostics-and-rich-presentation.md)
 - Phase 9d run-detail operator summary (slices 1–5) is shipped; see [`phase-9d-run-detail-operator-summary.md`](./phase-9d-run-detail-operator-summary.md). Dashboard **Operational Watch** now surfaces scheduling pressure and cross-artifact runtime/host pressure at fleet level; validate on real ACA runs before broad new surface area.
-- Preferred deployment stance for `signalforge-agent` is now environment-specific: host `systemd` remains the preferred path for `linux-audit-log`, a long-running containerized runner on the runtime host is the preferred path for `container-diagnostics`, and a cluster-side Deployment is the preferred path for `kubernetes-bundle`. The sibling repo now includes all three packaging forms plus token-file credential loading, `preflight`, a dry-run installer flow, explicit `kubectl` and kubeconfig pinning, managed kubeconfig install support, and stricter container-runtime readiness checks that require real Docker or Podman access rather than bare binary presence. A real `systemd-run --user` smoke now validates the preferred host-service path without requiring root.
+- Preferred deployment stance for `signalforge-agent` is now environment-specific: host `systemd` remains the preferred path for `linux-audit-log`, a long-running containerized runner on the runtime host is the preferred path for `container-diagnostics`, and a cluster-side Deployment is the preferred path for `kubernetes-bundle`. The sibling repo now includes all three packaging forms plus token-file credential loading, `preflight`, a dry-run installer flow, explicit `kubectl` and kubeconfig pinning, managed kubeconfig install support, and stricter container-runtime readiness checks that require real Docker or Podman access rather than bare binary presence. A real `systemd-run --user` verification now validates the preferred host-service path without requiring root.
 - Backend parity is in CI. Storage parity tests exercise both SQLite and Postgres. Upgrade-path migration coverage activates once `002_*` exists, and Postgres schema changes should follow the checked-in migration policy: [`../docs/postgres-migrations.md`](../docs/postgres-migrations.md). Plan: [`phase-7-storage-abstraction.md`](phase-7-storage-abstraction.md).
 - **Phase 6 agent delivered:** `signalforge-agent` repo implements the thin external agent from Phase 6b; validated E2E. Scheduling, notifications, token rotation, multi-source agents remain out of scope. Contract: [`phase-6b-source-job-api-contract.md`](phase-6b-source-job-api-contract.md). Architecture: [`phase-6-source-job-agent-architecture.md`](phase-6-source-job-agent-architecture.md). Boundary: [`phase-5-collector-architecture.md`](phase-5-collector-architecture.md); roadmap: [`roadmap.md`](./roadmap.md).
-- Remaining hardening follow-on in `signalforge-agent`: one production-like root-owned host install smoke outside the current dev workstation, plus live runtime-socket smoke on a host where the containerized runner can actually mount the intended Docker or Podman socket.
+- Remaining hardening follow-on in `signalforge-agent`: one production-like root-owned host install verification outside the current dev workstation, plus live runtime-socket verification on a host where the containerized runner can actually mount the intended Docker or Podman socket.
 - Future notifications should attach to domain events now that the source/job/agent model is stable.
 - Keep docs beginner-friendly and current as the product surface grows. `README.md` should stay orientation-first; detailed contracts belong under `docs/`.
 

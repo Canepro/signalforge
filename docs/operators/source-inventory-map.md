@@ -1,87 +1,59 @@
 # Source Inventory Map
 
-Status: slice 2 of Phase 12  
+Status: Phase 12 slice 2 reference
 Updated: 2026-05-27
 
-This document maps every planned and enrolled diagnostic Source to its stable
-target identifier, artifact family, collection scope, execution form, credential
-store, automation-agent access decision, and safe-fix policy. It is the authoritative
-reference before enrolling new tokens or adding automation agents.
+This document is the public template for mapping diagnostic Sources. Keep real
+fleet names, host paths, kubeconfig paths, IPs, and token values in a private
+operations repo or secret store. The SignalForge repo should document the
+contract and safe examples only.
 
-**Do not add secrets, token values, kubeconfig content, or IP addresses to this
-file. Paths to secret store files are safe to document; values are not.**
+For enrollment and wrapper details see:
 
----
+- [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md)
+- [`selene-source-wrappers.md`](./selene-source-wrappers.md)
+- [`automation-agent-integration.md`](./automation-agent-integration.md)
 
-## Quick reference
+## Quick Reference
 
-| target\_identifier      | status    | artifact family       | automation-agent access | safe-fix |
-|-------------------------|-----------|-----------------------|---------------|----------|
-| `oke:prod-eu1`          | live      | `kubernetes-bundle`   | yes           | `kubernetes.disable-service-account-token-automount.v1` only |
-| `linux:hostinger-prod`  | enrolled  | `linux-audit-log`     | yes           | none |
-| `mac:<workstation>`   | planned   | `linux-audit-log`*    | planned       | none |
-| `aks:<cluster-name>`    | planned   | `kubernetes-bundle`   | planned       | none |
-| `container-host:<host>` | planned   | `container-diagnostics` | planned     | none |
-
-\* Pending `mac-diagnostics` family decision. See open question in
-[`phase-12-fleet-diagnostic-surfaces.md`](../../plans/phase-12-fleet-diagnostic-surfaces.md).
+| target identifier pattern | status | artifact family | automation-agent access | safe-fix |
+| --- | --- | --- | --- | --- |
+| `kubernetes:<cluster-name>` | example-live | `kubernetes-bundle` | yes | named policy only |
+| `linux:<host-label>` | example-live | `linux-audit-log` | yes | none |
+| `mac:<workstation>` | planned | `linux-audit-log` or future `mac-diagnostics` | planned | none |
+| `aks:<cluster-name>` | planned | `kubernetes-bundle` | planned | none |
+| `container-host:<host-label>` | planned | `container-diagnostics` | planned | none |
 
 **Status key**
 
-| value    | meaning |
-|----------|---------|
-| `live`   | Automation-agent path tested end-to-end |
-| `enrolled` | Source and execution-agent token exist in the app; automation-agent token issued; live end-to-end diagnostic not yet confirmed |
-| `planned` | Fields documented; Source not yet created in the app |
+| value | meaning |
+| --- | --- |
+| `example-live` | Pattern has been proven in a private deployment; this row is still an anonymized example |
+| `enrolled` | Source exists and tokens are issued, but a completed diagnostic has not been recorded yet |
+| `planned` | Fields are documented; Source is not created yet |
 
----
+## Source Template
 
-## Sources
-
-### `oke:prod-eu1`
+Use one entry like this per Source in your private operations inventory.
 
 | field | value |
-|-------|-------|
-| **target\_identifier** | `oke:prod-eu1` |
-| **display name** | OKE cluster / oke-prod-eu1 |
-| **artifact family** | `kubernetes-bundle` |
-| **status** | live |
+| --- | --- |
+| **target_identifier** | `linux:<host-label>`, `kubernetes:<cluster-name>`, `aks:<cluster-name>`, or `container-host:<host-label>` |
+| **display name** | Operator-facing label that does not reveal private hostnames in public docs |
+| **artifact family** | `linux-audit-log`, `kubernetes-bundle`, or `container-diagnostics` |
+| **status** | `planned`, `enrolled`, or `live` |
+| **execution form** | Host `signalforge-agent`, cluster-side `signalforge-agent` Deployment, or manual artifact push |
+| **credential store - execution agent** | Source-local execution token, separate from automation-agent token |
+| **credential store - automation agent** | Per-source token file on the host where the operator automation runs |
+| **Infisical secret name** | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` |
+| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` or a private wrapper path |
+| **automation-agent access** | `yes`, `no`, or `planned` |
+| **safe-fix policy** | `none` or a named deterministic policy |
+| **validation proof** | Private run id, request id, date, and outcome; do not commit private reports here |
 
-**Collection scope**
+## Collection Scope Examples
 
-```json
-{
-  "kind": "kubernetes_scope",
-  "scope_level": "cluster",
-  "kubectl_context": "oke-primary",
-  "cluster_name": "oke-prod-eu1",
-  "provider": "oke"
-}
-```
-
-| field | value |
-|-------|-------|
-| **execution form** | Cluster-side `signalforge-agent` Deployment (or wrapper-triggered collection from the operator host) |
-| **credential store — execution agent** | `signalforge-agent` service env or Infisical-injected; stored as token hash in app |
-| **credential store — automation agent** | Per-source token file on the operator host (see [selene-multi-source-enrollment.md](./selene-multi-source-enrollment.md)) |
-| **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
-| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` |
-| **automation-agent access** | yes — automation-agent token enrolled; runs and results accessible |
-| **safe-fix policy** | `kubernetes.disable-service-account-token-automount.v1` only; source automation and auto-fix must be explicitly enabled in the app before any fix action is created |
-| **validation proof** | Automation-agent path confirmed working; OKE-scope kubernetes-bundle runs appear in the app with Kubernetes findings |
-
----
-
-### `linux:hostinger-prod`
-
-| field | value |
-|-------|-------|
-| **target\_identifier** | `linux:hostinger-prod` |
-| **display name** | Hostinger VPS — prod lane |
-| **artifact family** | `linux-audit-log` |
-| **status** | enrolled |
-
-**Collection scope**
+Linux host:
 
 ```json
 {
@@ -89,134 +61,19 @@ file. Paths to secret store files are safe to document; values are not.**
 }
 ```
 
-| field | value |
-|-------|-------|
-| **execution form** | `systemd` long-lived execution agent (`signalforge-agent`) on the VPS host |
-| **credential store — execution agent** | Host-local token file, separate from the automation-agent token; do not mix the two |
-| **credential store — automation agent** | Per-source token file on the operator host (per-source naming convention; see [selene-multi-source-enrollment.md](./selene-multi-source-enrollment.md)) |
-| **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
-| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` |
-| **automation-agent access** | yes — automation-agent token issued; live end-to-end diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run) |
-| **safe-fix policy** | none — no safe-fix policy enabled for Linux host sources |
-| **wrapper preflight** | Confirm `signalforge-agent` is running and heartbeating before requesting collection |
-| **validation proof needed** | Run one `linux-audit-log` collection job through the enrolled agent and confirm the run appears in the app with audit findings |
-
----
-
-### `mac:<workstation>`
-
-| field | value |
-|-------|-------|
-| **target\_identifier** | `mac:<workstation>` |
-| **display name** | Primary Mac workstation |
-| **artifact family** | `linux-audit-log` (interim; see open question below) |
-| **status** | planned |
-
-**Collection scope** (interim, pending mac-diagnostics family)
-
-```json
-{
-  "kind": "linux_host"
-}
-```
-
-| field | value |
-|-------|-------|
-| **execution form** | Local `signalforge-agent` service or manual push from the workstation |
-| **credential store — execution agent** | `~/.config/signalforge/agent-token` or Infisical dev injection |
-| **credential store — automation agent** | `~/.config/signalforge/selene-automation-agent-token-mac-<workstation>` (when enrolled) |
-| **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` (add when source is enrolled) |
-| **automation-agent access** | planned — automation-agent token not yet issued; access makes sense when on the same network or VPN |
-| **safe-fix policy** | none |
-| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh` (do not deploy until enrolled) |
-| **wrapper/preflight** | Local `bun run dev` or `signalforge-agent` service |
-| **validation proof needed** | Run one collection job from a local agent on the workstation and confirm the run appears in the app |
-
-**Open question:** Should Mac workstation diagnostics reuse `linux-audit-log`
-for Darwin-friendly sections, or become a dedicated `mac-diagnostics` artifact
-family? Do not enroll until this is decided.
-
----
-
-### `aks:<cluster-name>` (discovery required)
-
-The AKS source entry is a placeholder until the target cluster is identified.
-Fill in the discovery fields below, then create the Source in the app.
-
-**Discovery fields (fill in before creating Source)**
-
-| field | to fill in |
-|-------|-----------|
-| **target\_identifier** | `aks:<cluster-name>` — use the cluster's stable short name, e.g. `aks:prod-eu1` |
-| **display name** | `AKS cluster / <cluster-name>` |
-| **artifact family** | `kubernetes-bundle` |
-| **status** | planned → enrolled after Source creation |
-| **cloud** | Azure |
-| **cluster name** | AKS resource name in Azure |
-| **resource group** | Azure resource group |
-| **kube context** | kubectl context name configured on the operator host |
-| **kubeconfig path** | Per-cluster path following the pattern used for OKE |
-
-**Collection scope** (fill in before enrolling)
+Kubernetes cluster:
 
 ```json
 {
   "kind": "kubernetes_scope",
   "scope_level": "cluster",
-  "kubectl_context": "<aks-context-name>",
-  "cluster_name": "<aks-cluster-name>",
-  "provider": "aks"
+  "kubectl_context": "<context-name>",
+  "cluster_name": "<cluster-name>",
+  "provider": "<provider>"
 }
 ```
 
-**Naming conventions (once cluster name is known)**
-
-| artifact | pattern | example |
-|---|---|---|
-| target\_identifier | `aks:<cluster-name>` | `aks:prod-eu1` |
-| Infisical secret | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_<CLUSTER_NAME_UPPER>` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_PROD_EU1` |
-| token file | `<host-token-dir>/signalforge-automation-agent-token-aks-<cluster-name>` | `…-aks-prod-eu1` |
-| wrapper script | `signalforge-diagnostic-aks-<cluster-name>.sh` | `…-aks-prod-eu1.sh` |
-| kubeconfig | `<host-kubeconfig-dir>/aks-<cluster-name>.kubeconfig` | `…-aks-prod-eu1.kubeconfig` |
-
-| field | value |
-|-------|-------|
-| **execution form** | Cluster-side `signalforge-agent` Deployment with read-only RBAC |
-| **credential store — automation agent** | Token file at per-source host path; Infisical per-source secret name |
-| **automation-agent access** | planned — decide whether to start with production cluster (read-only diagnostics only) or a lower-risk validation cluster |
-| **safe-fix policy** | none initially; `kubernetes.disable-service-account-token-automount.v1` may be added once diagnostics are reliable |
-| **wrapper/preflight** | Follow OKE wrapper pattern; adapt for AKS kubeconfig and context |
-| **validation proof needed** | Confirm `kubectl --context=<target> auth can-i list pods --all-namespaces` passes for the agent ServiceAccount before enrolling |
-
-**Prerequisite:** resolve which AKS cluster to target before creating the
-Source in the app. See open question in
-[`phase-12-fleet-diagnostic-surfaces.md`](../../plans/phase-12-fleet-diagnostic-surfaces.md).
-
----
-
-### `container-host:<host-label>` (discovery required)
-
-A container-host source targets a specific host's container runtime. Multiple
-container-host sources may exist, one per distinct runtime host. Fill in the
-discovery fields before creating a Source.
-
-**What qualifies as a container-host source**
-
-A host running Docker or Podman that the automation agent should have visibility into. The
-host must have `signalforge-agent` installed with runtime socket access. Each
-stable, long-lived container runtime host gets its own Source with a unique
-`host-label`.
-
-**Discovery fields (fill in before creating Source)**
-
-| field | to fill in |
-|-------|-----------|
-| **target\_identifier** | `container-host:<host-label>` — use a stable label for the host, e.g. `container-host:vps-prod-01` |
-| **display name** | `Container host / <host-label>` |
-| **runtime** | `docker` or `podman` |
-| **container\_ref** | Stable workload identifier (not an ephemeral container ID) |
-
-**Collection scope** (fill in before enrolling)
+Container runtime host:
 
 ```json
 {
@@ -226,47 +83,38 @@ stable, long-lived container runtime host gets its own Source with a unique
 }
 ```
 
-**Naming conventions (once host label is known)**
+## Naming Conventions
 
-| artifact | pattern | example |
-|---|---|---|
-| target\_identifier | `container-host:<host-label>` | `container-host:vps-prod-01` |
-| Infisical secret | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_<LABEL_UPPER>` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_VPS_PROD_01` |
-| token file | `<host-token-dir>/signalforge-automation-agent-token-container-host-<host-label>` | `…-vps-prod-01` |
-| wrapper script | `signalforge-diagnostic-container-host-<host-label>.sh` | `…-vps-prod-01.sh` |
+`SOURCE_SLUG` is the `target_identifier` with `:` and `-` replaced by `_`, then
+uppercased.
 
-| field | value |
-|-------|-------|
-| **execution form** | Host agent (`signalforge-agent`) with runtime socket access |
-| **credential store — automation agent** | Token file at per-source host path; Infisical per-source secret name |
-| **automation-agent access** | planned |
-| **safe-fix policy** | none |
-| **wrapper/preflight** | Confirm runtime socket access (`docker info` or `podman info`) and container target before enrolling |
-| **validation proof needed** | Run one `container-diagnostics` collection job and confirm container posture findings appear in the app |
+| target identifier | secret name | token file |
+| --- | --- | --- |
+| `kubernetes:<cluster-name>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_KUBERNETES_<CLUSTER_NAME>` | `<token-dir>/signalforge-automation-agent-token-kubernetes-<cluster-name>` |
+| `linux:<host-label>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_LINUX_<HOST_LABEL>` | `<token-dir>/signalforge-automation-agent-token-linux-<host-label>` |
+| `mac:<workstation>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` | `~/.config/signalforge/automation-agent-token-mac-<workstation>` |
+| `aks:<cluster-name>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_AKS_<CLUSTER_NAME>` | `<token-dir>/signalforge-automation-agent-token-aks-<cluster-name>` |
+| `container-host:<host-label>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_<HOST_LABEL>` | `<token-dir>/signalforge-automation-agent-token-container-host-<host-label>` |
 
----
+## Enrollment Checklist
 
-## Enrollment checklist
+- [ ] `target_identifier` is stable and operator-chosen.
+- [ ] Artifact family is supported by the app.
+- [ ] Collection scope JSON matches `CollectionScope` in `src/lib/collection-scope.ts`.
+- [ ] Execution-agent token and automation-agent token are separate credentials.
+- [ ] Automation-agent token is source-bound and stored outside Git.
+- [ ] Safe-fix policy is explicit: `none` or one named policy.
+- [ ] At least one completed diagnostic is recorded before the Source is treated as live.
+- [ ] Private run ids, host paths, and source names live in the private operations inventory.
 
-Use this checklist before creating any Source entry in the app.
+## Credential Separation
 
-- [ ] target\_identifier is stable and operator-chosen (not a transient hostname or ephemeral ID)
-- [ ] artifact family is one of `linux-audit-log`, `kubernetes-bundle`, `container-diagnostics` (or a documented future family)
-- [ ] collection scope JSON is valid against `CollectionScope` in `src/lib/collection-scope.ts`
-- [ ] execution agent token will be stored at a source-local path (not printed to logs or chat)
-- [ ] automation agent token (for Selene) stored at a path that Selene can read on the relevant host
-- [ ] automation-agent access decision is explicit (yes / no / planned)
-- [ ] safe-fix policy decision is explicit (none / named policy only)
-- [ ] at least one successful collection run has been observed before Selene automation is turned on
+1. **Execution-agent token** - used by `signalforge-agent` for heartbeat, job
+   polling, claiming jobs, and artifact upload.
+2. **Automation-agent token** - used by an external operator agent to read
+   source-bound signals, request diagnostics, poll results, and request
+   permitted fix actions.
+3. **Admin token** - used by operators to create Sources and enroll agents.
 
-## Credential separation reminder
-
-Each Source has at most two tokens:
-
-1. **Collection execution-agent token** — used by `signalforge-agent` for
-   heartbeat, job polling, artifact upload. Never used by Selene.
-2. **Automation-agent token** — used by Selene (or a future operator agent) to
-   request diagnostics and read results. Never used for job execution.
-
-Do not share these tokens across Sources. Do not store token values in this
-file, in plans, or in chat history.
+Never reuse one token type as another. SignalForge stores issued token hashes;
+raw tokens, kubeconfigs, SSH keys, and host credentials stay outside this repo.

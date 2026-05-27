@@ -8,13 +8,13 @@ Make SignalForge useful as the diagnostics control plane for real operator
 machines and operational surfaces without turning the app into an RMM, SSH
 broker, or arbitrary command runner.
 
-Selene should be able to request and read diagnostics for source-bound targets
+An external operator automation agent should be able to request and read diagnostics for source-bound targets
 such as:
 
 - Mac workstation
-- Linux hosts and VPS lanes
+- Linux hosts
 - AKS clusters
-- OKE clusters
+- Kubernetes clusters
 - container/runtime surfaces
 - future narrow diagnostic surfaces that produce evidence artifacts
 
@@ -24,7 +24,7 @@ SignalForge owns:
 
 - Sources as durable target identities
 - source-bound execution-agent registration
-- source-bound automation-agent access for Selene or similar operators
+- source-bound automation-agent access for external operator agents
 - diagnostic request state
 - artifact ingestion
 - deterministic analysis
@@ -49,18 +49,18 @@ scope:
 | Surface | Source target example | Artifact family | Execution form |
 |---------|-----------------------|-----------------|----------------|
 | Mac workstation | `mac:<workstation>` | `linux-audit-log` or future `mac-diagnostics` | local host agent or manual push |
-| Linux VPS | `linux:hostinger-prod` | `linux-audit-log` | host `systemd` execution agent |
+| Linux host | `linux:<host-label>` | `linux-audit-log` | host `systemd` execution agent |
 | AKS cluster | `aks:prod-eu1` | `kubernetes-bundle` | cluster-side Deployment |
-| OKE cluster | `oke:prod-eu1` | `kubernetes-bundle` | cluster-side Deployment |
+| Kubernetes cluster | `kubernetes:<cluster-name>` | `kubernetes-bundle` | cluster-side Deployment |
 | Container host | `container-host:prod` | `container-diagnostics` | host runner with runtime socket access |
 
 The target identifier must be stable and operator-chosen. Hostnames, cluster
 names, and provider labels can appear as metadata, but compare and automation
 should anchor on the Source target key.
 
-## Selene Contract
+## Automation-Agent Contract
 
-Selene receives one automation-agent token per Source or per bounded operator
+An external operator agent receives one automation-agent token per Source or per bounded operator
 scope. That token can:
 
 - read source-bound signals
@@ -96,8 +96,8 @@ Done when:
 Add a documented operator map for the diagnostic surfaces in scope:
 
 - Mac
-- VPS/Linux hosts
-- OKE
+- Linux hosts
+- Kubernetes clusters
 - AKS
 - container/runtime surfaces
 
@@ -110,20 +110,20 @@ Done when each planned Source has:
 - collection scope
 - expected execution form
 - credential store
-- Selene access decision
+- automation-agent access decision
 - safe-fix policy decision
 
 **Current state (2026-05-27):**
 
-- `oke:prod-eu1` — live; Selene path confirmed end-to-end
-- `linux:hostinger-prod` — enrolled; wrapper production-ready; live diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run)
+- `kubernetes:<cluster-name>` — example-live pattern; private deployments record concrete source names outside this repo
+- `linux:<host-label>` — example-live pattern; private deployments record concrete source names outside this repo
 - `mac:<workstation>` — planned; blocked on mac-diagnostics family decision; Mac (Darwin) workstation, not Linux/WSL
 - `aks:<cluster-name>` — planned; cluster name unknown; do not enroll until resolved; see source-inventory-map for naming conventions
 - `container-host:<host-label>` — planned; target surface not yet chosen; see source-inventory-map for naming conventions
 
-### Slice 3: Multi-Source Selene Enrollment
+### Slice 3: Multi-Source Automation-Agent Enrollment
 
-Give Selene a durable way to discover which Sources she can operate without
+Give an external operator agent a durable way to discover which Sources it can operate without
 copying tokens through chat or collapsing all authority into one credential.
 
 Operator runbook: [`docs/operators/selene-multi-source-enrollment.md`](../docs/operators/selene-multi-source-enrollment.md)
@@ -132,13 +132,13 @@ Operator runbook: [`docs/operators/selene-multi-source-enrollment.md`](../docs/o
 
 | target\_identifier     | Infisical secret name |
 |------------------------|-----------------------|
-| `oke:prod-eu1`         | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
-| `linux:hostinger-prod` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
-| `mac:<workstation>`  | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` |
-| `aks:TODO`             | *(wait for cluster name)* |
-| `container-host:TODO`  | *(wait for target name)* |
+| `kubernetes:<cluster-name>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_KUBERNETES_<CLUSTER_NAME>` |
+| `linux:<host-label>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_LINUX_<HOST_LABEL>` |
+| `mac:<workstation>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` |
+| `aks:<cluster-name>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_AKS_<CLUSTER_NAME>` |
+| `container-host:<host-label>` | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_<HOST_LABEL>` |
 
-Pattern: `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` where
+Pattern: `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` where
 `SOURCE_SLUG` = `target_identifier` with `:` and `-` → `_`, uppercased.
 
 **Host file naming convention:**
@@ -151,39 +151,39 @@ For host files, `<source-slug>` is `target_identifier` with `:` replaced by
 `-`, kept lowercase. This is separate from the Infisical `SOURCE_SLUG`, which
 uses `_` and uppercase.
 
-The OKE token has been cut over to the per-source suffixed path. All new
-enrollments use the per-source suffix.
+Private deployments that migrated from a legacy unsuffixed token path should
+record that cutover in their private operations repo. All new enrollments use
+the per-source suffix.
 
 **Discovery model:** Source-bound at invocation time, not dynamic. The wrapper
-script for each Source reads its own token file. Selene never holds a
+script for each Source reads its own token file. The automation agent never holds a
 cross-source credential. Details in the runbook.
 
 **Strict separation (preserved from prior slices):**
 
 - automation-agent token ≠ execution-agent token
-- Selene token ≠ Codex App Server identity
-- SignalForge does not store raw kubeconfigs, SSH keys, or VPS credentials
+- automation-agent token ≠ Codex App Server identity
+- SignalForge does not store raw kubeconfigs, SSH keys, or host credentials
 
 Done when:
 
 - each enrolled Source has a source-bound automation-agent registration
 - per-source token stored in Infisical under the correct naming convention
 - per-source token written to the host file path at the correct location
-- Selene can list/access configured wrappers without seeing token values
+- the automation agent can list/access configured wrappers without seeing token values
 - cross-source override attempts remain rejected
-- `oke:prod-eu1` enrollment verified end-to-end (already live)
-- `linux:hostinger-prod` enrollment verified end-to-end
+- one Kubernetes source enrollment verified end-to-end in a private deployment
+- one Linux host enrollment verified end-to-end in a private deployment
 - `mac:<workstation>`, `aks:<cluster-name>`, `container-host:<host-label>` remain planned pending source-creation prerequisites
 
 **Current state (2026-05-27):**
 
-- `oke:prod-eu1` — token enrolled and live; per-source naming active
-- `linux:hostinger-prod` — token enrollment documented; live diagnostic pending (signalforge-agent not yet heartbeating)
+- Kubernetes and Linux host patterns — verified in a private deployment; concrete source names and run ids stay outside this public repo
 - remaining sources — blocked on source-creation prerequisites from slice 2
 
 ### Slice 4: Surface-Specific Collect Wrappers
 
-Create or document thin wrappers for each execution form so Selene's per-source
+Create or document thin wrappers for each execution form so source-bound
 access is usable without token-path guessing or manual env-var setup.
 
 Wrapper contract doc: [`docs/operators/selene-source-wrappers.md`](../docs/operators/selene-source-wrappers.md)  
@@ -193,8 +193,8 @@ Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
 
 | target\_identifier     | template script | status |
 |------------------------|-----------------|--------|
-| `oke:prod-eu1`         | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` | live in velora-infra on per-source wrapper/token path |
-| `linux:hostinger-prod` | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` | production-ready; deploy pending live diagnostic verification |
+| `kubernetes:<cluster-name>` | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` | pattern verified in a private deployment |
+| `linux:<host-label>` | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` | pattern verified in a private deployment |
 | `mac:<workstation>`  | `examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh` | template ready; deploy blocked on Source enrollment |
 | `aks:<cluster-name>`   | *(create when cluster name is confirmed; follow naming conventions in source-inventory-map)* | blocked |
 | `container-host:<host>` | *(create when target is confirmed; follow naming conventions in source-inventory-map)* | blocked |
@@ -208,10 +208,11 @@ Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
 **Exit codes:** 0 success, 1 usage error, 2 config error (token file missing),
 3 health check failed.
 
-**OKE token-path cutover:**
+**Token-path cutover:**
 
-- Completed in velora-infra. The deployed wrapper now reads the per-source
-  suffixed token path, and the legacy unsuffixed token file has been removed.
+- Verified in a private operations lane. The deployed wrapper reads the
+  per-source suffixed token path, and the legacy unsuffixed token file is no
+  longer used.
 
 Done when wrappers:
 
@@ -223,38 +224,36 @@ Done when wrappers:
 
 **Current state (2026-05-27):**
 
-- OKE wrapper: deployed to velora-infra; live; per-source token path active; legacy token removed
-- Linux VPS wrapper: production-ready in velora-infra; live diagnostic pending execution-agent heartbeat
+- Kubernetes wrapper pattern: live in a private deployment; per-source token path active
+- Linux host wrapper pattern: live in a private deployment; source-bound diagnostic verified
 - Mac wrapper: template ready; deploy deferred until Source enrollment prerequisites met
 - AKS, container-host: naming conventions documented in source-inventory-map; template creation blocked on target discovery
 
 ### Operational follow-through
 
 Deployment checklists and operator verification report template for the
-real Selene/velora-infra lane.
+private operations lane.
 
 Checklist doc: [`docs/operators/selene-wrapper-deployment-checklist.md`](../docs/operators/selene-wrapper-deployment-checklist.md)
 
 Covers:
 
-- `oke:prod-eu1` token-path cutover completion and rollback notes
-- `linux:hostinger-prod` initial wrapper deployment with preflight verification
+- Kubernetes source token-path cutover completion and rollback notes
+- Linux host initial wrapper deployment with preflight verification
 - Blocked-sources table (mac, aks, container-host) with explicit blocker reasons
-- Operator verification report template (fillable; stored in velora-infra notes,
-  not committed here)
+- Operator verification report template (fillable; stored in private operations
+  notes, not committed here)
 
 Done when:
 
-- `oke:prod-eu1` per-source token path and new wrapper deployed and verified
-  end-to-end in velora-infra ✓
-- `linux:hostinger-prod` wrapper deployed and live diagnostic verified end-to-end
-- Slice 3 `linux:hostinger-prod` enrollment verified (prerequisite for above)
+- Kubernetes per-source token path and wrapper deployed and verified end-to-end
+  in a private operations lane ✓
+- Linux host wrapper deployed and live diagnostic verified end-to-end in a
+  private operations lane ✓
 
 **Current blockers (2026-05-27):**
 
-- OKE cutover: complete in velora-infra
-- Linux VPS deployment: requires `signalforge-agent` heartbeat and one live
-  diagnostic run through `linux:hostinger-prod`
+- Kubernetes and Linux host patterns: complete in a private operations lane
 - Mac/AKS/container-host: blocked on source-creation prerequisites
 
 ### Slice 5: Action Policy Expansion
@@ -281,7 +280,7 @@ Done when every action has:
 
 - Should Mac workstation diagnostics reuse `linux-audit-log` for Darwin-friendly
   sections, or become a separate `mac-diagnostics` artifact family?
-- Should Selene hold one automation token per Source, or should SignalForge add
+- Should an automation agent hold one automation token per Source, or should SignalForge add
   a first-class operator identity that can be scoped to many Sources?
 - Which AKS cluster should be first: a production cluster with read-only
   diagnostics, or a lower-risk validation cluster?

@@ -175,17 +175,17 @@ The normal ACA cost posture is `minReplicas=0`. That only saves idle compute whe
 
 Long-running `signalforge-agent` deployments intentionally keep polling SignalForge for work. That is the right posture when immediate job-driven collection matters, but it can also keep the ACA app warm even when no jobs are queued. Use idle mode when operator responsiveness is less important than lowering baseline ACA spend.
 
-For the current OKE helper deployment:
+For the current Kubernetes helper deployment:
 
 ```bash
-kubectl --context oke-cluster -n signalforge scale deployment/signalforge-agent --replicas=0
+kubectl --context <cluster-context> -n signalforge scale deployment/signalforge-agent --replicas=0
 ```
 
 Verify that the helper is paused:
 
 ```bash
-kubectl --context oke-cluster -n signalforge get deploy signalforge-agent
-kubectl --context oke-cluster -n signalforge get pods
+kubectl --context <cluster-context> -n signalforge get deploy signalforge-agent
+kubectl --context <cluster-context> -n signalforge get pods
 ```
 
 Then watch ACA from the control plane without calling the app URL:
@@ -206,8 +206,8 @@ Do not use the browser, `curl`, `scripts/check-aca-app.sh`, or `az containerapp 
 Resume job-driven collection when needed:
 
 ```bash
-kubectl --context oke-cluster -n signalforge scale deployment/signalforge-agent --replicas=1
-kubectl --context oke-cluster -n signalforge rollout status deployment/signalforge-agent
+kubectl --context <cluster-context> -n signalforge scale deployment/signalforge-agent --replicas=1
+kubectl --context <cluster-context> -n signalforge rollout status deployment/signalforge-agent
 ```
 
 Record the pause time, resume time, active ACA revision, and observed replica samples in the GitHub issue or ops notes. If ACA stays at one replica after the helper is paused and no app traffic has occurred for longer than the cooldown, treat that as evidence of another warm traffic source before changing the ACA min-replica policy.

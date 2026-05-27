@@ -1,6 +1,7 @@
 # Automation-Agent Integration
 
-Use this guide when you want an external AI agent such as OpenClaw, Codex, or Claude Code to ask SignalForge for diagnostics on a monitored Source and read the resulting findings back.
+Use this guide when you want an external operator agent to ask SignalForge for
+diagnostics on a monitored Source and read the resulting findings back.
 
 This is an **HTTP integration**, not a plugin loaded into the SignalForge app process.
 
@@ -120,7 +121,9 @@ For a small copy-and-adapt reference client, use:
 - [`../../examples/automation_agent_client.py`](../../examples/automation_agent_client.py)
 - [`../../examples/openclaw_recommendation_handoff.py`](../../examples/openclaw_recommendation_handoff.py)
 
-It is intentionally dependency-free and uses only the Python standard library. The example is aimed at Codex- or OpenClaw-style agents that need a thin wrapper around the automation-agent HTTP API.
+It is intentionally dependency-free and uses only the Python standard library.
+The example is aimed at agents that need a thin wrapper around the
+automation-agent HTTP API.
 
 Example usage:
 
@@ -138,9 +141,10 @@ That example:
 
 The `--summary-only` output is useful when the external agent wants the most important fields without re-wrapping the full SignalForge payload itself.
 
-## Recommendation-Only OpenClaw Handoff
+## Recommendation-Only Handoff
 
-If you want an OpenClaw-style agent to turn the SignalForge result into operator guidance without any execution rights, use:
+If you want an external agent to turn the SignalForge result into operator
+guidance without any execution rights, use:
 
 ```bash
 python3 examples/openclaw_recommendation_handoff.py

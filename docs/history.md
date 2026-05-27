@@ -294,7 +294,7 @@ State at stop:
 
 - the live ACA staging app remains the active non-production control-plane target
 - `MogahPC` host `systemd` agent is now pointed at ACA staging and has completed a real host job end to end
-- Podman-backed `container-diagnostics` and OKE-backed `kubernetes-bundle` were both validated successfully against ACA staging
+- Podman-backed `container-diagnostics` and managed-Kubernetes `kubernetes-bundle` were both validated successfully against ACA staging
 - historical agent-submitted staging runs now carry best-effort `collected_at` values where trustworthy evidence existed
 
 What is done:
@@ -393,7 +393,7 @@ Result:
   - artifact `8dee8157-2fde-4f6e-b162-5914453cbdcc`
 - the new run now carries a real `collected_at = 2026-03-30T17:23:47.363Z`, confirming the previously missing live staging behavior is now deployed
 
-## 2026-03-30: durable OKE Kubernetes agent rollout completed
+## 2026-03-30: durable Kubernetes agent rollout completed
 
 The Kubernetes runner moved from one-shot validation into a real cluster-side deployment shape.
 
@@ -405,14 +405,14 @@ What changed:
   - dedicated `signalforge` namespace
   - dedicated service account
   - read-only cluster RBAC
-  - in-cluster kubeconfig ConfigMap with `oke-cluster` alias
+  - in-cluster kubeconfig ConfigMap with a stable context alias
   - writable `/work` volume for collector output
 - fixed the stale rollout mismatch where the live pod still lacked the newer writable workdir behavior
 - documented the publish and deploy flow in the `signalforge-agent` repo so the rollout is repeatable instead of chat-only
 
 What was learned during rollout:
 
-- the early failed namespace was not a Kubernetes design problem, it was stale amd64 and pre-fix image state on arm64 OKE nodes
+- the early failed namespace was not a Kubernetes design problem, it was stale amd64 and pre-fix image state on arm64 nodes
 - cluster-side collection needed both:
   - a writable collector output directory
   - the actual latest image, not only the latest manifest
@@ -434,7 +434,7 @@ Current state after rollout:
 
 - `linux-audit-log` has a durable host `systemd` runner
 - `container-diagnostics` has a durable root-owned runtime-host runner
-- `kubernetes-bundle` now has a durable cluster-side OKE runner
+- `kubernetes-bundle` now has a durable cluster-side runner
 - ACA staging has now been validated end to end across all three current artifact families with real agent-driven flows
 
 ## 2026-03-30: UI-system decision and run-detail redesign brief

@@ -106,7 +106,7 @@ If you want to prove the full automation-agent plus execution-agent loop locally
 bun run smoke:automation-agent
 ```
 
-That smoke script starts a temporary local app by default, drives both actor contracts over HTTP, uploads a real fixture, and prints the resulting `run_id`.
+That verification script starts a temporary local app by default, drives both actor contracts over HTTP, uploads a real fixture, and prints the resulting `run_id`.
 
 For operators, the preferred deployment is a long-lived agent service near the execution surface. For Linux host collection, that means a `systemd` service on the target VM, not repeated manual `once` runs from a shell session.
 
