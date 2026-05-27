@@ -67,7 +67,7 @@ not use `oke-cluster` — that context name does not resolve on the host.
 |-------|-------|
 | **execution form** | Cluster-side `signalforge-agent` Deployment (or wrapper-triggered collection from VPS) |
 | **credential store — execution agent** | `signalforge-agent` service env or Infisical-injected; stored as token hash in app |
-| **credential store — automation agent** | Legacy: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token` (in use); target: `…/signalforge-automation-agent-token-oke-prod-eu1` after slice 4 wrapper update |
+| **credential store — automation agent** | Legacy: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token` (in use); target: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` after slice 4 wrapper update |
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
 | **Selene wrapper** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh` |
 | **Selene access** | yes — automation-agent token enrolled; Selene can request runs and poll results for this Source |

@@ -55,13 +55,18 @@ fetching the value interactively.
 
 ## Host file naming convention
 
-On each execution host that runs Selene wrappers, store the token at:
+On Linux/VPS execution hosts that run Selene wrappers, store the token at:
 
 ```
 /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-<source-slug>
 ```
 
-where `<source-slug>` is the `target_identifier` with `:` replaced by `-`.
+where `<source-slug>` is the `target_identifier` with `:` replaced by `-` and
+kept lowercase.
+
+On macOS workstation surfaces, use a user-local path under `~/.config` with
+mode `600` unless the wrapper is intentionally installed as a LaunchDaemon with
+a different service account.
 
 | target\_identifier      | host file path |
 |-------------------------|----------------|

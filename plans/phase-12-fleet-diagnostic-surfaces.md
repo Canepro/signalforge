@@ -147,6 +147,10 @@ Pattern: `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` where
 /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-<source-slug>
 ```
 
+For host files, `<source-slug>` is `target_identifier` with `:` replaced by
+`-`, kept lowercase. This is separate from the Infisical `SOURCE_SLUG`, which
+uses `_` and uppercase.
+
 The OKE token at the legacy unsuffixed path stays in place until the slice 4
 wrapper update. All new enrollments use the per-source suffix.
 
