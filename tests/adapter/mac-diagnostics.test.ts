@@ -73,6 +73,21 @@ describe("MacDiagnosticsAdapter", () => {
     );
   });
 
+  it("ignores non-array listener JSON instead of throwing", () => {
+    const malformedSections = {
+      ...sections,
+      listening_tcp_json: '"sshd"',
+    };
+    const env = adapter.detectEnvironment(malformedSections);
+
+    expect(() => adapter.extractPreFindings(malformedSections, env)).not.toThrow();
+    expect(
+      adapter
+        .extractPreFindings(malformedSections, env)
+        .some((finding) => finding.rule_id === "mac.listening_tcp_services")
+    ).toBe(false);
+  });
+
   it("marks incomplete artifacts when required Mac fields are missing", () => {
     const incompleteSections = adapter.parseSections("=== mac-diagnostics ===\nhostname: mac\n");
     expect(adapter.detectIncomplete(incompleteSections)).toEqual({

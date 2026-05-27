@@ -436,6 +436,68 @@ ran_as_root: true
       Object.assign(process.env, envSnap);
     }
   });
+
+  it("fallback wording is Mac-security-aware for mac-diagnostics", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    const envSnap = { ...process.env };
+
+    try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.LLM_PROVIDER;
+      delete process.env.AZURE_OPENAI_API_KEY;
+      delete process.env.AZURE_OPENAI_ENDPOINT;
+      delete process.env.AZURE_OPENAI_API_VERSION;
+      delete process.env.AZURE_OPENAI_DEPLOYMENT;
+
+      const raw = `=== mac-diagnostics ===
+hostname: operator-mac.local
+os_name: macOS
+os_version: 26.5
+build_version: 25F71
+kernel: 25.5.0
+uptime: up 1 day
+ran_as_root: false
+firewall_state: on
+filevault_status: off
+sip_status: System Integrity Protection status: disabled.
+remote_login: off
+remote_management: off
+stealth_mode: on
+listening_tcp_json: []
+disk_root_used_percent: 72.1
+brew_outdated_count: 0
+mdm_enrollment: unknown
+`;
+
+      const result = await analyzeArtifact(raw, {
+        apiKey: undefined,
+        artifactType: "mac-diagnostics",
+      });
+
+      expect(result.meta.llm_succeeded).toBe(false);
+      expect(result.report).not.toBeNull();
+      expect(
+        result.report!.summary.some((line) =>
+          line.toLowerCase().includes("disk encryption")
+        )
+      ).toBe(true);
+      expect(
+        result.report!.top_actions_now.some((action) =>
+          action.includes("Enable FileVault")
+        )
+      ).toBe(true);
+      expect(
+        result.report!.top_actions_now.some((action) =>
+          action.includes("Re-enable System Integrity Protection")
+        )
+      ).toBe(true);
+    } finally {
+      for (const k of Object.keys(process.env)) {
+        if (!(k in envSnap)) delete process.env[k];
+      }
+      Object.assign(process.env, envSnap);
+    }
+  });
 });
 
 describe("LLM success path (mocked)", () => {

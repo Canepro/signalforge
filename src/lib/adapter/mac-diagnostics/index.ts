@@ -97,7 +97,10 @@ export class MacDiagnosticsAdapter implements ArtifactAdapter {
     const stealthMode = macValueFor(sections, "stealth_mode");
     const diskUsedPercent = parseMacFloat(sections.disk_root_used_percent);
     const brewOutdated = parseMacInteger(sections.brew_outdated_count);
-    const sockets = parseMacJson<ListeningSocket[]>(sections.listening_tcp_json) ?? [];
+    const parsedSockets = parseMacJson<unknown>(sections.listening_tcp_json);
+    const sockets: ListeningSocket[] = Array.isArray(parsedSockets)
+      ? (parsedSockets as ListeningSocket[])
+      : [];
 
     if (firewallState && stateIsDisabled(firewallState)) {
       findings.push({
