@@ -1,14 +1,16 @@
-# Selene and Codex App Server Integration
+# Automation Agent and Codex App Server Integration
 
 SignalForge keeps three roles separate:
 
 | Role | Purpose | Credential / runtime |
 | --- | --- | --- |
 | **Analysis brain** | One explanation pass over deterministic pre-findings | `LLM_PROVIDER=codex_app_server` spawns local `codex app-server` (stdio) |
-| **Automation agent (Selene)** | Security/SRE operator client: signals, diagnostic requests, fix-action requests | Source-bound token (e.g. `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN` in Infisical) |
+| **Automation agent** | External operator client: signals, diagnostic requests, fix-action requests | Source-bound token, such as `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` in Infisical |
 | **Execution agent** | Collection jobs and approved safe-fix apply | `signalforge-agent` source token |
 
-Do not collapse Selene into Codex App Server. Selene never replaces the analysis brain, and Codex App Server never replaces Selene's automation-agent token.
+Do not collapse the automation agent into Codex App Server. The automation
+agent never replaces the analysis brain, and Codex App Server never replaces a
+source-bound automation-agent token.
 
 ## Codex App Server (analysis brain only)
 
@@ -36,19 +38,19 @@ WebSocket transport is opt-in and requires loopback URLs plus token files; stdio
 | `CODEX_APP_SERVER_WS_TOKEN_FILE` | unset | Capability-token file for websocket config |
 | `CODEX_APP_SERVER_WS_SHARED_SECRET_FILE` | unset | Signed-bearer shared-secret file for websocket config |
 
-Use the fixture-based smoke when validating a Mac-local Codex App Server setup:
+Use the fixture check when validating a local Codex App Server setup:
 
 ```bash
 bun run smoke:codex-brain
 ```
 
-The smoke does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim that Vincent's current workstation is WSL.
+The fixture check does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim about the operator's workstation.
 
 See [Codex App Server](https://developers.openai.com/codex/app-server) for upstream app-server behavior.
 
-## Selene (automation agent)
+## Automation Agent
 
-Selene uses the existing automation-agent HTTP surface:
+An external operator agent uses the existing automation-agent HTTP surface:
 
 - `POST /api/automation-agent/registrations` (operator admin Bearer at enroll time)
 - `GET /api/automation-agent/signals/next`
@@ -56,7 +58,8 @@ Selene uses the existing automation-agent HTTP surface:
 - `GET /api/automation-agent/diagnostic-requests/[id]`
 - Fix-action request APIs when enabled on the Source
 
-Discovery scopes for Selene are published in `GET /auth.md` and well-known metadata (metadata only in this slice; routes still use existing capability gates):
+Discovery scopes are published in `GET /auth.md` and well-known metadata
+(metadata only in this slice; routes still use existing capability gates):
 
 - `source.read`
 - `automation_signal.read`
@@ -64,25 +67,30 @@ Discovery scopes for Selene are published in `GET /auth.md` and well-known metad
 - `diagnostic_request.read`
 - `fix_action.request`
 
-Store Selene's issued token in Infisical (recommended name: `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN`). Do not commit or log plaintext tokens.
+Store issued tokens in Infisical or an equivalent secret manager. Prefer one
+source-bound token per Source, using
+`SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>`. Do not commit or log
+plaintext tokens.
 
 Enrollment helper:
 
 ```bash
 export SIGNALFORGE_BASE_URL=https://your-signalforge-host
 export SIGNALFORGE_ADMIN_TOKEN=<from-infisical>
-./scripts/signalforge-automation-agent.sh register <source-id> --display-name selene --print-exports
+./scripts/signalforge-automation-agent.sh register <source-id> --display-name operator-agent --print-exports
 ```
 
 See [`automation-agent-integration.md`](./automation-agent-integration.md) for the full HTTP contract.
 
 ## Infisical
 
-Infisical owns runtime secrets for deploy and local dev. Use `infisical run --` to inject analysis and Selene tokens without placing them in the repo.
+Infisical owns runtime secrets for deploy and local dev. Use `infisical run --`
+to inject analysis settings and automation-agent tokens without placing them in
+the repo.
 
 ## Out of scope
 
 - OTP/email production auth
 - ID-JAG issuer trust
 - Admin scopes on agent tokens
-- Codex or Selene running collection, `kubectl`, or arbitrary remediation inside SignalForge
+- Codex App Server or the automation agent running collection, `kubectl`, or arbitrary remediation inside SignalForge

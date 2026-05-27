@@ -38,7 +38,7 @@ A **`Source`** is a **registered intent** that says: “this logical target may 
 | Field | Type / notes | Rationale |
 |-------|----------------|-----------|
 | **`id`** | UUID (server-generated) | Stable primary key in SignalForge. |
-| **`display_name`** | string | Operator-facing label (“Prod web-01”, “Vincent laptop WSL”). |
+| **`display_name`** | string | Operator-facing label (“Prod web-01”, “Operator laptop WSL”). |
 | **`target_identifier`** | string, required, unique per tenant later | Aligns with today’s run metadata; canonical compare key when set. Same value should appear on uploaded runs from this source. |
 | **`source_type`** | enum, e.g. `linux_host`, `wsl` (slice 1) | Drives which collectors and agent capabilities are valid. |
 | **`expected_artifact_type`** | e.g. `linux-audit-log` | Matches adapter registry; job requests this explicitly. |

@@ -13,7 +13,7 @@ Scope: SignalForge analysis brain (`LLM_PROVIDER=codex_app_server`) on mandatory
 | `kubernetes-payments-bundle.json` | Exposure, RBAC, rollout, node pressure | Cluster/namespace terms; operational pressure ranked in actions |
 | `kubernetes-public-ingress-namespace.json` | Ingress exposure, isolation gaps | Namespace-scoped wording; no payment-scenario bleed |
 
-## Live smoke (operator workstation)
+## Live fixture check (operator workstation)
 
 When `codex app-server` is available:
 
@@ -38,7 +38,7 @@ Observed on a live workstation (pre-PR #22 fail-closed fix):
 
 ## Deferred
 
-- **Selene automation-agent E2E** on live ACA remains blocked until production Postgres has `sources.automation_enabled` (migration drift).
+- **Automation-agent end-to-end verification** on live ACA remains blocked until production Postgres has `sources.automation_enabled` (migration drift).
 - **WebSocket Codex transport** remains unimplemented in SignalForge; stdio is the supported path.
 - Full live suite on CI agents without Codex CLI installed is intentionally skipped (`smoke:codex-brain` exits 0 when `codex` is missing).
 

@@ -32,7 +32,7 @@ This design direction is based on:
 - current run-detail implementation in `src/app/runs/[id]/run-detail-client.tsx`
 - current findings and evidence presentation components
 - the existing evidence-summary builder in `src/lib/run-evidence-presentation.ts`
-- the latest real ACA-backed Kubernetes run from OKE
+- the latest real ACA-backed Kubernetes run from the reference cluster
 - the local `frontend-review`, `observability-architecture`, and
   `design-system-maintenance` skills
 
@@ -214,7 +214,7 @@ family-aware instead of generic.
 
 The current product gap is especially visible on Kubernetes runs.
 
-Example from real OKE validation:
+Example from real Kubernetes validation:
 
 - the artifact contained node memory usage, pod consumers, and a
   `FailedScheduling` warning caused by insufficient CPU

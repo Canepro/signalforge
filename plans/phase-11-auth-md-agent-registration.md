@@ -193,7 +193,7 @@ On **409 `source_already_registered`**, the agent should fail with a clear messa
 5. Implement `/agent/auth` as a thin alias over the existing registration storage path.
 6. Update `docs/api-contract.md` and add JSON schemas for discovery + registration responses.
 7. Update `docs/operators/sources-and-agents.md` with discovery URL, enroll paths, and collection vs automation-agent note.
-8. Document local `curl` and `infisical run` smoke steps.
+8. Document local `curl` and `infisical run` verification steps.
 9. Add a small `signalforge-agent` discovery/enroll follow-up issue or doc note.
 10. Update `plans/current-plan.md` when the spike lands.
 
@@ -213,7 +213,7 @@ If storage code changes:
 bash scripts/run-postgres-parity-local.sh
 ```
 
-Manual smoke:
+Manual verification:
 
 ```bash
 curl -fsS http://localhost:3000/auth.md
@@ -280,6 +280,6 @@ SignalForge can use the same pattern later for operator investigations, but the 
 - WorkOS app guide: `https://workos.com/auth-md/docs/apps`
 - WorkOS agent-provider guide: `https://workos.com/auth-md/docs/agent-providers`
 - Reference repo: `https://github.com/workos/auth.md`
-- Local spike report: `/Users/canepro/Documents/Codex/2026-05-23/interesting-post-https-x-com-dkundel/reports/2026-05-23-auth-md-codex-infisical-spike.html`
+
 - SignalForge Infisical doc: `docs/infisical-secrets.md`
 - SignalForge Sources and Agents doc: `docs/operators/sources-and-agents.md`

@@ -1,272 +1,179 @@
-# Selene Wrapper Deployment Checklist
+# Automation-Agent Wrapper Deployment Checklist
 
-Status: Phase 12 operational follow-through  
+Status: Phase 12 operational reference
 Updated: 2026-05-27
 
-Operational checklists for deploying and verifying the per-source Selene
-wrapper scripts in velora-infra.
+Use this checklist when deploying or rotating a source-bound automation-agent
+wrapper. Keep real hostnames, token paths, run ids, and incident notes in the
+private operations repo.
 
-For the wrapper contract and script templates see
-[`selene-source-wrappers.md`](./selene-source-wrappers.md).  
-For token enrollment steps see
-[`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md).
+**Placeholders**
 
-**Do not add secret values, token contents, or host-specific credentials to
-this file.**
+- `<token-dir>` - host directory for automation-agent token files.
+- `<ops-base>/scripts/` - host directory for deployed wrappers.
+- `<source-slug>` - `target_identifier` with `:` replaced by `-`.
+- `<SOURCE_SLUG>` - `target_identifier` with `:` and `-` replaced by `_`, then uppercased.
 
----
+For the wrapper contract see [`selene-source-wrappers.md`](./selene-source-wrappers.md).
+For enrollment see [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md).
 
-## `oke:prod-eu1` — token-path cutover and wrapper deployment
+Do not add secret values, token contents, kubeconfigs, private host paths, or
+private reports to this file.
 
-**Pre-conditions (verify before starting):**
+## Token-Path Cutover
 
-- [ ] Selene live path is currently working (OKE runs appear in SignalForge)
-- [ ] Current token is at legacy path; test with:
-  ```bash
-  test -f /etc/velora-infra/selene/secrets/signalforge-automation-agent-token \
-    && echo "legacy token file: present" || echo "MISSING"
-  ```
-- [ ] SignalForge template is on the VPS (copy from
-  `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh`)
-- [ ] `signalforge-automation-agent.sh` is accessible on the VPS and path is
-  known for `SIGNALFORGE_AGENT_SCRIPT`
+Use this when migrating a Source from a legacy shared token file to a per-source
+token file.
 
-**Deployment steps:**
+**Pre-conditions**
 
-1. Write the token to the per-source path (do not print the value):
+- [ ] The current automation-agent path works.
+- [ ] The Source has a stable `target_identifier`.
+- [ ] The new per-source wrapper is deployed but not yet used for production requests.
+- [ ] The token exists in the secret manager under `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>`.
+
+**Steps**
+
+1. Write the token to the per-source path without printing the value:
 
    ```bash
-   # On the VPS host — requires root or sudo
-   install -m 0640 -o root -g ubuntu /dev/null \
-     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
-   # Copy the token bytes into the pre-created file without replacing its inode.
-   sudo tee /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1 \
-     < /etc/velora-infra/selene/secrets/signalforge-automation-agent-token \
-     >/dev/null
-   sudo stat -c '%U:%G %a %n' \
-     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
-   sudo test -r /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1 \
-     -a -s /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
+   install -m 0640 -o root -g <runtime-group> /dev/null \
+     <token-dir>/signalforge-automation-agent-token-<source-slug>
+   # Copy token bytes with an approved secret injection method.
    ```
 
-   Expected ownership and mode: `root:ubuntu 640`.
-
-2. Deploy the wrapper script from the SignalForge template:
+2. Confirm ownership, mode, and non-empty file:
 
    ```bash
-   cp /path/to/signalforge/examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh \
-      /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh
-   chmod 0755 /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh
-   ```
-
-3. Set `SIGNALFORGE_AGENT_SCRIPT` to the location of `signalforge-automation-agent.sh`
-   on the VPS if it is not on PATH (either in the wrapper config or as an env
-   var for the Selene runtime).
-
-4. Run the no-value health check on the **new** wrapper:
-
-   ```bash
-   SIGNALFORGE_BASE_URL=https://<signalforge-host> \
-   SIGNALFORGE_AGENT_SCRIPT=/path/to/signalforge-automation-agent.sh \
-   /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh \
-     --health-check
-   ```
-
-   Expected: exit 0, token file present, SignalForge reachable.
-
-5. Run a smoke diagnostic request through the **new** wrapper:
-
-   ```bash
-   SIGNALFORGE_BASE_URL=https://<signalforge-host> \
-   SIGNALFORGE_AGENT_SCRIPT=/path/to/signalforge-automation-agent.sh \
-   /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh \
-     --reason "oke cutover smoke" \
-     --wait
-   ```
-
-   Expected: terminal state `submitted`, run appears in SignalForge linked to
-   `oke:prod-eu1`.
-
-6. **Only after step 5 is confirmed:** remove the legacy unsuffixed token file:
-
-   ```bash
-   rm /etc/velora-infra/selene/secrets/signalforge-automation-agent-token
-   ```
-
-7. Update `docs/operators/source-inventory-map.md`: replace the legacy path
-   note on the OKE row with the confirmed per-source path.
-
-**Rollback:**
-
-The legacy token file is **not removed** until step 6 — so the legacy wrapper
-(if still deployed) will continue to work if anything fails before that point.
-
-If step 4 or 5 fail and you have not yet removed the legacy file:
-- The existing live Selene path is unaffected.
-- Remove the new wrapper and the new per-source token file.
-- Investigate the failure (token file permissions, SIGNALFORGE_AGENT_SCRIPT
-  path, connectivity).
-
-If you removed the legacy file and need to roll back:
-- Restore the token from Infisical secret
-  `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` to the legacy path.
-- Restore Selene's invocation path/config to the legacy wrapper
-  `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh`,
-  or set the deployed wrapper's token-file override back to:
-  `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token`.
-- Re-run the legacy wrapper health check before removing the per-source wrapper
-  or token file.
-
----
-
-## `linux:hostinger-prod` — initial wrapper deployment
-
-**Pre-conditions (verify before starting):**
-
-- [ ] Source `linux:hostinger-prod` exists in SignalForge Sources UI
-- [ ] Automation-agent token has been issued (see
-  [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md))
-- [ ] Token is stored in Infisical under
-  `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD`
-- [ ] `signalforge-agent` is running on the VPS and the Source shows a recent
-  heartbeat in the Sources UI
-- [ ] SignalForge is reachable from the VPS
-
-**Deployment steps:**
-
-1. Write the token to the host at the per-source path (fetch value from
-   Infisical; do not pass it through a shell variable that might appear in logs):
-
-   ```bash
-   # On the VPS host — requires root or sudo
-   install -m 0640 -o root -g ubuntu /dev/null \
-     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod
-   # Write the token value using infisical run or a trusted injection method
-   ```
-
-2. Verify the token file exists and is non-empty (without printing the value):
-
-   ```bash
-   test -s /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod \
-     && echo "token file: present and non-empty" || echo "MISSING or empty"
    stat -c '%U:%G %a %n' \
-     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod
+     <token-dir>/signalforge-automation-agent-token-<source-slug>
+   test -s <token-dir>/signalforge-automation-agent-token-<source-slug>
    ```
 
-   Expected ownership and mode on the VPS: `root:ubuntu 640`.
-
-3. Deploy the wrapper script from the SignalForge template:
-
-   ```bash
-   cp /path/to/signalforge/examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh \
-      /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh
-   chmod 0755 /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh
-   ```
-
-4. Run the no-value health check:
+3. Run the new wrapper health check:
 
    ```bash
    SIGNALFORGE_BASE_URL=https://<signalforge-host> \
    SIGNALFORGE_AGENT_SCRIPT=/path/to/signalforge-automation-agent.sh \
-   /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh \
-     --health-check
+   <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh --health-check
    ```
 
-   Expected: exit 0, token file present, SignalForge reachable.
-
-5. Confirm the `signalforge-agent` execution agent is actively heartbeating
-   for `linux:hostinger-prod` before requesting a run:
-
-   ```bash
-   # Check in the SignalForge Sources UI — look for a recent heartbeat timestamp.
-   # Only proceed when the Source shows an active heartbeat.
-   ```
-
-6. Run a smoke diagnostic request:
+4. Request diagnostics for a real operator reason:
 
    ```bash
    SIGNALFORGE_BASE_URL=https://<signalforge-host> \
    SIGNALFORGE_AGENT_SCRIPT=/path/to/signalforge-automation-agent.sh \
-   /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh \
-     --reason "linux hostinger smoke" \
-     --wait
+   <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh \
+     collect-summary "operator verification after token-path cutover"
    ```
 
-   Expected: terminal state `submitted`, `linux-audit-log` run appears in
-   SignalForge linked to `linux:hostinger-prod`.
+5. Record the request id, run id, status, and top findings in the private
+   verification report.
+6. Remove the legacy token file only after the new wrapper is confirmed.
 
-**Rollback:**
+**Rollback**
 
-This is the initial deployment — there is no live path to break. To roll back:
-- Remove the wrapper script from velora-infra.
-- The token file on the host can stay; it is not harmful to leave it present.
-- If a diagnostic request was queued by mistake, record its `request_id` and
-  check the Sources UI job timeline. A queued or claimed job can be cancelled by
-  an operator from the Source detail page or the collection-job cancel route.
-- Do not assume an unclaimed queued request automatically disappears after the
-  wrapper wait timeout; `--wait --timeout` only limits the local polling window.
+If the legacy token file has not been removed, switch the invocation path back
+to the legacy wrapper and remove the new token file. If the legacy file was
+removed, restore it from the secret manager before changing the wrapper path.
 
----
+## New Linux Host Deployment
 
-## Blocked sources — do not deploy
+Use this for a new `linux:<host-label>` Source.
 
-| source | blocker |
-|--------|---------|
-| `mac:vincent-primary` | `mac-diagnostics` family decision pending; Source not enrolled |
-| `aks:TODO` | AKS cluster name unknown; Source not created |
-| `container-host:TODO` | Container host target unknown; Source not created |
+**Pre-conditions**
 
-Do not deploy wrapper scripts or write token files for these Sources until their
-prerequisites are met. See [`source-inventory-map.md`](./source-inventory-map.md).
+- [ ] Source exists in the Sources UI.
+- [ ] Execution-agent token and automation-agent token are both enrolled.
+- [ ] `signalforge-agent` is running on the host and heartbeating.
+- [ ] SignalForge is reachable from the host.
+- [ ] Automation-agent token is stored under
+  `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>`.
 
----
+**Steps**
 
-## Operator verification report template
+1. Write the token to:
 
-Copy this block into a deployment record (local notes, Jira, or the velora-infra
-runbook) after deploying or rotating a wrapper. Do not commit completed reports
-to the SignalForge repo.
+   ```text
+   <token-dir>/signalforge-automation-agent-token-<source-slug>
+   ```
+
+2. Confirm file mode and ownership:
+
+   ```bash
+   test -s <token-dir>/signalforge-automation-agent-token-<source-slug>
+   stat -c '%U:%G %a %n' \
+     <token-dir>/signalforge-automation-agent-token-<source-slug>
+   ```
+
+3. Deploy the wrapper:
+
+   ```bash
+   cp /path/to/signalforge/examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh \
+      <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh
+   chmod 0755 <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh
+   ```
+
+4. Run `--health-check`.
+5. Request diagnostics with `collect-summary` for a real operator reason.
+6. Record the private verification result outside this repo.
+
+**Rollback**
+
+Remove the wrapper script and token file. If a diagnostic request was queued by
+mistake, record its `request_id` and cancel it through the Source detail page or
+collection-job cancel route when appropriate.
+
+## Blocked Sources
+
+Do not deploy wrappers or token files for Sources whose target name, artifact
+family, execution agent, or secret path is not decided yet.
+
+| source pattern | common blocker |
+| --- | --- |
+| `mac:<workstation>` | dedicated macOS artifact family or interim Linux-compatible evidence decision |
+| `aks:<cluster-name>` | cluster identity, kubeconfig path, and read-only RBAC not confirmed |
+| `container-host:<host-label>` | runtime host and Docker/Podman socket access not confirmed |
+
+## Verification Report Template
+
+Store completed reports in the private operations repo or ticket system.
 
 ```markdown
-## Selene wrapper deployment verification
+## Automation-agent wrapper deployment verification
 
 Date:
 Source target_identifier:
 Operator:
 SignalForge git sha:
-velora-infra wrapper path:
+Private wrapper path:
 
 ### Pre-deployment checks
 - [ ] Source exists in SignalForge Sources UI
-- [ ] Automation-agent token enrolled and in Infisical under correct per-source name
-- [ ] execution agent (signalforge-agent) heartbeating for this Source
+- [ ] Automation-agent token enrolled and stored under the correct per-source name
+- [ ] Execution agent is heartbeating for this Source
 
-### OKE cutover only
-- [ ] Legacy token file confirmed present before migration
-- [ ] Per-source token file written and permissions confirmed (root:ubuntu 0640)
-- [ ] Legacy file removed only after new wrapper confirmed working
+### Token path
+- [ ] Token file written at per-source path
+- [ ] Permissions confirmed (`root:<runtime-group> 0640` on Linux)
+- [ ] Legacy file removed only after replacement path works, if applicable
 
-### New deployment (linux, mac, or future sources)
-- [ ] Token file written at per-source path, permissions confirmed (root:ubuntu 0640 on Linux)
-
-### Wrapper deployment
+### Wrapper
 - [ ] Template copied to production scripts path
-- [ ] SIGNALFORGE_AGENT_SCRIPT set or binary on PATH
+- [ ] `SIGNALFORGE_AGENT_SCRIPT` set or helper on PATH
 - [ ] `--health-check` exit 0
 
-### Smoke test
+### Verification
 - [ ] Diagnostic request returned a request_id
-- [ ] `--wait` reached terminal state: _______________
+- [ ] Request reached terminal state: _______________
 - [ ] Run appeared in SignalForge linked to correct Source
-- [ ] Result was non-empty (submitted state, not failed/expired)
+- [ ] Result was non-empty
 
 ### Notes / blockers
 (free text)
 ```
 
----
-
-## Related docs
+## Related Docs
 
 - [`selene-source-wrappers.md`](./selene-source-wrappers.md)
 - [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md)

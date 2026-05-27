@@ -163,7 +163,7 @@ Current implementation status in the sibling `signalforge-agent` repo:
 - the installer supports a dry-run render path so operators can inspect the unit, env file, and token target before touching `systemd`
 - the service install flow supports an optional managed kubeconfig path for Kubernetes-capable runners, wired into the installed env file instead of relying on a mutable operator context
 - the agent supports explicit `SIGNALFORGE_KUBECTL_BIN` and `SIGNALFORGE_KUBECONFIG` overrides so Kubernetes-capable services can pin both the binary and the kubeconfig path
-- this service path has been smoke-tested under a real user `systemd` execution context via `systemd-run --user`, not only through static unit rendering
+- this service path has been verified under a real user `systemd` execution context via `systemd-run --user`, not only through static unit rendering
 - container-capable readiness now requires actual Docker or Podman access during capability derivation and `preflight`, not only a runtime binary on `PATH`
 
 ## Why this is the preferred model
@@ -178,11 +178,11 @@ This model is preferred because it:
 
 The tradeoff is cost. If SignalForge is hosted on an ACA app with `minReplicas=0`, an always-on agent that heartbeats and polls can still keep the app warm through normal API traffic. For low-use operator environments, prefer an explicit pause/resume posture instead of silently paying for always-warm collection.
 
-For the current OKE helper deployment, the safe pause path is documented in [`aca-app-runbook.md`](./aca-app-runbook.md#cost-saving-idle-mode). Pause only the helper agent deployment, verify no helper pods remain, and resume it before expecting queued jobs to be claimed.
+For the current Kubernetes helper deployment, the safe pause path is documented in [`aca-app-runbook.md`](./aca-app-runbook.md#cost-saving-idle-mode). Pause only the helper agent deployment, verify no helper pods remain, and resume it before expecting queued jobs to be claimed.
 
 ## Not the preferred model
 
-These may be useful for smoke tests or debugging, but they are not the normal production story:
+These may be useful for verification or debugging, but they are not the normal production story:
 
 - operator laptops
 - ad hoc `signalforge-agent once` as the default collection path
