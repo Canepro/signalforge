@@ -39,10 +39,17 @@ this file.**
    # On the VPS host — requires root or sudo
    install -m 0640 -o root -g ubuntu /dev/null \
      /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
-   # Copy the token value from the legacy file:
-   cp /etc/velora-infra/selene/secrets/signalforge-automation-agent-token \
-      /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
+   # Copy the token bytes into the pre-created file without replacing its inode.
+   sudo tee /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1 \
+     < /etc/velora-infra/selene/secrets/signalforge-automation-agent-token \
+     >/dev/null
+   sudo stat -c '%U:%G %a %n' \
+     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
+   sudo test -r /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1 \
+     -a -s /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
    ```
+
+   Expected ownership and mode: `root:ubuntu 640`.
 
 2. Deploy the wrapper script from the SignalForge template:
 
@@ -103,6 +110,12 @@ If step 4 or 5 fail and you have not yet removed the legacy file:
 If you removed the legacy file and need to roll back:
 - Restore the token from Infisical secret
   `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` to the legacy path.
+- Restore Selene's invocation path/config to the legacy wrapper
+  `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic.sh`,
+  or set the deployed wrapper's token-file override back to:
+  `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token`.
+- Re-run the legacy wrapper health check before removing the per-source wrapper
+  or token file.
 
 ---
 
@@ -136,7 +149,11 @@ If you removed the legacy file and need to roll back:
    ```bash
    test -s /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod \
      && echo "token file: present and non-empty" || echo "MISSING or empty"
+   stat -c '%U:%G %a %n' \
+     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod
    ```
+
+   Expected ownership and mode on the VPS: `root:ubuntu 640`.
 
 3. Deploy the wrapper script from the SignalForge template:
 
@@ -183,8 +200,11 @@ If you removed the legacy file and need to roll back:
 This is the initial deployment — there is no live path to break. To roll back:
 - Remove the wrapper script from velora-infra.
 - The token file on the host can stay; it is not harmful to leave it present.
-- A diagnostic request in flight will expire naturally (default: 5 minutes).
-- No change to SignalForge state is needed.
+- If a diagnostic request was queued by mistake, record its `request_id` and
+  check the Sources UI job timeline. A queued or claimed job can be cancelled by
+  an operator from the Source detail page or the collection-job cancel route.
+- Do not assume an unclaimed queued request automatically disappears after the
+  wrapper wait timeout; `--wait --timeout` only limits the local polling window.
 
 ---
 
