@@ -17,7 +17,7 @@ describe("examples/automation_agent_client.py", () => {
     expect(src).toContain("/api/automation-agent/diagnostic-requests");
     expect(src).toContain("SIGNALFORGE_AUTOMATION_AGENT_TOKEN");
     expect(src).toContain("--summary-only");
-    expect(src).toContain("Codex");
-    expect(src).toContain("OpenClaw");
+    expect(src).toContain("external automation");
+    expect(src).toContain("OpenClaw/Hermes-style");
   });
 });

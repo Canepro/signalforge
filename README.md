@@ -63,7 +63,7 @@ Full walkthrough: [docs/getting-started.md](docs/getting-started.md)
 Full environment reference: [docs/aca-env-contract.md](docs/aca-env-contract.md)
 
 LLM provider details: see `.env.example` and
-[`docs/operators/selene-codex-app-server-integration.md`](docs/operators/selene-codex-app-server-integration.md)
+[`docs/operators/automation-agent-codex-app-server-integration.md`](docs/operators/automation-agent-codex-app-server-integration.md)
 
 ## LLM Providers
 
@@ -72,7 +72,7 @@ SignalForge supports OpenAI, Azure OpenAI, and Codex App Server. If no provider 
 Local Codex fixture check:
 
 ```bash
-bun run smoke:codex-brain
+bun run verify:codex-brain
 ```
 
 ## CI and Deployment
@@ -92,7 +92,7 @@ External AI agents can request diagnostics over HTTP using a source-bound automa
 Local automation-agent fixture check:
 
 ```bash
-bun run smoke:automation-agent
+bun run verify:automation-agent
 ```
 
 Docs: [docs/operators/automation-agent-integration.md](docs/operators/automation-agent-integration.md)

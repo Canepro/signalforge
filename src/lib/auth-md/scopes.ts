@@ -9,7 +9,7 @@ export const COLLECTION_AGENT_SCOPES = [
 export type CollectionAgentScope = (typeof COLLECTION_AGENT_SCOPES)[number];
 
 /**
- * Discovery scope vocabulary for automation agents (e.g. Selene).
+ * Discovery scope vocabulary for automation agents (e.g. automation agent).
  * Metadata only until route-level enforcement is proven compatible with capability gates.
  */
 export const AUTOMATION_AGENT_SCOPES = [

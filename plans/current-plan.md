@@ -54,7 +54,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 - **Deployment surfaces:** the repo supports local Next.js development, the committed ACA app path (`Dockerfile` + `infra/aca/main.bicep`), and optional manual Vercel previews when explicitly needed.
 - **ACA hosting:** the app path is the checked-in ACA contract, and the reference instance now runs under the durable app name `ca-signalforge`.
 - **Preview hosting:** Vercel is no longer an automatic Git deployment path; use it only for intentional manual preview or review work and do not treat it as the main app-hosting source of truth.
-- **Release path:** the repo now has a GHCR publish workflow, a manual-dispatch ACA deploy workflow, and checked-in deploy or smoke helpers.
+- **Release path:** the repo now has a GHCR publish workflow, a manual-dispatch ACA deploy workflow, and checked-in deploy or verification helpers.
 - **Cross-repo operator contract:** current cleanup focus is portability across `signalforge`, `signalforge-agent`, and `signalforge-collectors` so one operator's workstation, cluster, or registry does not become the default product shape.
 - **CI:** GitHub Actions runs typecheck, test, build, and a Postgres parity job on every push to `main` and on PRs. Postgres schema changes follow the checked-in migration policy (`docs/postgres-migrations.md`).
 - **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js/SQLite (local), Postgres/Neon, Vitest, GitHub Actions, and a committed Docker/ACA deployment path.

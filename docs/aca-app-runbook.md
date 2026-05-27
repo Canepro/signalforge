@@ -240,7 +240,7 @@ Without that explicit JSON, the checked-in helper preserves the current live bin
 
 Reference deployment:
 
-- public app URL: `https://signalforge.canepro.me`
+- public app URL: `https://<your-signalforge-host>`
 - ACA default hostname: `https://ca-signalforge.kinddune-53ac219d.eastus2.azurecontainerapps.io`
 
 Do not point the GitHub repository homepage or operator bookmarks at a preview URL once the custom ACA domain is live.

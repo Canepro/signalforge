@@ -299,7 +299,7 @@ Requirements:
 - run detail clearly shows top actions, findings, suppressed noise, and metadata
 - severity styling is consistent
 - copy follows the approved terms
-- `bun test` passes
+- `bun run test` passes
 - `bun run typecheck` passes
 - no Phase 3 work has started
 

@@ -2,9 +2,9 @@
 """
 Minimal example automation-agent client for SignalForge.
 
-This is intended as a copy-and-adapt starting point for external AI agents such as
-Codex- or OpenClaw-style automation clients. It uses only the Python standard
-library and the published automation-agent HTTP routes.
+This is intended as a copy-and-adapt starting point for external automation
+clients, including OpenClaw/Hermes-style operator systems. It uses only the
+Python standard library and the published automation-agent HTTP routes.
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def build_agent_summary(result: dict[str, Any]) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Example SignalForge automation-agent client for Codex/OpenClaw-style agents."
+        description="Example SignalForge automation-agent client for external operator agents."
     )
     parser.add_argument(
         "--url",

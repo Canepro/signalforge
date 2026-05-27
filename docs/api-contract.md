@@ -215,7 +215,7 @@ Most errors use `{ "error": string, "code"?: string }`. Schema: `docs/schemas/er
 - Submit: `scripts/analyze.sh`
 - Read: `scripts/signalforge-read.sh` (`run` | `report` | `compare`)
 - Automation-agent bootstrap and polling: `scripts/signalforge-automation-agent.sh` (`register` | `request` | `poll` | `wait`)
-- Local end-to-end smoke: `scripts/smoke-automation-agent-local.sh` or `bun run smoke:automation-agent`
+- Local end-to-end verification: `scripts/verify-automation-agent-local.sh` or `bun run verify:automation-agent`
 
 ## Stability Guidance
 

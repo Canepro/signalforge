@@ -110,11 +110,11 @@ ${collectionScopeList}
 
 Runtime jobs/next gating still uses capability strings such as \`${capabilityExample}\` on heartbeat.
 
-### Automation agents (e.g. Selene)
+### Automation agents (e.g. automation agent)
 
 Automation agents are separate from collection execution agents and from the Codex App Server analysis brain.
 
-Enroll at \`POST ${urls.baseUrl}/api/automation-agent/registrations\` with operator Bearer proof. Store the issued token outside this repo (for example \`SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN\` in Infisical).
+Enroll at \`POST ${urls.baseUrl}/api/automation-agent/registrations\` with operator Bearer proof. Store the issued token outside this repo (for example \`SIGNALFORGE_AUTOMATION_AGENT_TOKEN\` in Infisical).
 
 ${automationScopeList}
 

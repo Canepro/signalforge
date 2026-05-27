@@ -18,9 +18,9 @@
     "test:parity": "node scripts/check-bun-runtime.mjs && vitest run tests/storage/parity.test.ts",
     "test:watch": "vitest",
     "test:integration": "vitest run tests/analyzer",
-    "smoke:automation-agent": "bash scripts/smoke-automation-agent-local.sh",
-    "smoke:codex-brain": "bash scripts/smoke-codex-app-server-brain.sh",
-    "smoke:codex-brain:fixtures": "bash scripts/smoke-codex-brain-fixture-suite.sh",
+    "verify:automation-agent": "bash scripts/verify-automation-agent-local.sh",
+    "verify:codex-brain": "bash scripts/verify-codex-app-server-brain.sh",
+    "verify:codex-brain:fixtures": "bash scripts/verify-codex-brain-fixture-suite.sh",
     "analyze": "bun src/lib/analyzer/cli.ts",
     "db:migrate:postgres": "bun scripts/db-migrate-postgres.ts",
     "db:backfill:collected-at": "bun scripts/backfill-collected-at.ts"

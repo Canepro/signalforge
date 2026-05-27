@@ -22,8 +22,8 @@ export LLM_PROVIDER=codex_app_server
 export CODEX_APP_SERVER_COMMAND="codex app-server"
 export CODEX_APP_SERVER_MODEL=gpt-5.4
 
-bun run smoke:codex-brain
-bash scripts/smoke-codex-brain-fixture-suite.sh
+bun run verify:codex-brain
+bash scripts/verify-codex-brain-fixture-suite.sh
 ```
 
 Observed on a live workstation (pre-PR #22 fail-closed fix):
@@ -40,7 +40,7 @@ Observed on a live workstation (pre-PR #22 fail-closed fix):
 
 - **Automation-agent end-to-end verification** on live ACA remains blocked until production Postgres has `sources.automation_enabled` (migration drift).
 - **WebSocket Codex transport** remains unimplemented in SignalForge; stdio is the supported path.
-- Full live suite on CI agents without Codex CLI installed is intentionally skipped (`smoke:codex-brain` exits 0 when `codex` is missing).
+- Full live suite on CI agents without Codex CLI installed is intentionally skipped (`verify:codex-brain` exits 0 when `codex` is missing).
 
 ## Validation commands
 
@@ -48,5 +48,5 @@ Observed on a live workstation (pre-PR #22 fail-closed fix):
 bun run typecheck
 bun run test tests/analyzer
 bun run build
-bun run smoke:codex-brain   # optional; requires local codex CLI
+bun run verify:codex-brain   # optional; requires local codex CLI
 ```

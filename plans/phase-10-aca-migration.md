@@ -313,7 +313,7 @@ Risk:
 Mitigation:
 
 - validate image locally before ACA work
-- add one focused smoke test against the built container
+- add one focused verification against the built container
 
 ### 2. Cold-start and operator responsiveness
 

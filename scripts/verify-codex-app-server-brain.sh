@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Run a local Codex App Server brain-provider smoke against a checked-in fixture.
+Run a local Codex App Server brain-provider verification against a checked-in fixture.
 
 This validates SignalForge's analyzer brain path only:
 deterministic fixture parsing -> local codex app-server stdio turn -> strict JSON report.
@@ -11,7 +11,7 @@ deterministic fixture parsing -> local codex app-server stdio turn -> strict JSO
 It does not inspect the current host and does not assume the machine is Linux or WSL.
 
 Usage:
-  bash scripts/smoke-codex-app-server-brain.sh [options]
+  bash scripts/verify-codex-app-server-brain.sh [options]
 
 Options:
   --fixture <path>       Fixture to analyze (default: tests/fixtures/sample-prod-server.log)
@@ -22,8 +22,8 @@ Options:
   -h, --help             Show this help
 
 Examples:
-  bash scripts/smoke-codex-app-server-brain.sh
-  bash scripts/smoke-codex-app-server-brain.sh --fixture tests/fixtures/wsl-nov2025-truncated.log
+  bash scripts/verify-codex-app-server-brain.sh
+  bash scripts/verify-codex-app-server-brain.sh --fixture tests/fixtures/wsl-nov2025-truncated.log
 EOF
 }
 
@@ -73,7 +73,7 @@ if [[ ! -f "$FIXTURE" ]]; then
 fi
 
 if [[ -z "$OUTPUT" ]]; then
-  OUTPUT="$(mktemp "${TMPDIR:-/tmp}/signalforge-codex-brain-smoke.XXXXXX")"
+  OUTPUT="$(mktemp "${TMPDIR:-/tmp}/signalforge-codex-brain-verification.XXXXXX")"
 fi
 
 export LLM_PROVIDER=codex_app_server
@@ -107,7 +107,7 @@ console.log(`findings=${findings.length}`);
 if (result.analysis_error) console.log(`analysis_error=${result.analysis_error}`);
 
 if (meta.llm_succeeded !== true) {
-  console.error("error: Codex App Server brain smoke fell back to deterministic-only output");
+  console.error("error: Codex App Server brain verification fell back to deterministic-only output");
   process.exit(1);
 }
 if (typeof meta.model_used !== "string" || !meta.model_used.startsWith("codex-app-server:")) {

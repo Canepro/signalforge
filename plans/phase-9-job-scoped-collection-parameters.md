@@ -1,6 +1,6 @@
 # Phase 9 Design: Job-Scoped Collection Parameters
 
-> Status: functionally implemented across SignalForge, `signalforge-agent`, and `signalforge-collectors`, with local end-to-end validation for Linux, container, and Kubernetes job-driven flows. Remaining follow-on is live Postgres parity for the new scope columns in a real Postgres environment plus production-like host or cluster runtime smoke outside this workstation.
+> Status: functionally implemented across SignalForge, `signalforge-agent`, and `signalforge-collectors`, with local end-to-end validation for Linux, container, and Kubernetes job-driven flows. Remaining follow-on is live Postgres parity for the new scope columns in a real Postgres environment plus production-like host or cluster runtime verification outside this workstation.
 
 ## Why this exists
 
@@ -181,7 +181,7 @@ Recommended rules:
     "kind": "kubernetes_scope",
     "scope_level": "namespace",
     "namespace": "payments",
-    "kubectl_context": "oke-prod",
+    "kubectl_context": "prod-cluster",
     "cluster_name": "prod-eu-1",
     "provider": "oke"
   }
@@ -417,12 +417,12 @@ The current repos now complete the practical cross-repo portion of this phase:
 - API docs, schemas, and targeted tests are updated
 - `signalforge-agent` maps the resolved scope to collector invocation and logs the claimed scope clearly
 - `signalforge-collectors` documents and validates the stable Linux, container, and Kubernetes input contract
-- repo-local end-to-end smoke covers Linux, container, and Kubernetes job-driven flows against a live SignalForge dev server, with mocked runtime and kubeconfig shims for the non-Linux paths
+- repo-local end-to-end verification covers Linux, container, and Kubernetes job-driven flows against a live SignalForge dev server, with mocked runtime and kubeconfig shims for the non-Linux paths
 
 The remaining hardening tail is narrower:
 
 - run live Postgres parity for the new scope columns in an environment with a real Postgres URL
-- run production-like container-host and cluster-side smoke on the intended execution environments, not only repo-local mocked runtime and kubeconfig shims
+- run production-like container-host and cluster-side verification on the intended execution environments, not only repo-local mocked runtime and kubeconfig shims
 
 ## Definition of done
 

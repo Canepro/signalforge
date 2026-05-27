@@ -14,8 +14,8 @@ private operations repo.
 - `<source-slug>` - `target_identifier` with `:` replaced by `-`.
 - `<SOURCE_SLUG>` - `target_identifier` with `:` and `-` replaced by `_`, then uppercased.
 
-For the wrapper contract see [`selene-source-wrappers.md`](./selene-source-wrappers.md).
-For enrollment see [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md).
+For the wrapper contract see [`automation-agent-source-wrappers.md`](./automation-agent-source-wrappers.md).
+For enrollment see [`automation-agent-multi-source-enrollment.md`](./automation-agent-multi-source-enrollment.md).
 
 Do not add secret values, token contents, kubeconfigs, private host paths, or
 private reports to this file.
@@ -109,7 +109,7 @@ Use this for a new `linux:<host-label>` Source.
 3. Deploy the wrapper:
 
    ```bash
-   cp /path/to/signalforge/examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh \
+   cp /path/to/signalforge/examples/automation-agent-wrappers/signalforge-diagnostic-<source-slug>.sh \
       <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh
    chmod 0755 <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh
    ```
@@ -175,7 +175,7 @@ Private wrapper path:
 
 ## Related Docs
 
-- [`selene-source-wrappers.md`](./selene-source-wrappers.md)
-- [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md)
+- [`automation-agent-source-wrappers.md`](./automation-agent-source-wrappers.md)
+- [`automation-agent-multi-source-enrollment.md`](./automation-agent-multi-source-enrollment.md)
 - [`source-inventory-map.md`](./source-inventory-map.md)
 - [`../infisical-secrets.md`](../infisical-secrets.md)

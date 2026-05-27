@@ -10,8 +10,8 @@ contract and safe examples only.
 
 For enrollment and wrapper details see:
 
-- [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md)
-- [`selene-source-wrappers.md`](./selene-source-wrappers.md)
+- [`automation-agent-multi-source-enrollment.md`](./automation-agent-multi-source-enrollment.md)
+- [`automation-agent-source-wrappers.md`](./automation-agent-source-wrappers.md)
 - [`automation-agent-integration.md`](./automation-agent-integration.md)
 
 ## Quick Reference
@@ -46,7 +46,7 @@ Use one entry like this per Source in your private operations inventory.
 | **credential store - execution agent** | Source-local execution token, separate from automation-agent token |
 | **credential store - automation agent** | Per-source token file on the host where the operator automation runs |
 | **Infisical secret name** | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` |
-| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` or a private wrapper path |
+| **wrapper template** | `examples/automation-agent-wrappers/signalforge-diagnostic-<source-slug>.sh` or a private wrapper path |
 | **automation-agent access** | `yes`, `no`, or `planned` |
 | **safe-fix policy** | `none` or a named deterministic policy |
 | **validation proof** | Private run id, request id, date, and outcome; do not commit private reports here |
