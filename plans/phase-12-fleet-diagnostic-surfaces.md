@@ -48,7 +48,7 @@ scope:
 
 | Surface | Source target example | Artifact family | Execution form |
 |---------|-----------------------|-----------------|----------------|
-| Mac workstation | `mac:<workstation>` | `linux-audit-log` or future `mac-diagnostics` | local host agent or manual push |
+| Mac workstation | `mac:<workstation>` | `mac-diagnostics` | local host agent or manual push |
 | Linux host | `linux:<host-label>` | `linux-audit-log` | host `systemd` execution agent |
 | AKS cluster | `aks:prod-eu1` | `kubernetes-bundle` | cluster-side Deployment |
 | Kubernetes cluster | `kubernetes:<cluster-name>` | `kubernetes-bundle` | cluster-side Deployment |
@@ -117,7 +117,7 @@ Done when each planned Source has:
 
 - `kubernetes:<cluster-name>` — example-live pattern; private deployments record concrete source names outside this repo
 - `linux:<host-label>` — example-live pattern; private deployments record concrete source names outside this repo
-- `mac:<workstation>` — planned; blocked on mac-diagnostics family decision; Mac (Darwin) workstation, not Linux/WSL
+- `mac:<workstation>` — planned; artifact family decided as `mac-diagnostics`; Mac (Darwin) workstation, not Linux/WSL
 - `aks:<cluster-name>` — planned; cluster name unknown; do not enroll until resolved; see source-inventory-map for naming conventions
 - `container-host:<host-label>` — planned; target surface not yet chosen; see source-inventory-map for naming conventions
 
@@ -226,7 +226,7 @@ Done when wrappers:
 
 - Kubernetes wrapper pattern: live in a private deployment; per-source token path active
 - Linux host wrapper pattern: live in a private deployment; source-bound diagnostic verified
-- Mac wrapper: template ready; deploy deferred until Source enrollment prerequisites met
+- Mac wrapper: template ready for `mac-diagnostics`; deploy deferred until Source enrollment prerequisites met
 - AKS, container-host: naming conventions documented in source-inventory-map; template creation blocked on target discovery
 
 ### Operational follow-through
@@ -278,8 +278,7 @@ Done when every action has:
 
 ## Open Questions
 
-- Should Mac workstation diagnostics reuse `linux-audit-log` for Darwin-friendly
-  sections, or become a separate `mac-diagnostics` artifact family?
+- Mac workstation diagnostics use a separate `mac-diagnostics` artifact family.
 - Should an automation agent hold one automation token per Source, or should SignalForge add
   a first-class operator identity that can be scoped to many Sources?
 - Which AKS cluster should be first: a production cluster with read-only

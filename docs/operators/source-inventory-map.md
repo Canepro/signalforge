@@ -20,7 +20,7 @@ For enrollment and wrapper details see:
 | --- | --- | --- | --- | --- |
 | `kubernetes:<cluster-name>` | example-live | `kubernetes-bundle` | yes | named policy only |
 | `linux:<host-label>` | example-live | `linux-audit-log` | yes | none |
-| `mac:<workstation>` | planned | `linux-audit-log` or future `mac-diagnostics` | planned | none |
+| `mac:<workstation>` | planned | `mac-diagnostics` | planned | none |
 | `aks:<cluster-name>` | planned | `kubernetes-bundle` | planned | none |
 | `container-host:<host-label>` | planned | `container-diagnostics` | planned | none |
 
@@ -40,7 +40,7 @@ Use one entry like this per Source in your private operations inventory.
 | --- | --- |
 | **target_identifier** | `linux:<host-label>`, `kubernetes:<cluster-name>`, `aks:<cluster-name>`, or `container-host:<host-label>` |
 | **display name** | Operator-facing label that does not reveal private hostnames in public docs |
-| **artifact family** | `linux-audit-log`, `kubernetes-bundle`, or `container-diagnostics` |
+| **artifact family** | `linux-audit-log`, `kubernetes-bundle`, `container-diagnostics`, or `mac-diagnostics` |
 | **status** | `planned`, `enrolled`, or `live` |
 | **execution form** | Host `signalforge-agent`, cluster-side `signalforge-agent` Deployment, or manual artifact push |
 | **credential store - execution agent** | Source-local execution token, separate from automation-agent token |

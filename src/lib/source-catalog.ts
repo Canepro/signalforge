@@ -7,6 +7,11 @@ export const SOURCE_TYPE_OPTIONS = [
     description: "A standard Linux machine running the external collector or agent.",
   },
   {
+    value: "mac_workstation",
+    label: "Mac workstation",
+    description: "A macOS workstation producing Mac diagnostics artifacts.",
+  },
+  {
     value: "wsl",
     label: "WSL",
     description: "A Windows Subsystem for Linux environment producing Linux audit output.",
@@ -30,6 +35,11 @@ export const ARTIFACT_TYPE_OPTIONS = [
     value: "kubernetes-bundle",
     label: "Kubernetes bundle",
     description: "UTF-8 JSON manifest carrying named Kubernetes evidence documents.",
+  },
+  {
+    value: "mac-diagnostics",
+    label: "Mac diagnostics",
+    description: "Structured macOS workstation diagnostics for security and resource posture.",
   },
 ] as const;
 
@@ -83,6 +93,17 @@ const ARTIFACT_FAMILY_PRESENTATIONS: ArtifactFamilyPresentation[] = [
     jobDrivenStatus:
       "Job-driven collection is supported with explicit Kubernetes scope when the execution environment has the intended kubeconfig and RBAC.",
   },
+  {
+    value: "mac-diagnostics",
+    label: "Mac diagnostics",
+    description: "macOS workstation posture, including firewall, FileVault, remote access, update, listener, and resource signals.",
+    uploadShape: "Structured .txt or .log artifact",
+    targetIdentifierHint: "Use a stable workstation identifier chosen by the operator.",
+    targetIdentifierExample: "mac:workstation-primary",
+    recommendedCollection: "Push directly from the workstation, or use a local launchd/user service once the Mac collector is installed.",
+    jobDrivenStatus:
+      "Job-driven collection is planned for Mac host agents; direct push is the initial path.",
+  },
 ] as const;
 
 export const COLLECTION_STACK_ROLES = [
@@ -96,7 +117,7 @@ export const COLLECTION_STACK_ROLES = [
     id: "signalforge-collectors",
     label: "signalforge-collectors",
     role: "Collector implementations",
-    description: "Produces Linux, container, and Kubernetes artifacts and can push them directly.",
+    description: "Produces Linux, Mac, container, and Kubernetes artifacts and can push them directly.",
   },
   {
     id: "signalforge-agent",
@@ -111,6 +132,7 @@ export const DEFAULT_EXPECTED_ARTIFACT_TYPE: ArtifactType = "linux-audit-log";
 
 const SOURCE_TYPE_SURFACE_LABELS: Record<string, string> = {
   linux_host: "Linux host",
+  mac_workstation: "Mac workstation",
   wsl: "WSL",
   upload: "Manual upload",
   api: "API submit",
@@ -192,6 +214,8 @@ export function getSourceExecutionSurfaceLabel({
     }
     return "Cluster-side Kubernetes runner";
   }
+
+  if (artifactType === "mac-diagnostics") return "Mac workstation";
 
   return getSourceTypeLabel(sourceType);
 }

@@ -14,8 +14,13 @@ import {
 
 describe("source-catalog", () => {
   it("lists the supported source types for operator-facing flows", () => {
-    expect(listSourceTypeOptions().map((option) => option.value)).toEqual(["linux_host", "wsl"]);
+    expect(listSourceTypeOptions().map((option) => option.value)).toEqual([
+      "linux_host",
+      "mac_workstation",
+      "wsl",
+    ]);
     expect(isSourceType("linux_host")).toBe(true);
+    expect(isSourceType("mac_workstation")).toBe(true);
     expect(isSourceType("wsl")).toBe(true);
     expect(isSourceType("container_host")).toBe(false);
   });
@@ -30,14 +35,19 @@ describe("source-catalog", () => {
     expect(defaultCapabilitiesForArtifactType("kubernetes-bundle")).toEqual([
       "collect:kubernetes-bundle",
     ]);
+    expect(defaultCapabilitiesForArtifactType("mac-diagnostics")).toEqual([
+      "collect:mac-diagnostics",
+    ]);
   });
 
   it("provides stable labels for the current source and artifact families", () => {
     expect(getSourceTypeLabel("linux_host")).toBe("Linux host");
+    expect(getSourceTypeLabel("mac_workstation")).toBe("Mac workstation");
     expect(getSourceTypeLabel("wsl")).toBe("WSL");
     expect(getArtifactTypeLabel("linux-audit-log")).toBe("Linux audit log");
     expect(getArtifactTypeLabel("container-diagnostics")).toBe("Container diagnostics");
     expect(getArtifactTypeLabel("kubernetes-bundle")).toBe("Kubernetes bundle");
+    expect(getArtifactTypeLabel("mac-diagnostics")).toBe("Mac diagnostics");
   });
 
   it("describes execution surfaces separately from artifact family labels", () => {
@@ -59,6 +69,13 @@ describe("source-catalog", () => {
         },
       })
     ).toBe("Podman runtime host");
+
+    expect(
+      getSourceExecutionSurfaceLabel({
+        sourceType: "linux_host",
+        artifactType: "mac-diagnostics",
+      })
+    ).toBe("Mac workstation");
 
     expect(
       getSourceExecutionSurfaceLabel({
@@ -85,10 +102,14 @@ describe("source-catalog", () => {
       "linux-audit-log",
       "container-diagnostics",
       "kubernetes-bundle",
+      "mac-diagnostics",
     ]);
 
     expect(getArtifactFamilyPresentation("container-diagnostics")).toMatchObject({
       targetIdentifierExample: "container-workload:host-a:podman:payments-api",
+    });
+    expect(getArtifactFamilyPresentation("mac-diagnostics")).toMatchObject({
+      targetIdentifierExample: "mac:workstation-primary",
     });
   });
 

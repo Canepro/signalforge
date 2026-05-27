@@ -1,0 +1,40 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": false,
+    "ran_as_root": false,
+    "os_contains": "macOS"
+  },
+  "must_be_noise": [
+    "Mac diagnostics collected without root privileges",
+    "MDM enrollment state unavailable"
+  ],
+  "must_not_be_findings": [
+    "MDM enrollment state unavailable"
+  ],
+  "must_be_findings": [
+    {
+      "title_contains": "application firewall is disabled",
+      "severity": "medium",
+      "category": "network"
+    },
+    {
+      "title_contains": "Remote Login is enabled",
+      "severity": "medium",
+      "category": "network"
+    },
+    {
+      "title_contains": "listening TCP services",
+      "severity": "high",
+      "category": "network"
+    },
+    {
+      "title_contains": "root volume usage is elevated",
+      "severity": "medium",
+      "category": "resource"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 5,
+  "max_findings": 5
+}

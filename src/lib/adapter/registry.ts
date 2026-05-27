@@ -2,6 +2,7 @@ import type { ArtifactAdapter } from "./types";
 import { ContainerDiagnosticsAdapter } from "./container-diagnostics/index";
 import { KubernetesBundleAdapter } from "./kubernetes-bundle/index";
 import { LinuxAuditLogAdapter } from "./linux-audit-log/index";
+import { MacDiagnosticsAdapter } from "./mac-diagnostics/index";
 import {
   DEFAULT_EXPECTED_ARTIFACT_TYPE,
   isCatalogArtifactType,
@@ -13,6 +14,7 @@ const adapters: Record<ArtifactType, ArtifactAdapter> = {
   "linux-audit-log": new LinuxAuditLogAdapter(),
   "container-diagnostics": new ContainerDiagnosticsAdapter(),
   "kubernetes-bundle": new KubernetesBundleAdapter(),
+  "mac-diagnostics": new MacDiagnosticsAdapter(),
 };
 
 export class UnsupportedArtifactTypeError extends Error {
@@ -51,6 +53,12 @@ export function detectArtifactType(content: string): ArtifactType {
     }
   } catch {
     // Fall through to text-family detection.
+  }
+  if (
+    /^===\s*mac-diagnostics\s*===/im.test(content) ||
+    (/^os_name:\s*macOS/im.test(content) && /^filevault_status:/im.test(content))
+  ) {
+    return "mac-diagnostics";
   }
   if (
     /^===\s*container-diagnostics\s*===/im.test(content) ||

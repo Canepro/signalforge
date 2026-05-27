@@ -51,7 +51,7 @@ lowercase.
 | field | value |
 | --- | --- |
 | **target_identifier** | `linux:<host-label>` or another stable Source key |
-| **artifact family** | `linux-audit-log`, `kubernetes-bundle`, or `container-diagnostics` |
+| **artifact family** | `linux-audit-log`, `kubernetes-bundle`, `container-diagnostics`, or `mac-diagnostics` |
 | **template script** | `examples/automation-agent-wrappers/signalforge-diagnostic-<source-slug>.sh` |
 | **production script location** | Private operations repo or host scripts path |
 | **token file** | `<token-dir>/signalforge-automation-agent-token-<source-slug>` |

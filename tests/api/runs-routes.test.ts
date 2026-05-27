@@ -365,6 +365,59 @@ ran_as_root: true
     ).toBe(true);
   });
 
+  it("POST JSON accepts mac-diagnostics and persists a Mac run", async () => {
+    const req = new NextRequest("http://localhost/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        artifact_type: "mac-diagnostics",
+        filename: "mac.txt",
+        source_type: "api",
+        target_identifier: "mac:workstation-primary",
+        content: `=== mac-diagnostics ===
+hostname: operator-mac.local
+os_name: macOS
+os_version: 26.5
+build_version: 25F71
+kernel: 25.5.0
+ran_as_root: false
+uptime: up 4 days
+firewall_state: Off
+filevault_status: On
+remote_login: On
+remote_management: Off
+listening_tcp_json: [{"command":"sshd","address":"0.0.0.0","port":22}]
+disk_root_used_percent: 91.2
+brew_outdated_count: 2
+`,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const detailRes = await GET_RUN(new NextRequest("http://localhost/api/runs/x"), {
+      params: Promise.resolve({ id: body.run_id }),
+    });
+    expect(detailRes.status).toBe(200);
+    const detail = await detailRes.json();
+    expect(detail.artifact_type).toBe("mac-diagnostics");
+    expect(detail.target_identifier).toBe("mac:workstation-primary");
+
+    const reportRes = await GET_REPORT(new NextRequest("http://localhost/api/runs/x/report"), {
+      params: Promise.resolve({ id: body.run_id }),
+    });
+    const report = await reportRes.json();
+    expect(report.environment_context.os).toContain("macOS");
+    expect(
+      report.findings.some((f: { title: string }) => f.title.includes("firewall is disabled"))
+    ).toBe(true);
+    expect(
+      report.findings.some((f: { title: string }) => f.title.includes("Remote Login"))
+    ).toBe(true);
+  });
+
   it("POST JSON emits run lifecycle events after persistence", async () => {
     const emitSpy = vi
       .spyOn(domainEvents, "emitRunLifecycleEvents")

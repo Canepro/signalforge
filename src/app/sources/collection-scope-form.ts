@@ -37,6 +37,8 @@ export function parseCollectionScopeFormData(
 
   if (kind === "linux_host") {
     scope = { kind: "linux_host" };
+  } else if (kind === "mac_host") {
+    scope = { kind: "mac_host" };
   } else if (kind === "container_target") {
     const containerRef = readTrimmedString(formData, `${opts.prefix}_container_ref`);
     if (!containerRef) {

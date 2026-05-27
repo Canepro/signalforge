@@ -1,6 +1,7 @@
 export type ContainerRuntime = "docker" | "podman";
 
 export type LinuxHostCollectionScope = { kind: "linux_host" };
+export type MacHostCollectionScope = { kind: "mac_host" };
 
 export type ContainerTargetCollectionScope = {
   kind: "container_target";
@@ -20,6 +21,7 @@ export type KubernetesScopeCollectionScope = {
 
 export type CollectionScope =
   | LinuxHostCollectionScope
+  | MacHostCollectionScope
   | ContainerTargetCollectionScope
   | KubernetesScopeCollectionScope;
 
@@ -45,6 +47,11 @@ export function isCollectionScope(input: unknown): input is CollectionScope {
   const value = input as Record<string, unknown>;
 
   if (value.kind === "linux_host") {
+    if (!hasOnlyKeys(value, ["kind"])) return false;
+    return true;
+  }
+
+  if (value.kind === "mac_host") {
     if (!hasOnlyKeys(value, ["kind"])) return false;
     return true;
   }
@@ -105,6 +112,11 @@ export function validateCollectionScopeForArtifactType(
         { ok: true }
       : { ok: false, error: "linux-audit-log jobs require collection_scope.kind=linux_host" };
   }
+  if (artifactType === "mac-diagnostics") {
+    return scope.kind === "mac_host" ?
+        { ok: true }
+      : { ok: false, error: "mac-diagnostics jobs require collection_scope.kind=mac_host" };
+  }
   if (artifactType === "container-diagnostics") {
     return scope.kind === "container_target" ?
         { ok: true }
@@ -131,6 +143,10 @@ export function formatCollectionScopeSummary(scope: CollectionScope | null): str
     return "Linux host";
   }
 
+  if (scope.kind === "mac_host") {
+    return "Mac host";
+  }
+
   if (scope.kind === "container_target") {
     return `Container target: ${scope.container_ref}`;
   }
@@ -144,6 +160,10 @@ export function formatCollectionScopeDetails(scope: CollectionScope | null): str
   if (!scope) return [];
 
   if (scope.kind === "linux_host") {
+    return [];
+  }
+
+  if (scope.kind === "mac_host") {
     return [];
   }
 
@@ -168,6 +188,10 @@ export function summarizeCollectionScope(scope: CollectionScope | null): string 
     return "Linux host";
   }
 
+  if (scope.kind === "mac_host") {
+    return "Mac host";
+  }
+
   if (scope.kind === "container_target") {
     const runtime = scope.runtime ? ` via ${scope.runtime}` : "";
     return `Container ${scope.container_ref}${runtime}`;
@@ -185,6 +209,10 @@ export function detailCollectionScope(scope: CollectionScope | null): string[] {
 
   if (scope.kind === "linux_host") {
     return ["kind=linux_host"];
+  }
+
+  if (scope.kind === "mac_host") {
+    return ["kind=mac_host"];
   }
 
   if (scope.kind === "container_target") {

@@ -68,4 +68,17 @@ describe("parseCollectionScopeFormData", () => {
     if (result.ok) return;
     expect(result.code).toBe("invalid_default_collection_scope");
   });
+
+  it("parses a Mac host scope", () => {
+    const form = new FormData();
+    form.set("default_collection_scope_kind", "mac_host");
+
+    const result = parseCollectionScopeFormData(form, {
+      prefix: "default_collection_scope",
+      artifactType: "mac-diagnostics",
+      errorCode: "invalid_default_collection_scope",
+    });
+
+    expect(result).toEqual({ ok: true, value: { kind: "mac_host" } });
+  });
 });

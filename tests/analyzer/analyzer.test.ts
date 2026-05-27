@@ -4,6 +4,7 @@ import { join } from "path";
 import { ContainerDiagnosticsAdapter } from "@/lib/adapter/container-diagnostics/index";
 import { KubernetesBundleAdapter } from "@/lib/adapter/kubernetes-bundle/index";
 import { LinuxAuditLogAdapter } from "@/lib/adapter/linux-audit-log/index";
+import { MacDiagnosticsAdapter } from "@/lib/adapter/mac-diagnostics/index";
 import { AnalysisResultSchema, AuditReportSchema } from "@/lib/analyzer/schema";
 
 const FIXTURES = join(__dirname, "../fixtures");
@@ -68,6 +69,11 @@ const FIXTURE_FILES = [
     log: "kubernetes-public-ingress-namespace.json",
     golden: "kubernetes-public-ingress-namespace.expected.json",
     adapter: new KubernetesBundleAdapter(),
+  },
+  {
+    log: "mac-workstation-diagnostics.txt",
+    golden: "mac-workstation-diagnostics.expected.json",
+    adapter: new MacDiagnosticsAdapter(),
   },
 ];
 
