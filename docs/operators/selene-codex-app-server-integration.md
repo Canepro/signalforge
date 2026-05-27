@@ -23,6 +23,19 @@ SignalForge does **not** expose Codex shell/file tools for analysis. If your app
 
 WebSocket transport is opt-in and requires loopback URLs plus token files; stdio is the supported default.
 
+### Environment
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `LLM_PROVIDER` | `openai` | Set to `codex_app_server` to use Codex App Server for the analysis explanation pass |
+| `CODEX_APP_SERVER_TRANSPORT` | `stdio` | `stdio` is supported; `websocket` is config-only and fails closed |
+| `CODEX_APP_SERVER_COMMAND` | `codex app-server` | Command used to start the local app-server process |
+| `CODEX_APP_SERVER_MODEL` | `gpt-5.4` | Model id passed to Codex App Server |
+| `CODEX_APP_SERVER_TURN_TIMEOUT_MS` | `120000` | Per-analysis wait before deterministic fallback |
+| `CODEX_APP_SERVER_WS_URL` | unset | Loopback WebSocket URL when testing websocket config |
+| `CODEX_APP_SERVER_WS_TOKEN_FILE` | unset | Capability-token file for websocket config |
+| `CODEX_APP_SERVER_WS_SHARED_SECRET_FILE` | unset | Signed-bearer shared-secret file for websocket config |
+
 Use the fixture-based smoke when validating a Mac-local Codex App Server setup:
 
 ```bash
@@ -31,7 +44,7 @@ bun run smoke:codex-brain
 
 The smoke does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim that Vincent's current workstation is WSL.
 
-See [Codex App Server](https://developers.openai.com/codex/app-server) and `README.md` for `CODEX_APP_SERVER_*` variables.
+See [Codex App Server](https://developers.openai.com/codex/app-server) for upstream app-server behavior.
 
 ## Selene (automation agent)
 

@@ -62,7 +62,8 @@ Full walkthrough: [docs/getting-started.md](docs/getting-started.md)
 
 Full environment reference: [docs/aca-env-contract.md](docs/aca-env-contract.md)
 
-LLM provider details: see `.env.example`
+LLM provider details: see `.env.example` and
+[`docs/operators/selene-codex-app-server-integration.md`](docs/operators/selene-codex-app-server-integration.md)
 
 ## LLM Providers
 
