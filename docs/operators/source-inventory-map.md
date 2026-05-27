@@ -1,12 +1,11 @@
 # Source Inventory Map
 
 Status: slice 2 of Phase 12  
-Updated: 2026-05-27  
-Maintained by: Vincent Mogah
+Updated: 2026-05-27
 
 This document maps every planned and enrolled diagnostic Source to its stable
 target identifier, artifact family, collection scope, execution form, credential
-store, Selene access decision, and safe-fix policy. It is the authoritative
+store, automation-agent access decision, and safe-fix policy. It is the authoritative
 reference before enrolling new tokens or adding automation agents.
 
 **Do not add secrets, token values, kubeconfig content, or IP addresses to this
@@ -16,11 +15,11 @@ file. Paths to secret store files are safe to document; values are not.**
 
 ## Quick reference
 
-| target\_identifier      | status    | artifact family       | Selene access | safe-fix |
+| target\_identifier      | status    | artifact family       | automation-agent access | safe-fix |
 |-------------------------|-----------|-----------------------|---------------|----------|
 | `oke:prod-eu1`          | live      | `kubernetes-bundle`   | yes           | `kubernetes.disable-service-account-token-automount.v1` only |
 | `linux:hostinger-prod`  | enrolled  | `linux-audit-log`     | yes           | none |
-| `mac:vincent-primary`   | planned   | `linux-audit-log`*    | planned       | none |
+| `mac:<workstation>`   | planned   | `linux-audit-log`*    | planned       | none |
 | `aks:<cluster-name>`    | planned   | `kubernetes-bundle`   | planned       | none |
 | `container-host:<host>` | planned   | `container-diagnostics` | planned     | none |
 
@@ -31,7 +30,7 @@ file. Paths to secret store files are safe to document; values are not.**
 
 | value    | meaning |
 |----------|---------|
-| `live`   | Selene automation-agent path tested end-to-end |
+| `live`   | Automation-agent path tested end-to-end |
 | `enrolled` | Source and execution-agent token exist in the app; automation-agent token issued; live end-to-end diagnostic not yet confirmed |
 | `planned` | Fields documented; Source not yet created in the app |
 
@@ -60,20 +59,16 @@ file. Paths to secret store files are safe to document; values are not.**
 }
 ```
 
-Note: the kubeconfig context on the VPS execution host is `oke-primary`. Do
-not use `oke-cluster` — that context name does not resolve on the host.
-
 | field | value |
 |-------|-------|
-| **execution form** | Cluster-side `signalforge-agent` Deployment (or wrapper-triggered collection from VPS) |
+| **execution form** | Cluster-side `signalforge-agent` Deployment (or wrapper-triggered collection from the operator host) |
 | **credential store — execution agent** | `signalforge-agent` service env or Infisical-injected; stored as token hash in app |
-| **credential store — automation agent** | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` |
+| **credential store — automation agent** | Per-source token file on the operator host (see [selene-multi-source-enrollment.md](./selene-multi-source-enrollment.md)) |
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
-| **Selene wrapper (current live)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh` |
 | **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` |
-| **Selene access** | yes — automation-agent token enrolled; Selene can request runs and poll results for this Source |
+| **automation-agent access** | yes — automation-agent token enrolled; runs and results accessible |
 | **safe-fix policy** | `kubernetes.disable-service-account-token-automount.v1` only; source automation and auto-fix must be explicitly enabled in the app before any fix action is created |
-| **validation proof** | Selene live path confirmed working via velora-infra; OKE-scope kubernetes-bundle runs appear in the app with Kubernetes findings |
+| **validation proof** | Automation-agent path confirmed working; OKE-scope kubernetes-bundle runs appear in the app with Kubernetes findings |
 
 ---
 
@@ -97,24 +92,23 @@ not use `oke-cluster` — that context name does not resolve on the host.
 | field | value |
 |-------|-------|
 | **execution form** | `systemd` long-lived execution agent (`signalforge-agent`) on the VPS host |
-| **credential store — execution agent** | Stored at a host-local path under `/etc/velora-infra/` (exact file separate from the Selene automation token; do not mix the two) |
-| **credential store — automation agent** | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod` (per-source naming; separate from OKE token) |
+| **credential store — execution agent** | Host-local token file, separate from the automation-agent token; do not mix the two |
+| **credential store — automation agent** | Per-source token file on the operator host (per-source naming convention; see [selene-multi-source-enrollment.md](./selene-multi-source-enrollment.md)) |
 | **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
-| **Selene wrapper (target)** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh` |
 | **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` |
-| **Selene access** | yes — automation-agent token issued; live end-to-end diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run) |
+| **automation-agent access** | yes — automation-agent token issued; live end-to-end diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run) |
 | **safe-fix policy** | none — no safe-fix policy enabled for Linux host sources |
 | **wrapper preflight** | Confirm `signalforge-agent` is running and heartbeating before requesting collection |
 | **validation proof needed** | Run one `linux-audit-log` collection job through the enrolled agent and confirm the run appears in the app with audit findings |
 
 ---
 
-### `mac:vincent-primary`
+### `mac:<workstation>`
 
 | field | value |
 |-------|-------|
-| **target\_identifier** | `mac:vincent-primary` |
-| **display name** | Vincent — primary Mac workstation |
+| **target\_identifier** | `mac:<workstation>` |
+| **display name** | Primary Mac workstation |
 | **artifact family** | `linux-audit-log` (interim; see open question below) |
 | **status** | planned |
 
@@ -130,11 +124,11 @@ not use `oke-cluster` — that context name does not resolve on the host.
 |-------|-------|
 | **execution form** | Local `signalforge-agent` service or manual push from the workstation |
 | **credential store — execution agent** | `~/.config/signalforge/agent-token` or Infisical dev injection |
-| **credential store — automation agent** | `~/.config/signalforge/selene-automation-agent-token-mac-vincent-primary` (when enrolled) |
-| **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` (add when source is enrolled) |
-| **Selene access** | planned — automation-agent token not yet issued; Selene access makes sense when on the same network or VPN |
+| **credential store — automation agent** | `~/.config/signalforge/selene-automation-agent-token-mac-<workstation>` (when enrolled) |
+| **Infisical secret name** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` (add when source is enrolled) |
+| **automation-agent access** | planned — automation-agent token not yet issued; access makes sense when on the same network or VPN |
 | **safe-fix policy** | none |
-| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh` (do not deploy until enrolled) |
+| **wrapper template** | `examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh` (do not deploy until enrolled) |
 | **wrapper/preflight** | Local `bun run dev` or `signalforge-agent` service |
 | **validation proof needed** | Run one collection job from a local agent on the workstation and confirm the run appears in the app |
 
@@ -181,15 +175,15 @@ Fill in the discovery fields below, then create the Source in the app.
 |---|---|---|
 | target\_identifier | `aks:<cluster-name>` | `aks:prod-eu1` |
 | Infisical secret | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_<CLUSTER_NAME_UPPER>` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_PROD_EU1` |
-| token file | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-aks-<cluster-name>` | `…-aks-prod-eu1` |
+| token file | `<host-token-dir>/signalforge-automation-agent-token-aks-<cluster-name>` | `…-aks-prod-eu1` |
 | wrapper script | `signalforge-diagnostic-aks-<cluster-name>.sh` | `…-aks-prod-eu1.sh` |
-| kubeconfig | `/etc/velora-infra/selene/kubeconfigs/aks-<cluster-name>.kubeconfig` | `…-aks-prod-eu1.kubeconfig` |
+| kubeconfig | `<host-kubeconfig-dir>/aks-<cluster-name>.kubeconfig` | `…-aks-prod-eu1.kubeconfig` |
 
 | field | value |
 |-------|-------|
 | **execution form** | Cluster-side `signalforge-agent` Deployment with read-only RBAC |
 | **credential store — automation agent** | Token file at per-source host path; Infisical per-source secret name |
-| **Selene access** | planned — decide whether to start with production cluster (read-only diagnostics only) or a lower-risk validation cluster |
+| **automation-agent access** | planned — decide whether to start with production cluster (read-only diagnostics only) or a lower-risk validation cluster |
 | **safe-fix policy** | none initially; `kubernetes.disable-service-account-token-automount.v1` may be added once diagnostics are reliable |
 | **wrapper/preflight** | Follow OKE wrapper pattern; adapt for AKS kubeconfig and context |
 | **validation proof needed** | Confirm `kubectl --context=<target> auth can-i list pods --all-namespaces` passes for the agent ServiceAccount before enrolling |
@@ -208,7 +202,7 @@ discovery fields before creating a Source.
 
 **What qualifies as a container-host source**
 
-A host running Docker or Podman that Selene should have visibility into. The
+A host running Docker or Podman that the automation agent should have visibility into. The
 host must have `signalforge-agent` installed with runtime socket access. Each
 stable, long-lived container runtime host gets its own Source with a unique
 `host-label`.
@@ -238,14 +232,14 @@ stable, long-lived container runtime host gets its own Source with a unique
 |---|---|---|
 | target\_identifier | `container-host:<host-label>` | `container-host:vps-prod-01` |
 | Infisical secret | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_<LABEL_UPPER>` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_VPS_PROD_01` |
-| token file | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-container-host-<host-label>` | `…-vps-prod-01` |
+| token file | `<host-token-dir>/signalforge-automation-agent-token-container-host-<host-label>` | `…-vps-prod-01` |
 | wrapper script | `signalforge-diagnostic-container-host-<host-label>.sh` | `…-vps-prod-01.sh` |
 
 | field | value |
 |-------|-------|
 | **execution form** | Host agent (`signalforge-agent`) with runtime socket access |
 | **credential store — automation agent** | Token file at per-source host path; Infisical per-source secret name |
-| **Selene access** | planned |
+| **automation-agent access** | planned |
 | **safe-fix policy** | none |
 | **wrapper/preflight** | Confirm runtime socket access (`docker info` or `podman info`) and container target before enrolling |
 | **validation proof needed** | Run one `container-diagnostics` collection job and confirm container posture findings appear in the app |
@@ -261,7 +255,7 @@ Use this checklist before creating any Source entry in the app.
 - [ ] collection scope JSON is valid against `CollectionScope` in `src/lib/collection-scope.ts`
 - [ ] execution agent token will be stored at a source-local path (not printed to logs or chat)
 - [ ] automation agent token (for Selene) stored at a path that Selene can read on the relevant host
-- [ ] Selene access decision is explicit (yes / no / planned)
+- [ ] automation-agent access decision is explicit (yes / no / planned)
 - [ ] safe-fix policy decision is explicit (none / named policy only)
 - [ ] at least one successful collection run has been observed before Selene automation is turned on
 

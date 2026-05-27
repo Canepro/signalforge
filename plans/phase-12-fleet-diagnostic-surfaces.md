@@ -4,7 +4,7 @@ Status: slice 1 complete; slice 2 complete; slice 3 in progress; slice 4 complet
 
 ## Goal
 
-Make SignalForge useful as the diagnostics control plane for Vincent's real
+Make SignalForge useful as the diagnostics control plane for real operator
 machines and operational surfaces without turning the app into an RMM, SSH
 broker, or arbitrary command runner.
 
@@ -48,7 +48,7 @@ scope:
 
 | Surface | Source target example | Artifact family | Execution form |
 |---------|-----------------------|-----------------|----------------|
-| Mac workstation | `mac:vincent-primary` | `linux-audit-log` or future `mac-diagnostics` | local host agent or manual push |
+| Mac workstation | `mac:<workstation>` | `linux-audit-log` or future `mac-diagnostics` | local host agent or manual push |
 | Linux VPS | `linux:hostinger-prod` | `linux-audit-log` | host `systemd` execution agent |
 | AKS cluster | `aks:prod-eu1` | `kubernetes-bundle` | cluster-side Deployment |
 | OKE cluster | `oke:prod-eu1` | `kubernetes-bundle` | cluster-side Deployment |
@@ -93,7 +93,7 @@ Done when:
 
 ### Slice 2: Source Inventory Map
 
-Add a documented operator map for Vincent's real diagnostic surfaces:
+Add a documented operator map for the diagnostic surfaces in scope:
 
 - Mac
 - VPS/Linux hosts
@@ -117,7 +117,7 @@ Done when each planned Source has:
 
 - `oke:prod-eu1` — live; Selene path confirmed end-to-end
 - `linux:hostinger-prod` — enrolled; wrapper production-ready; live diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run)
-- `mac:vincent-primary` — planned; blocked on mac-diagnostics family decision; Mac (Darwin) workstation, not Linux/WSL
+- `mac:<workstation>` — planned; blocked on mac-diagnostics family decision; Mac (Darwin) workstation, not Linux/WSL
 - `aks:<cluster-name>` — planned; cluster name unknown; do not enroll until resolved; see source-inventory-map for naming conventions
 - `container-host:<host-label>` — planned; target surface not yet chosen; see source-inventory-map for naming conventions
 
@@ -134,7 +134,7 @@ Operator runbook: [`docs/operators/selene-multi-source-enrollment.md`](../docs/o
 |------------------------|-----------------------|
 | `oke:prod-eu1`         | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
 | `linux:hostinger-prod` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
-| `mac:vincent-primary`  | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` |
+| `mac:<workstation>`  | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` |
 | `aks:TODO`             | *(wait for cluster name)* |
 | `container-host:TODO`  | *(wait for target name)* |
 
@@ -144,7 +144,7 @@ Pattern: `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` where
 **Host file naming convention:**
 
 ```
-/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-<source-slug>
+<host-token-dir>/signalforge-automation-agent-token-<source-slug>
 ```
 
 For host files, `<source-slug>` is `target_identifier` with `:` replaced by
@@ -173,7 +173,7 @@ Done when:
 - cross-source override attempts remain rejected
 - `oke:prod-eu1` enrollment verified end-to-end (already live)
 - `linux:hostinger-prod` enrollment verified end-to-end
-- `mac:vincent-primary`, `aks:<cluster-name>`, `container-host:<host-label>` remain planned pending source-creation prerequisites
+- `mac:<workstation>`, `aks:<cluster-name>`, `container-host:<host-label>` remain planned pending source-creation prerequisites
 
 **Current state (2026-05-27):**
 
@@ -195,7 +195,7 @@ Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
 |------------------------|-----------------|--------|
 | `oke:prod-eu1`         | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` | live in velora-infra on per-source wrapper/token path |
 | `linux:hostinger-prod` | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` | production-ready; deploy pending live diagnostic verification |
-| `mac:vincent-primary`  | `examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh` | template ready; deploy blocked on Source enrollment |
+| `mac:<workstation>`  | `examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh` | template ready; deploy blocked on Source enrollment |
 | `aks:<cluster-name>`   | *(create when cluster name is confirmed; follow naming conventions in source-inventory-map)* | blocked |
 | `container-host:<host>` | *(create when target is confirmed; follow naming conventions in source-inventory-map)* | blocked |
 

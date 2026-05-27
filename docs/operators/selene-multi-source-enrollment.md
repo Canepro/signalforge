@@ -42,7 +42,7 @@ uppercased.
 |-------------------------|-----------------------|
 | `oke:prod-eu1`          | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
 | `linux:hostinger-prod`  | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
-| `mac:vincent-primary`   | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` |
+| `mac:<workstation>`     | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` |
 | `aks:TODO`              | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_AKS_TODO` *(do not create until cluster is named)* |
 | `container-host:TODO`   | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_CONTAINER_HOST_TODO` *(do not create until target is named)* |
 
@@ -55,10 +55,10 @@ fetching the value interactively.
 
 ## Host file naming convention
 
-On Linux/VPS execution hosts that run Selene wrappers, store the token at:
+On Linux/VPS execution hosts that run automation-agent wrappers, store the token at:
 
 ```
-/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-<source-slug>
+<host-token-dir>/signalforge-automation-agent-token-<source-slug>
 ```
 
 where `<source-slug>` is the `target_identifier` with `:` replaced by `-` and
@@ -70,13 +70,12 @@ a different service account.
 
 | target\_identifier      | host file path |
 |-------------------------|----------------|
-| `oke:prod-eu1`          | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` |
-| `linux:hostinger-prod`  | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod` |
-| `mac:vincent-primary`   | `~/.config/signalforge/selene-automation-agent-token-mac-vincent-primary` |
+| `oke:prod-eu1`          | `<host-token-dir>/signalforge-automation-agent-token-oke-prod-eu1` |
+| `linux:hostinger-prod`  | `<host-token-dir>/signalforge-automation-agent-token-linux-hostinger-prod` |
+| `mac:<workstation>`     | `~/.config/signalforge/selene-automation-agent-token-mac-<workstation>` |
 
 **OKE backward-compatibility note:** The existing live OKE token is currently
-stored at the legacy path
-`/etc/velora-infra/selene/secrets/signalforge-automation-agent-token`
+stored at the legacy path `<host-token-dir>/signalforge-automation-agent-token`
 (no source suffix). That path is in use and must not be moved until the
 `signalforge-diagnostic.sh` wrapper on the VPS is updated to read the
 per-source path. Until that wrapper update (slice 4), keep the OKE token at
@@ -103,15 +102,15 @@ The OKE automation-agent token is already enrolled. To verify:
 3. Confirm the token file exists at the legacy path (do not print value):
 
    ```bash
-   test -f /etc/velora-infra/selene/secrets/signalforge-automation-agent-token \
+   test -f <host-token-dir>/signalforge-automation-agent-token \
      && echo "token file present" || echo "MISSING"
    ```
 
-4. Confirm Selene can request a diagnostic run:
+4. Confirm the automation agent can request a diagnostic run:
 
    ```bash
-   SIGNALFORGE_AUTOMATION_AGENT_TOKEN=$(cat /etc/velora-infra/selene/secrets/signalforge-automation-agent-token) \
-   ./scripts/signalforge-automation-agent.sh request --reason "slice-3 smoke"
+   SIGNALFORGE_AUTOMATION_AGENT_TOKEN=$(cat <host-token-dir>/signalforge-automation-agent-token) \
+   ./scripts/signalforge-automation-agent.sh request --reason "slice-3 verification"
    ```
 
 5. Add the token to Infisical under
@@ -121,7 +120,7 @@ The OKE automation-agent token is already enrolled. To verify:
 
 ---
 
-### `linux:hostinger-prod` (enrolled — end-to-end smoke pending)
+### `linux:hostinger-prod` (enrolled — end-to-end verification pending)
 
 1. Find the SignalForge `source_id` for this Source from the Sources UI.
 
@@ -152,20 +151,20 @@ The OKE automation-agent token is already enrolled. To verify:
 
    ```bash
    # On the VPS host — do not run on a shared or dev machine
-   install -m 0640 -o root -g ubuntu /dev/null \
-     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod
+   install -m 0640 -o root -g <selene-runtime-group> /dev/null \
+     <host-token-dir>/signalforge-automation-agent-token-linux-hostinger-prod
    # Write the token value using your preferred secret injection method
    ```
 
-   Use the group that the Selene runtime belongs to. On the current VPS that is
-   `ubuntu`, matching the live OKE token file contract (`root:ubuntu 0640`).
+   Use the group that the automation-agent runtime belongs to, matching the
+   token file permissions contract for your host (`root:<group> 0640`).
 
-5. Smoke-test the enrollment:
+5. Verify the enrollment:
 
    ```bash
    SIGNALFORGE_AUTOMATION_AGENT_TOKEN=$(cat \
-     /etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod) \
-   ./scripts/signalforge-automation-agent.sh request --reason "slice-3 smoke"
+     <host-token-dir>/signalforge-automation-agent-token-linux-hostinger-prod) \
+   ./scripts/signalforge-automation-agent.sh request --reason "slice-3 verification"
    ```
 
    Expected: a `request_id` is returned and the request transitions to
@@ -173,16 +172,16 @@ The OKE automation-agent token is already enrolled. To verify:
 
 ---
 
-### `mac:vincent-primary` (planned — do not enroll yet)
+### `mac:<workstation>` (planned — do not enroll yet)
 
 Blocked pending the `mac-diagnostics` artifact family decision. When the Source
 is created in the app and the family is decided:
 
-1. Create the Source in SignalForge with `target_identifier=mac:vincent-primary`.
+1. Create the Source in SignalForge with `target_identifier=mac:<workstation>`.
 2. Enroll the automation-agent token using the same `register` command above.
 3. Store in Infisical under
-   `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY`.
-4. Store token at `~/.config/signalforge/selene-automation-agent-token-mac-vincent-primary`
+   `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>`.
+4. Store token at `~/.config/signalforge/selene-automation-agent-token-mac-<workstation>`
    on the workstation (permissions `600`).
 
 ---
@@ -246,7 +245,7 @@ Run after enrolling or rotating a token for any Source:
 - [ ] `register` returned an `automation_agent_id` and a one-time token
 - [ ] Token stored in Infisical under the correct per-source secret name
 - [ ] Token stored at the correct host file path (`root:<selene-runtime-group> 0640` on Linux hosts; `600` for local user-only workstation files)
-- [ ] `request --reason "smoke"` returns a `request_id`
+- [ ] `request --reason "verification"` returns a `request_id`
 - [ ] `wait <request-id>` reaches `submitted` with a non-null `result`
 - [ ] Run appears in the SignalForge Sources UI linked to the correct Source
 - [ ] No cross-source access: a token enrolled for Source A must return `403` when used against Source B's requests

@@ -42,7 +42,7 @@ Use the fixture-based smoke when validating a Mac-local Codex App Server setup:
 bun run smoke:codex-brain
 ```
 
-The smoke does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim that Vincent's current workstation is WSL.
+The fixture check does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim about the operator's workstation.
 
 See [Codex App Server](https://developers.openai.com/codex/app-server) for upstream app-server behavior.
 

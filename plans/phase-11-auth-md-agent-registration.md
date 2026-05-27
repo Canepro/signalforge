@@ -280,6 +280,6 @@ SignalForge can use the same pattern later for operator investigations, but the 
 - WorkOS app guide: `https://workos.com/auth-md/docs/apps`
 - WorkOS agent-provider guide: `https://workos.com/auth-md/docs/agent-providers`
 - Reference repo: `https://github.com/workos/auth.md`
-- Local spike report: `/Users/canepro/Documents/Codex/2026-05-23/interesting-post-https-x-com-dkundel/reports/2026-05-23-auth-md-codex-infisical-spike.html`
+
 - SignalForge Infisical doc: `docs/infisical-secrets.md`
 - SignalForge Sources and Agents doc: `docs/operators/sources-and-agents.md`

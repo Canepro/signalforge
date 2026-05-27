@@ -79,8 +79,8 @@ Store app-runtime names in Infisical rather than GitHub-specific names:
 - optional `LLM_PROVIDER` and Codex App Server transport settings (`CODEX_APP_SERVER_*`) when using the local analysis brain
 - optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN` — legacy single-source Selene token (keep for backward compat; prefer per-source names below)
 - optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` — Selene token for `oke:prod-eu1`
-- optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` — Selene token for `linux:hostinger-prod`
-- optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` — Selene token for `mac:vincent-primary` (add when source is enrolled)
+- optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` — automation-agent token for `linux:hostinger-prod`
+- optional `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` — automation-agent token for the enrolled Mac workstation Source (add when source is enrolled; substitute actual workstation slug)
 - (additional sources follow the pattern `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>`; see [`operators/selene-multi-source-enrollment.md`](./operators/selene-multi-source-enrollment.md))
 
 The workflow maps those names to the deploy helper inputs:

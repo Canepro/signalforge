@@ -3,8 +3,8 @@
 Status: Phase 12 slice 4 — wrapper contract  
 Updated: 2026-05-27
 
-This document defines the per-source wrapper contract for Selene's SignalForge
-diagnostic requests. Each wrapper is a source-bound shell script that reads a
+This document defines the per-source wrapper contract for automation-agent
+SignalForge diagnostic requests. Each wrapper is a source-bound shell script that reads a
 single token file, calls the SignalForge automation-agent API, and optionally
 waits for a result.
 
@@ -34,8 +34,8 @@ For the Source inventory see
   policy for its Source. Wrappers do not trigger fix actions; they request
   diagnostic runs only.
 - **Templates only in this repo.** Scripts in `examples/selene-wrappers/` are
-  templates. Production wrappers live in velora-infra. Do not deploy from
-  `examples/` directly.
+  templates. Production wrappers are deployed to the operator scripts repo. Do
+  not deploy from `examples/` directly.
 
 ---
 
@@ -52,7 +52,7 @@ kept lowercase.
 |------------------------|--------------|
 | `oke:prod-eu1`         | `signalforge-diagnostic-oke-prod-eu1.sh` |
 | `linux:hostinger-prod` | `signalforge-diagnostic-linux-hostinger-prod.sh` |
-| `mac:vincent-primary`  | `signalforge-diagnostic-mac-vincent-primary.sh` |
+| `mac:<workstation>`    | `signalforge-diagnostic-mac-<workstation>.sh` |
 | `aks:TODO`             | *(create when cluster name is confirmed)* |
 | `container-host:TODO`  | *(create when target is confirmed)* |
 
@@ -67,8 +67,8 @@ kept lowercase.
 | **target\_identifier** | `oke:prod-eu1` |
 | **artifact family** | `kubernetes-bundle` |
 | **template script** | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` |
-| **production script location** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-oke-prod-eu1.sh` *(target)* |
-| **token file** | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1` *(target; see migration note)* |
+| **production script location** | `<ops-base>/scripts/signalforge-diagnostic-oke-prod-eu1.sh` *(target)* |
+| **token file** | `<token-dir>/signalforge-automation-agent-token-oke-prod-eu1` *(target; see migration note)* |
 | **token env var** | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN` |
 | **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
 | **safe-fix policy** | `kubernetes.disable-service-account-token-automount.v1` — source automation and auto-fix must be explicitly enabled in the app |
@@ -80,23 +80,23 @@ kept lowercase.
 
 The live OKE token is currently at the legacy unsuffixed path:
 ```
-/etc/velora-infra/selene/secrets/signalforge-automation-agent-token
+<token-dir>/signalforge-automation-agent-token
 ```
 
 The target per-source path is:
 ```
-/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1
+<token-dir>/signalforge-automation-agent-token-oke-prod-eu1
 ```
 
 Do not perform this migration in the SignalForge repo. The migration requires:
-1. Writing the token to the new path on the VPS.
-2. Updating the deployed wrapper in velora-infra to read the new path.
-3. Confirming the live Selene path still works.
+1. Writing the token to the new path on the host.
+2. Updating the deployed wrapper in the operator scripts repo to read the new path.
+3. Confirming the live automation-agent path still works.
 4. Removing the legacy unsuffixed file only after step 3 is confirmed.
 
 Until the migration is done, set `SIGNALFORGE_SELENE_TOKEN_FILE` to the legacy
-path when running the template. The production deployed wrapper in velora-infra
-retains its current behavior until explicitly updated.
+path when running the template. The production deployed wrapper retains its
+current behavior until explicitly updated.
 
 ---
 
@@ -107,8 +107,8 @@ retains its current behavior until explicitly updated.
 | **target\_identifier** | `linux:hostinger-prod` |
 | **artifact family** | `linux-audit-log` |
 | **template script** | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` |
-| **production script location** | `/opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-linux-hostinger-prod.sh` *(target)* |
-| **token file** | `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-linux-hostinger-prod` |
+| **production script location** | `<ops-base>/scripts/signalforge-diagnostic-linux-hostinger-prod.sh` *(target)* |
+| **token file** | `<token-dir>/signalforge-automation-agent-token-linux-hostinger-prod` |
 | **token env var** | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN` |
 | **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
 | **safe-fix policy** | none |
@@ -118,21 +118,21 @@ retains its current behavior until explicitly updated.
 
 ---
 
-### `mac:vincent-primary`
+### `mac:<workstation>`
 
 | field | value |
 |-------|-------|
-| **target\_identifier** | `mac:vincent-primary` |
+| **target\_identifier** | `mac:<workstation>` |
 | **artifact family** | `linux-audit-log` (interim; pending `mac-diagnostics` family decision) |
-| **template script** | `examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh` |
-| **production script location** | Local workstation path; not deployed to velora-infra |
-| **token file** | `~/.config/signalforge/selene-automation-agent-token-mac-vincent-primary` |
+| **template script** | `examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh` |
+| **production script location** | Local workstation path; not deployed to the operator scripts repo |
+| **token file** | `~/.config/signalforge/selene-automation-agent-token-mac-<workstation>` |
 | **token env var** | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN` |
-| **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` *(add when enrolled)* |
+| **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_<WORKSTATION>` *(add when enrolled)* |
 | **safe-fix policy** | none |
 | **collection window** | Confirm `signalforge-agent` service is running locally before requesting |
 | **expected terminal states** | `submitted` (success), `failed`, `cancelled`, `expired` |
-| **validation command** | `SIGNALFORGE_BASE_URL=<url> ./examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh --health-check` |
+| **validation command** | `SIGNALFORGE_BASE_URL=<url> ./examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh --health-check` |
 | **status** | **Planned** — do not deploy this wrapper until the Source is enrolled. See enrollment prerequisites in [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md). |
 
 ---
@@ -193,26 +193,26 @@ use that Source's wrapper.
 
 ---
 
-## Deploying a wrapper to velora-infra
+## Deploying a wrapper to the operator scripts repo
 
 This repo provides templates in `examples/selene-wrappers/`. General steps:
 
-1. Copy the template to the production path in velora-infra:
+1. Copy the template to the production path in your operator scripts repo:
    ```
-   /opt/velora-infra/stacks/hermes/selene/scripts/signalforge-diagnostic-<source-slug>.sh
+   <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh
    ```
 2. Set `SIGNALFORGE_AGENT_SCRIPT` to the location of `signalforge-automation-agent.sh`
    on the production host, or ensure it is on PATH.
-3. Confirm the token file is at the expected path with `root:<selene-runtime-group> 0640`.
+3. Confirm the token file is at the expected path with `root:<runtime-group> 0640`.
 4. Run `--health-check` to confirm the wrapper is wired up correctly:
    ```bash
    SIGNALFORGE_BASE_URL=https://<host> \
-     /opt/velora-infra/.../signalforge-diagnostic-<source-slug>.sh --health-check
+     <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh --health-check
    ```
-5. Run a smoke diagnostic request:
+5. Run a diagnostic request to verify:
    ```bash
    SIGNALFORGE_BASE_URL=https://<host> \
-     /opt/velora-infra/.../signalforge-diagnostic-<source-slug>.sh --reason "smoke" --wait
+     <ops-base>/scripts/signalforge-diagnostic-<source-slug>.sh --reason "verification" --wait
    ```
 
 For per-source deployment checklists with exact commands, rollback procedures,
