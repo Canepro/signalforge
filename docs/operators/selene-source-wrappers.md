@@ -73,7 +73,7 @@ kept lowercase.
 | **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
 | **safe-fix policy** | `kubernetes.disable-service-account-token-automount.v1` — source automation and auto-fix must be explicitly enabled in the app |
 | **collection window** | No windowing required; the execution agent (cluster-side Deployment) is always running |
-| **expected terminal states** | `submitted` (success), `failed`, `expired` |
+| **expected terminal states** | `submitted` (success), `failed`, `cancelled`, `expired` |
 | **validation command** | `SIGNALFORGE_BASE_URL=<url> ./examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh --health-check` |
 
 **OKE token-path migration note:**
@@ -113,7 +113,7 @@ retains its current behavior until explicitly updated.
 | **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
 | **safe-fix policy** | none |
 | **collection window** | Confirm `signalforge-agent` is running and heartbeating on the VPS before requesting. A request with no available execution agent will remain pending until the job expires. |
-| **expected terminal states** | `submitted` (success), `failed`, `expired` |
+| **expected terminal states** | `submitted` (success), `failed`, `cancelled`, `expired` |
 | **validation command** | `SIGNALFORGE_BASE_URL=<url> ./examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh --health-check` |
 
 ---
@@ -131,7 +131,7 @@ retains its current behavior until explicitly updated.
 | **Infisical secret** | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` *(add when enrolled)* |
 | **safe-fix policy** | none |
 | **collection window** | Confirm `signalforge-agent` service is running locally before requesting |
-| **expected terminal states** | `submitted` (success), `failed`, `expired` |
+| **expected terminal states** | `submitted` (success), `failed`, `cancelled`, `expired` |
 | **validation command** | `SIGNALFORGE_BASE_URL=<url> ./examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh --health-check` |
 | **status** | **Planned** — do not deploy this wrapper until the Source is enrolled. See enrollment prerequisites in [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md). |
 

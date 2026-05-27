@@ -24,8 +24,8 @@ ARTIFACT_FAMILY="linux-audit-log"
 # Override via SIGNALFORGE_SELENE_TOKEN_FILE for testing.
 TOKEN_FILE="${SIGNALFORGE_SELENE_TOKEN_FILE:-${HOME}/.config/signalforge/selene-automation-agent-token-mac-vincent-primary}"
 
-# SignalForge base URL — must be set in the deployment environment.
-: "${SIGNALFORGE_BASE_URL:?SIGNALFORGE_BASE_URL must be set}"
+# SignalForge base URL. Validated after arg parsing so --help works without env.
+SIGNALFORGE_BASE_URL="${SIGNALFORGE_BASE_URL:-}"
 
 # Path to signalforge-automation-agent.sh.
 # Override SIGNALFORGE_AGENT_SCRIPT when deployed outside the repo.
@@ -42,7 +42,7 @@ HEALTH_CHECK=false
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 usage() {
-  cat >&2 <<EOF
+  cat <<EOF
 Usage: $(basename "$0") [options]
 
 Source-bound diagnostic wrapper for ${SOURCE_IDENTIFIER} (${ARTIFACT_FAMILY}).
@@ -67,12 +67,11 @@ Optional environment:
 
 Terminal states (when --wait): submitted, failed, cancelled, expired
 EOF
-  exit 1
 }
 
 check_token_file() {
-  if [[ ! -f "${TOKEN_FILE}" ]]; then
-    echo "ERROR: token file not found: ${TOKEN_FILE}" >&2
+  if [[ ! -f "${TOKEN_FILE}" || ! -r "${TOKEN_FILE}" || ! -s "${TOKEN_FILE}" ]]; then
+    echo "ERROR: token file not found, unreadable, or empty: ${TOKEN_FILE}" >&2
     echo "  This Source may not be enrolled yet." >&2
     echo "  See: docs/operators/selene-multi-source-enrollment.md" >&2
     exit 2
@@ -80,9 +79,16 @@ check_token_file() {
 }
 
 check_agent_script() {
-  if [[ ! -x "${SIGNALFORGE_AGENT_SCRIPT}" ]]; then
-    echo "ERROR: signalforge-automation-agent.sh not found or not executable: ${SIGNALFORGE_AGENT_SCRIPT}" >&2
+  if [[ ! -f "${SIGNALFORGE_AGENT_SCRIPT}" || ! -r "${SIGNALFORGE_AGENT_SCRIPT}" ]]; then
+    echo "ERROR: signalforge-automation-agent.sh not found or unreadable: ${SIGNALFORGE_AGENT_SCRIPT}" >&2
     echo "  Set SIGNALFORGE_AGENT_SCRIPT to override the path." >&2
+    exit 2
+  fi
+}
+
+check_base_url() {
+  if [[ -z "${SIGNALFORGE_BASE_URL}" ]]; then
+    echo "ERROR: SIGNALFORGE_BASE_URL must be set" >&2
     exit 2
   fi
 }
@@ -100,19 +106,23 @@ check_signalforge_reachable() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --reason)       REASON="$2"; shift 2 ;;
+    --reason)
+      if [[ $# -lt 2 ]]; then echo "ERROR: missing value after --reason" >&2; usage >&2; exit 1; fi
+      REASON="$2"; shift 2 ;;
     --wait)         WAIT_MODE=true; shift ;;
-    --timeout)      TIMEOUT_SECONDS="$2"; shift 2 ;;
+    --timeout)
+      if [[ $# -lt 2 ]]; then echo "ERROR: missing value after --timeout" >&2; usage >&2; exit 1; fi
+      TIMEOUT_SECONDS="$2"; shift 2 ;;
     --health-check) HEALTH_CHECK=true; shift ;;
-    -h|--help)      usage ;;
-    *) echo "Unknown option: $1" >&2; usage ;;
+    -h|--help)      usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
 # ── main ───────────────────────────────────────────────────────────────────────
 
+check_base_url
 check_token_file
-check_agent_script
 
 if [[ "${HEALTH_CHECK}" == "true" ]]; then
   echo "source     : ${SOURCE_IDENTIFIER}" >&2
@@ -122,6 +132,8 @@ if [[ "${HEALTH_CHECK}" == "true" ]]; then
   exit 0
 fi
 
+check_agent_script
+
 # Load token without printing it to stdout or a shell trace.
 # shellcheck disable=SC2155
 SIGNALFORGE_AUTOMATION_AGENT_TOKEN="$(< "${TOKEN_FILE}")"
@@ -130,12 +142,14 @@ export SIGNALFORGE_AUTOMATION_AGENT_TOKEN
 # Request diagnostic run.
 REQUEST_JSON=$(
   SIGNALFORGE_BASE_URL="${SIGNALFORGE_BASE_URL}" \
-  "${SIGNALFORGE_AGENT_SCRIPT}" request --reason "${REASON}"
+  bash "${SIGNALFORGE_AGENT_SCRIPT}" request --reason "${REASON}"
 )
-echo "${REQUEST_JSON}"
 
 if [[ "${WAIT_MODE}" == "true" ]]; then
-  REQUEST_ID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "${REQUEST_JSON}")
+  REQUEST_ID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["request_id"])' <<< "${REQUEST_JSON}")
+  echo "queued request_id: ${REQUEST_ID}" >&2
   SIGNALFORGE_BASE_URL="${SIGNALFORGE_BASE_URL}" \
-  "${SIGNALFORGE_AGENT_SCRIPT}" wait "${REQUEST_ID}" --timeout "${TIMEOUT_SECONDS}"
+  bash "${SIGNALFORGE_AGENT_SCRIPT}" wait "${REQUEST_ID}" --timeout "${TIMEOUT_SECONDS}"
+else
+  echo "${REQUEST_JSON}"
 fi
