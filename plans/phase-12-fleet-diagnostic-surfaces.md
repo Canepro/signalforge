@@ -1,6 +1,6 @@
 # Phase 12: Fleet Diagnostic Surfaces
 
-Status: slice 1 complete; slice 2 in progress
+Status: slice 1 complete; slice 2 complete; slice 3 in progress
 
 ## Goal
 
@@ -126,12 +126,56 @@ Done when each planned Source has:
 Give Selene a durable way to discover which Sources she can operate without
 copying tokens through chat or collapsing all authority into one credential.
 
+Operator runbook: [`docs/operators/selene-multi-source-enrollment.md`](../docs/operators/selene-multi-source-enrollment.md)
+
+**Infisical naming convention (one secret per Source):**
+
+| target\_identifier     | Infisical secret name |
+|------------------------|-----------------------|
+| `oke:prod-eu1`         | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_OKE_PROD_EU1` |
+| `linux:hostinger-prod` | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD` |
+| `mac:vincent-primary`  | `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_MAC_VINCENT_PRIMARY` |
+| `aks:TODO`             | *(wait for cluster name)* |
+| `container-host:TODO`  | *(wait for target name)* |
+
+Pattern: `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` where
+`SOURCE_SLUG` = `target_identifier` with `:` and `-` → `_`, uppercased.
+
+**Host file naming convention:**
+
+```
+/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-<source-slug>
+```
+
+The OKE token at the legacy unsuffixed path stays in place until the slice 4
+wrapper update. All new enrollments use the per-source suffix.
+
+**Discovery model:** Source-bound at invocation time, not dynamic. The wrapper
+script for each Source reads its own token file. Selene never holds a
+cross-source credential. Details in the runbook.
+
+**Strict separation (preserved from prior slices):**
+
+- automation-agent token ≠ execution-agent token
+- Selene token ≠ Codex App Server identity
+- SignalForge does not store raw kubeconfigs, SSH keys, or VPS credentials
+
 Done when:
 
-- each Source has a source-bound automation-agent registration
-- tokens are stored in Infisical or source-local runtime files
+- each enrolled Source has a source-bound automation-agent registration
+- per-source token stored in Infisical under the correct naming convention
+- per-source token written to the host file path at the correct location
 - Selene can list/access configured wrappers without seeing token values
 - cross-source override attempts remain rejected
+- `oke:prod-eu1` enrollment verified end-to-end (already live)
+- `linux:hostinger-prod` enrollment smoke-tested end-to-end
+- `mac:vincent-primary`, `aks:TODO`, `container-host:TODO` remain TODO pending prior blockers
+
+**Current state (2026-05-27):**
+
+- `oke:prod-eu1` — token enrolled and live; Infisical migration to per-source name pending
+- `linux:hostinger-prod` — token enrollment steps documented; smoke test pending
+- remaining sources — blocked on source-creation prerequisites from slice 2
 
 ### Slice 4: Surface-Specific Collect Wrappers
 
