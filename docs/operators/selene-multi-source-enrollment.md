@@ -125,7 +125,11 @@ The OKE automation-agent token is already enrolled. To verify:
 
 1. Find the SignalForge `source_id` for this Source from the Sources UI.
 
-2. Enroll the automation-agent token:
+2. Confirm the automation-agent registration already exists. Do not run
+   `register` again for this Source; duplicate registration returns
+   `409 automation_agent_already_registered`.
+
+   For a new Source that is not yet registered, the enrollment command is:
 
    ```bash
    ./scripts/signalforge-automation-agent.sh \
@@ -138,8 +142,11 @@ The OKE automation-agent token is already enrolled. To verify:
    ready-to-export env lines to stderr. Copy the token from the response —
    it is shown only once.
 
-3. Store the token in Infisical under
-   `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD`.
+3. Confirm the already-issued token is stored in Infisical under
+   `SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN_LINUX_HOSTINGER_PROD`. If the
+   token is missing from Infisical and not present on the host, stop and use the
+   operator-approved rotation procedure once available; do not try to recover by
+   re-registering.
 
 4. Write the token to the host file (on the VPS, as root or with sudo):
 
@@ -219,9 +226,10 @@ operate two Sources, she holds two tokens, one per Source.
 
 To rotate an existing automation-agent token for a Source:
 
-1. Reissue the automation-agent token from the Sources UI or a future
-   operator-admin rotation route. Do not retry `register` in a loop:
-   duplicate registration returns `409 source_already_registered`.
+1. Use the operator-approved automation-agent rotation path once implemented.
+   The current `register` command is create-only and duplicate registration
+   returns `409 automation_agent_already_registered`, so it is not a rotation
+   mechanism.
 2. Copy the new token to Infisical under the per-source secret name.
 3. Write the new token to the host file path.
 4. Confirm the wrapper can still request diagnostics before closing the rotation.
