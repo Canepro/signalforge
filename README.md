@@ -46,13 +46,11 @@ Full walkthrough: [docs/getting-started.md](docs/getting-started.md)
 
 ## Configuration
 
-**Required:**
+**Operator/API access:**
 
 | Variable | Description |
 |---|---|
 | `SIGNALFORGE_ADMIN_TOKEN` | Admin bootstrap token (Sources, agent, operator APIs) |
-| `LLM_PROVIDER` | `openai`, `azure`, or `codex_app_server` (default: `openai`) |
-| `OPENAI_API_KEY` | Required when `LLM_PROVIDER=openai` |
 
 **Database:**
 
@@ -70,7 +68,7 @@ LLM provider details: see `.env.example`
 
 SignalForge supports OpenAI, Azure OpenAI, and Codex App Server. If no provider is configured or reachable, it falls back to deterministic analysis.
 
-Local Codex smoke test:
+Local Codex fixture check:
 
 ```bash
 bun run smoke:codex-brain
@@ -89,6 +87,8 @@ Deployment docs: [docs/aca-app-deployment.md](docs/aca-app-deployment.md)
 ## Automation Agent
 
 External AI agents can request diagnostics over HTTP using a source-bound automation-agent token.
+
+Local automation-agent fixture check:
 
 ```bash
 bun run smoke:automation-agent
