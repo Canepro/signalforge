@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-check a SignalForge ACA app endpoint.
+# Verify a SignalForge ACA app endpoint.
 set -euo pipefail
 
 BASE_URL=""
@@ -8,7 +8,7 @@ ADMIN_TOKEN="${SIGNALFORGE_ADMIN_TOKEN:-}"
 
 show_help() {
   cat <<'EOF'
-Smoke-check a SignalForge ACA app endpoint.
+Verify a SignalForge ACA app endpoint.
 
 Usage:
   bash scripts/check-aca-app.sh [options] <base-url>

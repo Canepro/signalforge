@@ -312,7 +312,7 @@ Status: deferred
 - API and persistence work
 - duplicate artifact reuse preserves per-run metadata
 - route tests pass
-- `bun test` passes
+- `bun run test` passes
 - `bun run typecheck` passes
 
 ### Phase 2

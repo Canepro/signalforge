@@ -3,8 +3,8 @@ import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-describe("scripts/smoke-automation-agent-local.sh", () => {
-  const script = join(__dirname, "../../scripts/smoke-automation-agent-local.sh");
+describe("scripts/verify-automation-agent-local.sh", () => {
+  const script = join(__dirname, "../../scripts/verify-automation-agent-local.sh");
 
   it("parses as valid bash", () => {
     expect(() => {
@@ -33,8 +33,8 @@ describe("scripts/smoke-automation-agent-local.sh", () => {
   });
 });
 
-describe("scripts/smoke-codex-app-server-brain.sh", () => {
-  const script = join(__dirname, "../../scripts/smoke-codex-app-server-brain.sh");
+describe("scripts/verify-codex-app-server-brain.sh", () => {
+  const script = join(__dirname, "../../scripts/verify-codex-app-server-brain.sh");
 
   it("parses as valid bash", () => {
     expect(() => {
@@ -44,7 +44,7 @@ describe("scripts/smoke-codex-app-server-brain.sh", () => {
 
   it("prints help with fixture-based wording", () => {
     const out = execSync(`bash "${script}" --help`, { encoding: "utf8" });
-    expect(out).toContain("Codex App Server brain-provider smoke");
+    expect(out).toContain("Codex App Server brain-provider verification");
     expect(out).toContain("--fixture");
     expect(out).toContain("sample-prod-server.log");
     expect(out).toContain("does not assume the machine is Linux or WSL");

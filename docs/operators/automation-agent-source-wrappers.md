@@ -8,7 +8,7 @@ diagnostic requests. A wrapper is a small script that reads one token file,
 calls the SignalForge automation-agent API, and optionally waits for the result.
 
 For token naming and enrollment see
-[`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md).
+[`automation-agent-multi-source-enrollment.md`](./automation-agent-multi-source-enrollment.md).
 For the HTTP contract see
 [`automation-agent-integration.md`](./automation-agent-integration.md).
 For the Source map see [`source-inventory-map.md`](./source-inventory-map.md).
@@ -25,7 +25,7 @@ For the Source map see [`source-inventory-map.md`](./source-inventory-map.md).
   SignalForge reachability without requesting diagnostics.
 - **Explicit fix policy.** Wrappers request diagnostics only. Fix actions use
   separate policy-gated APIs.
-- **Templates only in this repo.** `examples/selene-wrappers/` contains public
+- **Templates only in this repo.** `examples/automation-agent-wrappers/` contains public
   templates. Production wrappers and private host paths belong in the
   operations repo.
 
@@ -52,7 +52,7 @@ lowercase.
 | --- | --- |
 | **target_identifier** | `linux:<host-label>` or another stable Source key |
 | **artifact family** | `linux-audit-log`, `kubernetes-bundle`, or `container-diagnostics` |
-| **template script** | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` |
+| **template script** | `examples/automation-agent-wrappers/signalforge-diagnostic-<source-slug>.sh` |
 | **production script location** | Private operations repo or host scripts path |
 | **token file** | `<token-dir>/signalforge-automation-agent-token-<source-slug>` |
 | **token env var** | `SIGNALFORGE_AUTOMATION_AGENT_TOKEN` |
@@ -118,15 +118,15 @@ Source you intend to operate.
    verification report.
 
 For a deployment checklist and report template, see
-[`selene-wrapper-deployment-checklist.md`](./selene-wrapper-deployment-checklist.md).
+[`automation-agent-wrapper-deployment-checklist.md`](./automation-agent-wrapper-deployment-checklist.md).
 
 Do not commit production token values or host-specific configuration back to
 this repo.
 
 ## Related Docs
 
-- [`selene-wrapper-deployment-checklist.md`](./selene-wrapper-deployment-checklist.md)
+- [`automation-agent-wrapper-deployment-checklist.md`](./automation-agent-wrapper-deployment-checklist.md)
 - [`source-inventory-map.md`](./source-inventory-map.md)
-- [`selene-multi-source-enrollment.md`](./selene-multi-source-enrollment.md)
+- [`automation-agent-multi-source-enrollment.md`](./automation-agent-multi-source-enrollment.md)
 - [`automation-agent-integration.md`](./automation-agent-integration.md)
-- [`selene-codex-app-server-integration.md`](./selene-codex-app-server-integration.md)
+- [`automation-agent-codex-app-server-integration.md`](./automation-agent-codex-app-server-integration.md)

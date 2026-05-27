@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run Codex App Server brain smoke across mandatory analyzer fixtures.
+# Run Codex App Server brain verification across mandatory analyzer fixtures.
 # Skips gracefully when `codex` is not installed.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if ! command -v codex >/dev/null 2>&1; then
-  echo "SKIP: codex not found in PATH; install Codex CLI to run live brain smoke"
+  echo "SKIP: codex not found in PATH; install Codex CLI to run live brain verification"
   exit 0
 fi
 
@@ -23,15 +23,15 @@ FIXTURES=(
 failures=0
 for fixture in "${FIXTURES[@]}"; do
   echo "=== $fixture ==="
-  if ! bash scripts/smoke-codex-app-server-brain.sh --fixture "$fixture"; then
+  if ! bash scripts/verify-codex-app-server-brain.sh --fixture "$fixture"; then
     failures=$((failures + 1))
   fi
   echo
 done
 
 if [[ "$failures" -gt 0 ]]; then
-  echo "error: $failures fixture smoke(s) failed" >&2
+  echo "error: $failures fixture verification run(s) failed" >&2
   exit 1
 fi
 
-echo "All ${#FIXTURES[@]} fixture smokes passed."
+echo "All ${#FIXTURES[@]} fixture verification runs passed."

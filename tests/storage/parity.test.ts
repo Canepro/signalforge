@@ -5,10 +5,10 @@
  * Postgres runs only when DATABASE_URL_TEST (or DATABASE_URL) is set.
  *
  * Run just parity tests:
- *   bun test tests/storage/parity
+ *   bun run test:parity
  *
  * With Postgres:
- *   DATABASE_URL_TEST=postgres://signalforge:signalforge@127.0.0.1:5432/signalforge bun test tests/storage/parity
+ *   DATABASE_URL_TEST=postgres://signalforge:signalforge@127.0.0.1:5432/signalforge bun run test:parity
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";

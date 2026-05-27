@@ -46,7 +46,7 @@ Environment:
   SIGNALFORGE_AUTOMATION_WAIT_TIMEOUT_SECONDS
 
 Examples:
-  ./scripts/signalforge-automation-agent.sh --url http://localhost:3000 register <source-id> --display-name openclaw --print-exports
+  ./scripts/signalforge-automation-agent.sh --url http://localhost:3000 register <source-id> --display-name operator-agent --print-exports
   ./scripts/signalforge-automation-agent.sh request --reason "investigate target drift"
   ./scripts/signalforge-automation-agent.sh poll <request-id>
   ./scripts/signalforge-automation-agent.sh wait <request-id> --timeout 600

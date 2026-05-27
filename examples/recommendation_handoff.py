@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Build a recommendation-only handoff for an OpenClaw-style agent from SignalForge output.
+Build a recommendation-only handoff for an external agent from SignalForge output.
+OpenClaw/Hermes-style operator systems can use this shape when they need
+recommendation text without execution rights.
 
 This example keeps the trust boundary explicit:
 - SignalForge provides diagnostics and findings
@@ -56,7 +58,7 @@ def fetch_summary_from_signalforge(args: argparse.Namespace) -> dict[str, Any]:
     return json.loads(completed.stdout)
 
 
-def build_openclaw_handoff(summary: dict[str, Any], user_goal: str) -> dict[str, Any]:
+def build_recommendation_handoff(summary: dict[str, Any], user_goal: str) -> dict[str, Any]:
     system_prompt = """You are an infrastructure diagnostics recommendation agent.
 
 Use the supplied SignalForge summary as your evidence boundary.
@@ -99,7 +101,7 @@ Important constraints:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build an OpenClaw-style recommendation handoff from SignalForge automation-agent output."
+        description="Build an external recommendation handoff from SignalForge automation-agent output."
     )
     parser.add_argument(
         "--summary-file",
@@ -165,7 +167,7 @@ def main() -> int:
             return 1
         summary = fetch_summary_from_signalforge(args)
 
-    handoff = build_openclaw_handoff(summary, args.user_goal)
+    handoff = build_recommendation_handoff(summary, args.user_goal)
     if args.prompt_only:
         print(handoff["agent_user_prompt"])
     else:

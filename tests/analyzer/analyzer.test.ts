@@ -511,7 +511,7 @@ describe("LLM success path (mocked)", () => {
     }));
     const raw = JSON.stringify({
       schema_version: "kubernetes-bundle.v1",
-      cluster: { name: "oke-prod-eu1", provider: "oke" },
+      cluster: { name: "managed-prod-eu1", provider: "managed-kubernetes" },
       scope: { level: "cluster" },
       documents: [
         {
@@ -531,7 +531,7 @@ describe("LLM success path (mocked)", () => {
           return {
             output_text: JSON.stringify({
               summary: [
-                "OKE has broad public Service exposure that should be reviewed as a fleet surface.",
+                "The cluster has broad public Service exposure that should be reviewed as a fleet surface.",
               ],
               top_actions_now: [
                 "Review all public LoadBalancer Services and remove any that do not need external reachability.",

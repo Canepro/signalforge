@@ -41,7 +41,7 @@ WebSocket transport is opt-in and requires loopback URLs plus token files; stdio
 Use the fixture check when validating a local Codex App Server setup:
 
 ```bash
-bun run smoke:codex-brain
+bun run verify:codex-brain
 ```
 
 The fixture check does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim about the operator's workstation.

@@ -43,7 +43,7 @@ describe("auth.md discovery routes", () => {
     expect(body).toContain("POST http://localhost:3000/agent/auth");
     expect(body).toContain("/api/automation-agent/registrations");
     expect(body).toContain("diagnostic_request.create");
-    expect(body).toContain("SIGNALFORGE_SELENE_AUTOMATION_AGENT_TOKEN");
+    expect(body).toContain("SIGNALFORGE_AUTOMATION_AGENT_TOKEN");
   });
 
   it("GET /.well-known/oauth-protected-resource returns PRM JSON", async () => {

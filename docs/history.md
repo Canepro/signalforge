@@ -526,7 +526,7 @@ What changed in this repo:
 
 - added a repo-owned `Publish App Image` GitHub Actions workflow for `ghcr.io/canepro/signalforge`
 - added a repo-owned `Deploy ACA App` manual-dispatch workflow with Azure OIDC
-- added checked-in shell helpers for ACA deploys and API smoke checks
+- added checked-in shell helpers for ACA deploys and API verification checks
 - updated the ACA runbooks around the real primary-app story and the `ca-signalforge-staging` to `ca-signalforge` cutover
 
 What was verified before landing the repo changes:

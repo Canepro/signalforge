@@ -76,7 +76,7 @@ The intended steady state for the new app is:
 
 ## Step 4: validate the new app before moving agents
 
-Use the smoke script against the new hostname:
+Use the verification script against the new hostname:
 
 ```bash
 SIGNALFORGE_ADMIN_TOKEN='<long-random-secret>' \

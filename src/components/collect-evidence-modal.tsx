@@ -371,7 +371,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
             <p className="text-xs leading-relaxed text-on-surface-variant">
               This is the normal operator setup.{" "}
               <span className="font-semibold text-on-surface">run</span> stays alive in the background;{" "}
-              <span className="font-semibold text-on-surface">once</span> is only for smoke tests, debugging, or cron-style schedules.
+              <span className="font-semibold text-on-surface">once</span> is only for verifications, debugging, or cron-style schedules.
             </p>
             <p className="text-xs leading-relaxed text-on-surface-variant">
               Linux and WSL host audits are the cleanest fit for this model. Container and Kubernetes job-driven collection are also supported, but only when the execution surface already has the intended runtime access, kubeconfig, and RBAC. If you do not already have that posture in place, direct push is usually the faster and safer starting point.

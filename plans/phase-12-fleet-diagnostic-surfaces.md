@@ -126,7 +126,7 @@ Done when each planned Source has:
 Give an external operator agent a durable way to discover which Sources it can operate without
 copying tokens through chat or collapsing all authority into one credential.
 
-Operator runbook: [`docs/operators/selene-multi-source-enrollment.md`](../docs/operators/selene-multi-source-enrollment.md)
+Operator runbook: [`docs/operators/automation-agent-multi-source-enrollment.md`](../docs/operators/automation-agent-multi-source-enrollment.md)
 
 **Infisical naming convention (one secret per Source):**
 
@@ -186,16 +186,16 @@ Done when:
 Create or document thin wrappers for each execution form so source-bound
 access is usable without token-path guessing or manual env-var setup.
 
-Wrapper contract doc: [`docs/operators/selene-source-wrappers.md`](../docs/operators/selene-source-wrappers.md)  
-Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
+Wrapper contract doc: [`docs/operators/automation-agent-source-wrappers.md`](../docs/operators/automation-agent-source-wrappers.md)
+Template scripts: [`examples/automation-agent-wrappers/`](../examples/automation-agent-wrappers/)
 
 **Per-source wrappers (one per Source, source-bound by construction):**
 
 | target\_identifier     | template script | status |
 |------------------------|-----------------|--------|
-| `kubernetes:<cluster-name>` | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` | pattern verified in a private deployment |
-| `linux:<host-label>` | `examples/selene-wrappers/signalforge-diagnostic-<source-slug>.sh` | pattern verified in a private deployment |
-| `mac:<workstation>`  | `examples/selene-wrappers/signalforge-diagnostic-mac-<workstation>.sh` | template ready; deploy blocked on Source enrollment |
+| `kubernetes:<cluster-name>` | `examples/automation-agent-wrappers/signalforge-diagnostic-<source-slug>.sh` | pattern verified in a private deployment |
+| `linux:<host-label>` | `examples/automation-agent-wrappers/signalforge-diagnostic-<source-slug>.sh` | pattern verified in a private deployment |
+| `mac:<workstation>`  | `examples/automation-agent-wrappers/signalforge-diagnostic-mac-<workstation>.sh` | template ready; deploy blocked on Source enrollment |
 | `aks:<cluster-name>`   | *(create when cluster name is confirmed; follow naming conventions in source-inventory-map)* | blocked |
 | `container-host:<host>` | *(create when target is confirmed; follow naming conventions in source-inventory-map)* | blocked |
 
@@ -234,7 +234,7 @@ Done when wrappers:
 Deployment checklists and operator verification report template for the
 private operations lane.
 
-Checklist doc: [`docs/operators/selene-wrapper-deployment-checklist.md`](../docs/operators/selene-wrapper-deployment-checklist.md)
+Checklist doc: [`docs/operators/automation-agent-wrapper-deployment-checklist.md`](../docs/operators/automation-agent-wrapper-deployment-checklist.md)
 
 Covers:
 

@@ -3,8 +3,8 @@ import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-describe("examples/openclaw_recommendation_handoff.py", () => {
-  const script = join(__dirname, "../../examples/openclaw_recommendation_handoff.py");
+describe("examples/recommendation_handoff.py", () => {
+  const script = join(__dirname, "../../examples/recommendation_handoff.py");
   const fixture = join(__dirname, "../fixtures/automation-agent-summary-sample.json");
 
   it("parses as valid Python", () => {
@@ -20,7 +20,8 @@ describe("examples/openclaw_recommendation_handoff.py", () => {
     expect(src).toContain("remediation_allowed");
     expect(src).toContain("automation_agent_client.py");
     expect(src).toContain("--prompt-only");
-    expect(src).toContain("OpenClaw");
+    expect(src).toContain("build_recommendation_handoff");
+    expect(src).toContain("OpenClaw/Hermes-style");
   });
 
   it("builds a prompt from the checked-in sample summary fixture", () => {

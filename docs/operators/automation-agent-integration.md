@@ -1,7 +1,9 @@
 # Automation-Agent Integration
 
 Use this guide when you want an external operator agent to ask SignalForge for
-diagnostics on a monitored Source and read the resulting findings back.
+diagnostics on a monitored Source and read the resulting findings back. That
+can be a small script, a Codex/Claude-style coding agent, or a larger
+OpenClaw/Hermes-style operator system.
 
 This is an **HTTP integration**, not a plugin loaded into the SignalForge app process.
 
@@ -46,7 +48,7 @@ For autonomous Kubernetes actions, the automation agent still does not patch the
 The easiest bootstrap path is the helper script:
 
 ```bash
-./scripts/signalforge-automation-agent.sh register <source-id> --display-name openclaw --print-exports
+./scripts/signalforge-automation-agent.sh register <source-id> --display-name operator-agent --print-exports
 ```
 
 Required env for registration:
@@ -68,12 +70,12 @@ That split is intentional:
 - stdout stays safe for another agent or script to parse as JSON
 - stderr can still carry human-friendly export lines when you want a quick shell setup
 
-## Local End-To-End Smoke
+## Local End-To-End Verification
 
-When you want to prove the full contract locally, including the execution-agent side, use the repo smoke script:
+When you want to prove the full contract locally, including the execution-agent side, use the repo verification script:
 
 ```bash
-bun run smoke:automation-agent
+bun run verify:automation-agent
 ```
 
 That script can:
@@ -96,10 +98,10 @@ If you already have a local app running, reuse it instead:
 
 ```bash
 SIGNALFORGE_ADMIN_TOKEN=your-admin-token \
-bash ./scripts/smoke-automation-agent-local.sh --url http://127.0.0.1:3000
+bash ./scripts/verify-automation-agent-local.sh --url http://127.0.0.1:3000
 ```
 
-The smoke output prints stable summary lines such as:
+The verification output prints stable summary lines such as:
 
 - `source_id`
 - `request_id`
@@ -119,7 +121,7 @@ Once the automation-agent token is set, the external agent has three normal oper
 For a small copy-and-adapt reference client, use:
 
 - [`../../examples/automation_agent_client.py`](../../examples/automation_agent_client.py)
-- [`../../examples/openclaw_recommendation_handoff.py`](../../examples/openclaw_recommendation_handoff.py)
+- [`../../examples/recommendation_handoff.py`](../../examples/recommendation_handoff.py)
 
 It is intentionally dependency-free and uses only the Python standard library.
 The example is aimed at agents that need a thin wrapper around the
@@ -147,7 +149,7 @@ If you want an external agent to turn the SignalForge result into operator
 guidance without any execution rights, use:
 
 ```bash
-python3 examples/openclaw_recommendation_handoff.py
+python3 examples/recommendation_handoff.py
 ```
 
 That example either:
@@ -167,13 +169,13 @@ Example prompt-only usage:
 ```bash
 export SIGNALFORGE_BASE_URL=http://localhost:3000
 export SIGNALFORGE_AUTOMATION_AGENT_TOKEN=<token>
-python3 examples/openclaw_recommendation_handoff.py --prompt-only
+python3 examples/recommendation_handoff.py --prompt-only
 ```
 
 If you want to inspect the handoff shape without a live SignalForge instance, use the checked-in sample summary fixture:
 
 ```bash
-python3 examples/openclaw_recommendation_handoff.py \
+python3 examples/recommendation_handoff.py \
   --summary-file tests/fixtures/automation-agent-summary-sample.json \
   --prompt-only
 ```
@@ -341,7 +343,7 @@ Register:
 curl -X POST \
   -H "Authorization: Bearer ${SIGNALFORGE_ADMIN_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"source_id":"<source-id>","display_name":"openclaw"}' \
+  -d '{"source_id":"<source-id>","display_name":"operator-agent"}' \
   "${SIGNALFORGE_BASE_URL%/}/api/automation-agent/registrations"
 ```
 

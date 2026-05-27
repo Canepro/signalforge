@@ -94,7 +94,7 @@ Restart the dev server, open **`/sources`**, and sign in at **`/sources/login`**
 **External automation agent:** if another AI agent should be able to request diagnostics and read findings back for one monitored Source, enroll a separate **automation-agent token** with `POST /api/automation-agent/registrations`. That actor connects to SignalForge over HTTP, not as an in-process plugin, and it stays separate from the execution-plane agent. The easiest bootstrap path is [`scripts/signalforge-automation-agent.sh`](../scripts/signalforge-automation-agent.sh):
 
 ```bash
-./scripts/signalforge-automation-agent.sh register <source-id> --display-name openclaw --print-exports
+./scripts/signalforge-automation-agent.sh register <source-id> --display-name operator-agent --print-exports
 ./scripts/signalforge-automation-agent.sh request --reason "investigate target drift"
 ```
 
@@ -103,7 +103,7 @@ Use [`operators/automation-agent-integration.md`](./operators/automation-agent-i
 If you want to prove the full automation-agent plus execution-agent loop locally in one command, run:
 
 ```bash
-bun run smoke:automation-agent
+bun run verify:automation-agent
 ```
 
 That verification script starts a temporary local app by default, drives both actor contracts over HTTP, uploads a real fixture, and prints the resulting `run_id`.
@@ -298,7 +298,7 @@ bun run typecheck
 Tests:
 
 ```bash
-bun test
+bun run test
 ```
 
 Storage parity tests (SQLite always; Postgres when `DATABASE_URL_TEST` is set):
@@ -367,7 +367,7 @@ Use that port in:
 - `SIGNALFORGE_BASE_URL`
 - `SIGNALFORGE_URL` only when you are using the older compatibility name
 
-For long-lived agents or other external callers, point to the ACA app URL (for example `https://signalforge.canepro.me`) and avoid legacy `*.vercel.app` endpoints.
+For long-lived agents or other external callers, point to your ACA app URL and avoid legacy `*.vercel.app` endpoints.
 
 ### The LLM is unavailable
 

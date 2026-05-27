@@ -7,7 +7,7 @@ This document is the Slice 1 runtime contract for running SignalForge as a produ
 - build with Bun to stay aligned with the repo and CI
 - run the built app as a normal Node process using Next standalone output
 - keep `DATABASE_DRIVER=postgres` with Neon Postgres for the first ACA cut
-- keep SQLite support for local development and local container smoke checks only
+- keep SQLite support for local development and local container verification checks only
 
 This slice does **not** change Azure resources, DNS, or the database provider.
 
@@ -53,7 +53,7 @@ Behavior:
 
 This endpoint is intentionally config-focused. It does **not** prove live database reachability or outbound LLM connectivity.
 
-## Local build and smoke commands
+## Local build and verification commands
 
 Build the image:
 
@@ -61,14 +61,14 @@ Build the image:
 docker build -t signalforge:slice1 .
 ```
 
-Minimal boot smoke with default SQLite:
+Minimal boot verification with default SQLite:
 
 ```bash
 docker run --rm -p 3000:3000 signalforge:slice1
 curl http://127.0.0.1:3000/api/health
 ```
 
-Production-like boot smoke with Postgres:
+Production-like boot verification with Postgres:
 
 ```bash
 docker run --rm --network host \

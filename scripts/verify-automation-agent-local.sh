@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# End-to-end local smoke for automation-agent -> collection-job -> execution-agent -> findings.
+# End-to-end local verification for automation-agent -> collection-job -> execution-agent -> findings.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 BASE_URL="${SIGNALFORGE_BASE_URL:-}"
-HOST="${SIGNALFORGE_SMOKE_HOST:-127.0.0.1}"
-PORT="${SIGNALFORGE_SMOKE_PORT:-3210}"
-ARTIFACT_PATH="${SIGNALFORGE_SMOKE_ARTIFACT_PATH:-${REPO_ROOT}/tests/fixtures/sample-prod-server.log}"
+HOST="${SIGNALFORGE_VERIFY_HOST:-127.0.0.1}"
+PORT="${SIGNALFORGE_VERIFY_PORT:-3210}"
+ARTIFACT_PATH="${SIGNALFORGE_VERIFY_ARTIFACT_PATH:-${REPO_ROOT}/tests/fixtures/sample-prod-server.log}"
 ADMIN_TOKEN="${SIGNALFORGE_ADMIN_TOKEN:-}"
 KEEP_SERVER="false"
 REUSE_SERVER="false"
@@ -18,7 +18,7 @@ DB_PATH=""
 
 show_help() {
   cat <<'EOF'
-Run a local end-to-end smoke for the automation-agent diagnostics flow.
+Run a local end-to-end verification for the automation-agent diagnostics flow.
 
 This proves the full path:
   automation agent request
@@ -27,26 +27,26 @@ This proves the full path:
   -> automation-agent findings poll
 
 Usage:
-  ./scripts/smoke-automation-agent-local.sh [options]
+  ./scripts/verify-automation-agent-local.sh [options]
 
 Options:
   --url, -u BASE       Reuse an existing SignalForge base URL instead of starting a local dev server
   --host VALUE         Host for a temporary local dev server (default: 127.0.0.1)
   --port VALUE         Port for a temporary local dev server (default: 3210)
   --artifact PATH      Artifact fixture to upload (default: tests/fixtures/sample-prod-server.log)
-  --keep-server        Leave the temporary dev server running after the smoke completes
+  --keep-server        Leave the temporary dev server running after the verification completes
   -h, --help           Show this help
 
 Environment:
   SIGNALFORGE_BASE_URL             Reuse an existing app instead of booting a temp server
   SIGNALFORGE_ADMIN_TOKEN          Required only when reusing an existing app
-  SIGNALFORGE_SMOKE_HOST           Override temporary server host
-  SIGNALFORGE_SMOKE_PORT           Override temporary server port
-  SIGNALFORGE_SMOKE_ARTIFACT_PATH  Override uploaded artifact path
+  SIGNALFORGE_VERIFY_HOST           Override temporary server host
+  SIGNALFORGE_VERIFY_PORT           Override temporary server port
+  SIGNALFORGE_VERIFY_ARTIFACT_PATH  Override uploaded artifact path
 
 Examples:
-  bash ./scripts/smoke-automation-agent-local.sh
-  bash ./scripts/smoke-automation-agent-local.sh --url http://127.0.0.1:3000
+  bash ./scripts/verify-automation-agent-local.sh
+  bash ./scripts/verify-automation-agent-local.sh --url http://127.0.0.1:3000
 
 Success output includes:
   source_id
@@ -169,9 +169,9 @@ if [[ "$REUSE_SERVER" == "true" ]]; then
   fi
 else
   BASE_URL="http://${HOST}:${PORT}"
-  ADMIN_TOKEN="local-admin-token-smoke"
-  DB_PATH="/tmp/signalforge-automation-smoke-${PORT}.db"
-  SERVER_LOG="$(mktemp "/tmp/signalforge-automation-smoke-${PORT}.XXXX.log")"
+  ADMIN_TOKEN="local-admin-token-verification"
+  DB_PATH="/tmp/signalforge-automation-verification-${PORT}.db"
+  SERVER_LOG="$(mktemp "/tmp/signalforge-automation-verification-${PORT}.XXXX.log")"
   rm -f "$DB_PATH"
 
   (
@@ -207,14 +207,14 @@ else
 fi
 
 BASE="${BASE_URL%/}"
-INSTANCE_ID="codex-smoke-$(date +%s)"
+INSTANCE_ID="signalforge-verification-$(date +%s)"
 
 source_resp="$(curl -fsS -X POST "${BASE}/api/sources" \
   -H "authorization: Bearer ${ADMIN_TOKEN}" \
   -H "content-type: application/json" \
   --data '{
-    "display_name":"Codex Local Smoke Source",
-    "target_identifier":"codex-local-smoke-source",
+    "display_name":"Local Verification Source",
+    "target_identifier":"local-verification-source",
     "source_type":"linux_host",
     "expected_artifact_type":"linux-audit-log",
     "default_collector_type":"first-audit",
@@ -238,14 +238,14 @@ request_resp="$(
   SIGNALFORGE_BASE_URL="$BASE" \
   SIGNALFORGE_AUTOMATION_AGENT_TOKEN="$AUTOMATION_TOKEN" \
   bash "${REPO_ROOT}/scripts/signalforge-automation-agent.sh" request \
-    --reason "codex local automation-agent smoke"
+    --reason "local automation-agent verification"
 )"
 REQUEST_ID="$(printf '%s' "$request_resp" | json_get 'request_id')"
 
 heartbeat_resp="$(curl -fsS -X POST "${BASE}/api/agent/heartbeat" \
   -H "authorization: Bearer ${AGENT_TOKEN}" \
   -H "content-type: application/json" \
-  --data '{"agent_version":"codex-local-smoke","capabilities":["collect:linux-audit-log"],"attributes":{"mode":"local-smoke"}}')"
+  --data '{"agent_version":"signalforge-local-verification","capabilities":["collect:linux-audit-log"],"attributes":{"mode":"local-verification"}}')"
 
 next_resp="$(curl -fsS "${BASE}/api/agent/jobs/next?limit=1" \
   -H "authorization: Bearer ${AGENT_TOKEN}")"
@@ -291,13 +291,13 @@ TOP_ACTION="$(
 )"
 
 if [[ "$REQUEST_STATUS" != "submitted" ]]; then
-  echo "error: smoke completed with unexpected request status: ${REQUEST_STATUS}" >&2
+  echo "error: verification completed with unexpected request status: ${REQUEST_STATUS}" >&2
   printf '%s\n' "$final_resp" >&2
   exit 1
 fi
 
 if [[ -z "$RUN_ID" ]]; then
-  echo "error: smoke completed without a result.run_id" >&2
+  echo "error: verification completed without a result.run_id" >&2
   printf '%s\n' "$final_resp" >&2
   exit 1
 fi

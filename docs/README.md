@@ -43,24 +43,24 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | [`operators/sources-and-agents.md`](./operators/sources-and-agents.md) | Sources UI, enrollment, collection-job lifecycle, and the control-plane / execution-plane split |
 | [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md) | Source-bound automation-agent setup, HTTP connection model, and helper-script workflow for external AI agents |
 | [`operators/source-inventory-map.md`](./operators/source-inventory-map.md) | Canonical map of every planned and enrolled diagnostic Source: target identifier, artifact family, credential store, and automation-agent access |
-| [`operators/selene-multi-source-enrollment.md`](./operators/selene-multi-source-enrollment.md) | Per-source automation-agent token naming, Infisical secret names, host file paths, enrollment steps, and discovery model |
-| [`operators/selene-source-wrappers.md`](./operators/selene-source-wrappers.md) | Per-source wrapper contract and template scripts for automation-agent diagnostic requests |
-| [`operators/selene-wrapper-deployment-checklist.md`](./operators/selene-wrapper-deployment-checklist.md) | Deployment checklists, rollback procedures, operator verification report template |
-| [`operators/selene-codex-app-server-integration.md`](./operators/selene-codex-app-server-integration.md) | Automation-agent vs Codex App Server analysis brain roles, scopes, and Infisical secret boundaries |
-| [`operators/codex-brain-artifact-quality-pass.md`](./operators/codex-brain-artifact-quality-pass.md) | Mandatory-fixture Codex brain quality review notes and smoke commands |
+| [`operators/automation-agent-multi-source-enrollment.md`](./operators/automation-agent-multi-source-enrollment.md) | Per-source automation-agent token naming, Infisical secret names, host file paths, enrollment steps, and discovery model |
+| [`operators/automation-agent-source-wrappers.md`](./operators/automation-agent-source-wrappers.md) | Per-source wrapper contract and template scripts for automation-agent diagnostic requests |
+| [`operators/automation-agent-wrapper-deployment-checklist.md`](./operators/automation-agent-wrapper-deployment-checklist.md) | Deployment checklists, rollback procedures, operator verification report template |
+| [`operators/automation-agent-codex-app-server-integration.md`](./operators/automation-agent-codex-app-server-integration.md) | Automation-agent vs Codex App Server analysis brain roles, scopes, and Infisical secret boundaries |
+| [`operators/codex-brain-artifact-quality-pass.md`](./operators/codex-brain-artifact-quality-pass.md) | Mandatory-fixture Codex brain quality review notes and verification commands |
 | [`operators/autonomous-kubernetes-actions.md`](./operators/autonomous-kubernetes-actions.md) | Autonomous Kubernetes signal and safe-fix action model, including trust boundaries and required capabilities |
 | [`../examples/automation_agent_client.py`](../examples/automation_agent_client.py) | Minimal dependency-free example client for external agents consuming the automation-agent API |
-| [`../examples/openclaw_recommendation_handoff.py`](../examples/openclaw_recommendation_handoff.py) | Recommendation-only handoff builder that wraps SignalForge summaries without granting execution rights |
+| [`../examples/recommendation_handoff.py`](../examples/recommendation_handoff.py) | Recommendation-only handoff builder that wraps SignalForge summaries without granting execution rights |
 | [`operators/collection-paths.md`](./operators/collection-paths.md) | Honest push-first vs job-driven collection guidance by environment |
 | [`operators/job-scoped-collection.md`](./operators/job-scoped-collection.md) | Typed collection-scope model, source defaults, job overrides, and remaining cross-repo limits |
 | [`agent-deployment.md`](./agent-deployment.md) | Preferred `signalforge-agent` deployment model, trust boundaries, and security baseline |
 | [`api-contract.md`](./api-contract.md) | Current HTTP routes, request shapes, response shapes, and stability notes |
 | [`external-submit.md`](./external-submit.md) | Sending evidence into SignalForge from scripts, CI, or external collectors |
-| [`../scripts/smoke-automation-agent-local.sh`](../scripts/smoke-automation-agent-local.sh) | One-command local end-to-end smoke for automation-agent request, execution-agent fulfillment, and findings polling |
-| [`../scripts/smoke-codex-app-server-brain.sh`](../scripts/smoke-codex-app-server-brain.sh) | One-command local fixture smoke for the Codex App Server analysis brain provider |
+| [`../scripts/verify-automation-agent-local.sh`](../scripts/verify-automation-agent-local.sh) | One-command local end-to-end verification for automation-agent request, execution-agent fulfillment, and findings polling |
+| [`../scripts/verify-codex-app-server-brain.sh`](../scripts/verify-codex-app-server-brain.sh) | One-command local fixture verification for the Codex App Server analysis brain provider |
 | [`history.md`](./history.md) | Running project history log for milestones, migration triggers, validations, and major operating decisions |
 | [`ui-system-direction.md`](./ui-system-direction.md) | Current UI-system decision, including how SignalForge should treat `shadcn/ui` versus the existing `sf-*` design primitives |
-| [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local smoke guidance before ACA-specific rollout work |
+| [`app-container-runtime.md`](./app-container-runtime.md) | Slice 1 app-container runtime contract, health checks, and local verification guidance before ACA-specific rollout work |
 | [`aca-env-contract.md`](./aca-env-contract.md) | Slice 2 ACA environment contract, including secret classification and required app variables |
 | [`aca-app-deployment.md`](./aca-app-deployment.md) | Slice 2 ACA app shape, ingress, revisions, replica policy, and rollout contract |
 | [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md) | Repo-owned GHCR image publication, GitHub Actions deploy flow, and the portable ACA release contract |
