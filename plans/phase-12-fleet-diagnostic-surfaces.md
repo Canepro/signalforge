@@ -116,7 +116,6 @@ Done when each planned Source has:
 **Current state (2026-05-27):**
 
 - `oke:prod-eu1` — live; Selene path confirmed end-to-end
-- `oke:prod-eu1` — live; Selene path confirmed end-to-end
 - `linux:hostinger-prod` — enrolled; wrapper production-ready; live diagnostic pending (awaiting `signalforge-agent` heartbeat and confirmed collection run)
 - `mac:vincent-primary` — planned; blocked on mac-diagnostics family decision; Mac (Darwin) workstation, not Linux/WSL
 - `aks:<cluster-name>` — planned; cluster name unknown; do not enroll until resolved; see source-inventory-map for naming conventions
@@ -152,8 +151,8 @@ For host files, `<source-slug>` is `target_identifier` with `:` replaced by
 `-`, kept lowercase. This is separate from the Infisical `SOURCE_SLUG`, which
 uses `_` and uppercase.
 
-The OKE token at the legacy unsuffixed path stays in place until the slice 4
-wrapper update. All new enrollments use the per-source suffix.
+The OKE token has been cut over to the per-source suffixed path. All new
+enrollments use the per-source suffix.
 
 **Discovery model:** Source-bound at invocation time, not dynamic. The wrapper
 script for each Source reads its own token file. Selene never holds a
@@ -194,7 +193,7 @@ Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
 
 | target\_identifier     | template script | status |
 |------------------------|-----------------|--------|
-| `oke:prod-eu1`         | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` | template ready; OKE token-path migration pending velora-infra update |
+| `oke:prod-eu1`         | `examples/selene-wrappers/signalforge-diagnostic-oke-prod-eu1.sh` | live in velora-infra on per-source wrapper/token path |
 | `linux:hostinger-prod` | `examples/selene-wrappers/signalforge-diagnostic-linux-hostinger-prod.sh` | production-ready; deploy pending live diagnostic verification |
 | `mac:vincent-primary`  | `examples/selene-wrappers/signalforge-diagnostic-mac-vincent-primary.sh` | template ready; deploy blocked on Source enrollment |
 | `aks:<cluster-name>`   | *(create when cluster name is confirmed; follow naming conventions in source-inventory-map)* | blocked |
@@ -209,11 +208,10 @@ Template scripts: [`examples/selene-wrappers/`](../examples/selene-wrappers/)
 **Exit codes:** 0 success, 1 usage error, 2 config error (token file missing),
 3 health check failed.
 
-**OKE token-path cutover (required in velora-infra, not this repo):**
+**OKE token-path cutover:**
 
-- Live token: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token` (legacy)
-- Target path: `/etc/velora-infra/selene/secrets/signalforge-automation-agent-token-oke-prod-eu1`
-- Migration: write token to new path → update deployed wrapper to read new path → confirm live → remove legacy file
+- Completed in velora-infra. The deployed wrapper now reads the per-source
+  suffixed token path, and the legacy unsuffixed token file has been removed.
 
 Done when wrappers:
 
@@ -226,7 +224,7 @@ Done when wrappers:
 **Current state (2026-05-27):**
 
 - OKE wrapper: deployed to velora-infra; live; per-source token path active; legacy token removed
-- Linux VPS wrapper: production-ready in velora-infra; live diagnostic pending Source enrollment
+- Linux VPS wrapper: production-ready in velora-infra; live diagnostic pending execution-agent heartbeat
 - Mac wrapper: template ready; deploy deferred until Source enrollment prerequisites met
 - AKS, container-host: naming conventions documented in source-inventory-map; template creation blocked on target discovery
 
@@ -239,8 +237,7 @@ Checklist doc: [`docs/operators/selene-wrapper-deployment-checklist.md`](../docs
 
 Covers:
 
-- `oke:prod-eu1` token-path cutover: legacy unsuffixed → per-source path,
-  step-by-step with rollback
+- `oke:prod-eu1` token-path cutover completion and rollback notes
 - `linux:hostinger-prod` initial wrapper deployment with preflight verification
 - Blocked-sources table (mac, aks, container-host) with explicit blocker reasons
 - Operator verification report template (fillable; stored in velora-infra notes,
@@ -255,9 +252,9 @@ Done when:
 
 **Current blockers (2026-05-27):**
 
-- OKE cutover: requires coordinated velora-infra change; checklist is ready
-- Linux VPS deployment: requires `linux:hostinger-prod` source enrollment smoke
-  test to pass first; checklist is ready
+- OKE cutover: complete in velora-infra
+- Linux VPS deployment: requires `signalforge-agent` heartbeat and one live
+  diagnostic run through `linux:hostinger-prod`
 - Mac/AKS/container-host: blocked on source-creation prerequisites
 
 ### Slice 5: Action Policy Expansion
