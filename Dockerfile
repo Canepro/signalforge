@@ -26,6 +26,7 @@ RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=deps --chown=nextjs:nextjs /app/node_modules/ws ./node_modules/ws
 
 USER nextjs
 
