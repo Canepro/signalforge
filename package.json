@@ -33,6 +33,7 @@
     "react-dom": "^19.1.0",
     "sql.js": "^1.14.1",
     "vercel": "^50.41.0",
+    "ws": "^8.21.0",
     "zod": "^3.25.23"
   },
   "devDependencies": {
@@ -41,6 +42,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
+    "@types/ws": "^8.18.1",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.8.3",
     "vitest": "^3.2.1"

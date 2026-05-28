@@ -27,11 +27,17 @@ OPENAI_MODEL="${ACA_OPENAI_MODEL:-gpt-5-mini}"
 AZURE_OPENAI_ENDPOINT="${ACA_AZURE_OPENAI_ENDPOINT:-}"
 AZURE_OPENAI_DEPLOYMENT="${ACA_AZURE_OPENAI_DEPLOYMENT:-}"
 AZURE_OPENAI_API_VERSION="${ACA_AZURE_OPENAI_API_VERSION:-}"
+CODEX_APP_SERVER_TRANSPORT="${ACA_CODEX_APP_SERVER_TRANSPORT:-}"
+CODEX_APP_SERVER_MODEL="${ACA_CODEX_APP_SERVER_MODEL:-gpt-5.4}"
+CODEX_APP_SERVER_TURN_TIMEOUT_MS="${ACA_CODEX_APP_SERVER_TURN_TIMEOUT_MS:-120000}"
+CODEX_APP_SERVER_WS_URL="${ACA_CODEX_APP_SERVER_WS_URL:-}"
+CODEX_APP_SERVER_WS_ALLOW_REMOTE="${ACA_CODEX_APP_SERVER_WS_ALLOW_REMOTE:-false}"
 
 ACA_DATABASE_URL_VALUE="${ACA_DATABASE_URL:-}"
 ACA_ADMIN_TOKEN_VALUE="${ACA_ADMIN_TOKEN:-}"
 ACA_OPENAI_API_KEY_VALUE="${ACA_OPENAI_API_KEY:-}"
 ACA_AZURE_OPENAI_API_KEY_VALUE="${ACA_AZURE_OPENAI_API_KEY:-}"
+ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN_VALUE="${ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN:-}"
 
 show_help() {
   cat <<'EOF'
@@ -60,11 +66,21 @@ Optional options:
   --custom-domains-json VALUE
                              JSON array of ACA ingress custom-domain bindings
   --tags-json VALUE          JSON object for ACA tags
-  --llm-provider VALUE       '', openai, or azure
+  --llm-provider VALUE       '', openai, azure, or codex_app_server
   --openai-model VALUE       OpenAI model override
   --azure-openai-endpoint VALUE
   --azure-openai-deployment VALUE
   --azure-openai-api-version VALUE
+  --codex-app-server-transport VALUE
+                             Codex App Server transport: stdio or websocket
+  --codex-app-server-model VALUE
+                             Codex App Server model override
+  --codex-app-server-turn-timeout-ms VALUE
+                             Codex App Server turn timeout in milliseconds
+  --codex-app-server-ws-url VALUE
+                             Codex App Server WebSocket URL
+  --codex-app-server-ws-allow-remote VALUE
+                             true only for authenticated private/tunnel endpoints
   --what-if                  Run az deployment group what-if instead of create
   -h, --help                 Show this help
 
@@ -75,6 +91,7 @@ Required environment:
 Optional secret environment:
   ACA_OPENAI_API_KEY
   ACA_AZURE_OPENAI_API_KEY
+  ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN
 
 Examples:
   ACA_DATABASE_URL=postgres://... \
@@ -186,6 +203,26 @@ while [[ $# -gt 0 ]]; do
       AZURE_OPENAI_API_VERSION="${2:?missing value after $1}"
       shift 2
       ;;
+    --codex-app-server-transport)
+      CODEX_APP_SERVER_TRANSPORT="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --codex-app-server-model)
+      CODEX_APP_SERVER_MODEL="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --codex-app-server-turn-timeout-ms)
+      CODEX_APP_SERVER_TURN_TIMEOUT_MS="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --codex-app-server-ws-url)
+      CODEX_APP_SERVER_WS_URL="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --codex-app-server-ws-allow-remote)
+      CODEX_APP_SERVER_WS_ALLOW_REMOTE="${2:?missing value after $1}"
+      shift 2
+      ;;
     --what-if)
       MODE="what-if"
       shift
@@ -239,6 +276,20 @@ case "$LLM_PROVIDER" in
     fi
     if [[ -z "$ACA_AZURE_OPENAI_API_KEY_VALUE" ]]; then
       echo "error: ACA_AZURE_OPENAI_API_KEY must be set when --llm-provider azure is used" >&2
+      exit 1
+    fi
+    ;;
+  codex_app_server)
+    if [[ "${CODEX_APP_SERVER_TRANSPORT}" != "websocket" ]]; then
+      echo "error: --codex-app-server-transport websocket is required for ACA codex_app_server deployments" >&2
+      exit 1
+    fi
+    if [[ -z "$CODEX_APP_SERVER_WS_URL" ]]; then
+      echo "error: --codex-app-server-ws-url is required when --llm-provider codex_app_server is used on ACA" >&2
+      exit 1
+    fi
+    if [[ -z "$ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN_VALUE" ]]; then
+      echo "error: ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN must be set when --llm-provider codex_app_server is used on ACA" >&2
       exit 1
     fi
     ;;
@@ -320,6 +371,12 @@ AZ_ARGS=(
   --parameters "azureOpenAiApiKey=${ACA_AZURE_OPENAI_API_KEY_VALUE}"
   --parameters "azureOpenAiDeployment=${AZURE_OPENAI_DEPLOYMENT}"
   --parameters "azureOpenAiApiVersion=${AZURE_OPENAI_API_VERSION}"
+  --parameters "codexAppServerTransport=${CODEX_APP_SERVER_TRANSPORT}"
+  --parameters "codexAppServerModel=${CODEX_APP_SERVER_MODEL}"
+  --parameters "codexAppServerTurnTimeoutMs=${CODEX_APP_SERVER_TURN_TIMEOUT_MS}"
+  --parameters "codexAppServerWsUrl=${CODEX_APP_SERVER_WS_URL}"
+  --parameters "codexAppServerWsAllowRemote=${CODEX_APP_SERVER_WS_ALLOW_REMOTE}"
+  --parameters "codexAppServerWsBearerToken=${ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN_VALUE}"
   --parameters "revisionSuffix=${REVISION_SUFFIX}"
   --parameters "customDomains=${CUSTOM_DOMAINS_JSON}"
   --parameters "tags=${TAGS_JSON}"

@@ -1,10 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
+import WebSocket from "ws";
 import { auditEnrichmentJsonSchema, auditReportJsonSchema } from "../schema";
 import {
   codexBrainTurnSafetyParams,
   type CodexAppServerResolvedConfig,
   type CodexAppServerStdioConfig,
+  type CodexAppServerWebSocketConfig,
 } from "./config";
 import {
   extractAuditEnrichmentFromCodexTurnPayload,
@@ -37,6 +40,13 @@ export type CodexEnrichmentBrainResult = {
   enrichment: import("../schema").AuditEnrichment;
   tokensUsed: number;
 };
+
+function webSocketDataToString(data: WebSocket.RawData): string {
+  if (typeof data === "string") return data;
+  if (Buffer.isBuffer(data)) return data.toString("utf8");
+  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
+  return Buffer.from(data).toString("utf8");
+}
 
 export type CodexAppServerLineTransport = {
   writeLine: (line: string) => void;
@@ -125,6 +135,80 @@ export class CodexAppServerSession {
     return new CodexAppServerSession(transport);
   }
 
+  static async spawnWebSocket(
+    config: CodexAppServerWebSocketConfig
+  ): Promise<CodexAppServerSession> {
+    const token =
+      config.auth.kind === "bearer-token"
+        ? config.auth.token.trim()
+        : readFileSync(
+            config.auth.kind === "capability-token"
+              ? config.auth.tokenFile
+              : config.auth.sharedSecretFile,
+            "utf8"
+          ).trim();
+    if (!token) {
+      throw new Error("Codex App Server WebSocket auth file is empty");
+    }
+
+    const socket = new WebSocket(config.wsUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    let lineHandler: ((line: string) => void) | null = null;
+    let errorHandler: ((error: Error) => void) | null = null;
+
+    socket.on("message", (data) => {
+      lineHandler?.(webSocketDataToString(data));
+    });
+    socket.on("error", (error) => {
+      errorHandler?.(error instanceof Error ? error : new Error(String(error)));
+    });
+    socket.on("close", (code) => {
+      if (code !== 1000) {
+        errorHandler?.(new Error(`codex app-server websocket closed with code ${code}`));
+      }
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Codex App Server WebSocket connection timed out")),
+        10_000
+      );
+      socket.once("open", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      socket.once("error", (error) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+    });
+
+    const transport: CodexAppServerLineTransport = {
+      writeLine: (line) => {
+        socket.send(line.trimEnd());
+      },
+      close: () => {
+        try {
+          socket.close();
+        } catch {
+          // Socket may already be closed after transport failures.
+        }
+      },
+      onLine: (handler) => {
+        lineHandler = handler;
+      },
+      onError: (handler) => {
+        errorHandler = handler;
+      },
+    };
+
+    return new CodexAppServerSession(transport);
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -183,12 +267,6 @@ export class CodexAppServerSession {
     prompts: CodexBrainPrompt,
     schemaSpec: Record<string, unknown>
   ): Promise<{ output: unknown; tokensUsed: number }> {
-    if (config.transport === "websocket") {
-      throw new Error(
-        "Codex App Server WebSocket transport is not implemented in SignalForge yet; use CODEX_APP_SERVER_TRANSPORT=stdio."
-      );
-    }
-
     try {
       await this.request("initialize", {
         clientInfo: CLIENT_INFO,

@@ -15,7 +15,8 @@ export type CodexAppServerWebSocketConfig = {
   wsUrl: string;
   auth:
     | { kind: "capability-token"; tokenFile: string }
-    | { kind: "signed-bearer"; sharedSecretFile: string };
+    | { kind: "signed-bearer"; sharedSecretFile: string }
+    | { kind: "bearer-token"; token: string };
   model: string;
   turnTimeoutMs: number;
 };
@@ -46,6 +47,10 @@ function isLoopbackWebSocketUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function allowsRemoteWebSocket(env: NodeJS.ProcessEnv): boolean {
+  return (env.CODEX_APP_SERVER_WS_ALLOW_REMOTE ?? "").trim().toLowerCase() === "true";
 }
 
 function fileExists(path: string): boolean {
@@ -105,16 +110,30 @@ export function resolveCodexAppServerConfig(
     };
   }
 
-  if (!isLoopbackWebSocketUrl(wsUrl)) {
+  if (!isLoopbackWebSocketUrl(wsUrl) && !allowsRemoteWebSocket(env)) {
     return {
       ready: false,
       reason:
-        "CODEX_APP_SERVER_WS_URL must be loopback (127.0.0.1, localhost, or ::1). Non-loopback WebSocket listeners are not enabled.",
+        "CODEX_APP_SERVER_WS_URL is non-loopback. Set CODEX_APP_SERVER_WS_ALLOW_REMOTE=true only for authenticated private/tunnel endpoints.",
     };
   }
 
   const tokenFile = env.CODEX_APP_SERVER_WS_TOKEN_FILE?.trim();
   const sharedSecretFile = env.CODEX_APP_SERVER_WS_SHARED_SECRET_FILE?.trim();
+  const bearerToken = env.CODEX_APP_SERVER_WS_BEARER_TOKEN?.trim();
+
+  if (bearerToken) {
+    return {
+      ready: true,
+      config: {
+        transport: "websocket",
+        wsUrl,
+        auth: { kind: "bearer-token", token: bearerToken },
+        model,
+        turnTimeoutMs,
+      },
+    };
+  }
 
   if (tokenFile && fileExists(tokenFile)) {
     return {
@@ -145,7 +164,7 @@ export function resolveCodexAppServerConfig(
   return {
     ready: false,
     reason:
-      "CODEX_APP_SERVER_TRANSPORT=websocket requires CODEX_APP_SERVER_WS_TOKEN_FILE or CODEX_APP_SERVER_WS_SHARED_SECRET_FILE pointing at readable secret files.",
+      "CODEX_APP_SERVER_TRANSPORT=websocket requires CODEX_APP_SERVER_WS_BEARER_TOKEN, CODEX_APP_SERVER_WS_TOKEN_FILE, or CODEX_APP_SERVER_WS_SHARED_SECRET_FILE.",
   };
 }
 
