@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["sql.js", "pg"],
+  serverExternalPackages: ["sql.js", "pg", "ws"],
   outputFileTracingIncludes: {
     "/*": ["./node_modules/sql.js/dist/*.wasm"],
   },
