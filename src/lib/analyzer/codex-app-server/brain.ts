@@ -48,13 +48,10 @@ export async function callCodexAppServerBrain(
     return options._sessionFactory(resolved.config, prompts);
   }
 
-  if (resolved.config.transport !== "stdio") {
-    throw new Error(
-      "Codex App Server WebSocket transport is not implemented in SignalForge yet; use CODEX_APP_SERVER_TRANSPORT=stdio."
-    );
-  }
-
-  const session = await CodexAppServerSession.spawnStdio(resolved.config);
+  const session =
+    resolved.config.transport === "stdio"
+      ? await CodexAppServerSession.spawnStdio(resolved.config)
+      : await CodexAppServerSession.spawnWebSocket(resolved.config);
   const result = await session.analyzeArtifactTurn(resolved.config, prompts);
   return {
     report: result.report,
@@ -72,13 +69,10 @@ export async function callCodexAppServerEnrichmentBrain(
     throw new Error(resolved.reason);
   }
 
-  if (resolved.config.transport !== "stdio") {
-    throw new Error(
-      "Codex App Server WebSocket transport is not implemented in SignalForge yet; use CODEX_APP_SERVER_TRANSPORT=stdio."
-    );
-  }
-
-  const session = await CodexAppServerSession.spawnStdio(resolved.config);
+  const session =
+    resolved.config.transport === "stdio"
+      ? await CodexAppServerSession.spawnStdio(resolved.config)
+      : await CodexAppServerSession.spawnWebSocket(resolved.config);
   const result = await session.analyzeArtifactEnrichmentTurn(resolved.config, prompts);
   return {
     enrichment: result.enrichment,

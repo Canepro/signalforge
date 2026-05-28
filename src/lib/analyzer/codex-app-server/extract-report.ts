@@ -95,6 +95,14 @@ export function extractAuditReportFromCodexTurnPayload(payload: unknown): AuditR
         if (fromItem) return fromItem;
       }
     }
+
+    const notifications = record.notifications;
+    if (Array.isArray(notifications)) {
+      for (const notification of notifications) {
+        const fromNotification = extractAuditReportFromCodexTurnPayload(notification);
+        if (fromNotification) return fromNotification;
+      }
+    }
   }
 
   const strings: string[] = [];
@@ -148,6 +156,14 @@ export function extractAuditEnrichmentFromCodexTurnPayload(
       for (const item of items) {
         const fromItem = extractAuditEnrichmentFromCodexTurnPayload(item);
         if (fromItem) return fromItem;
+      }
+    }
+
+    const notifications = record.notifications;
+    if (Array.isArray(notifications)) {
+      for (const notification of notifications) {
+        const fromNotification = extractAuditEnrichmentFromCodexTurnPayload(notification);
+        if (fromNotification) return fromNotification;
       }
     }
   }

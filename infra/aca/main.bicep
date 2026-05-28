@@ -58,6 +58,7 @@ param signalforgeAdminToken string
   ''
   'openai'
   'azure'
+  'codex_app_server'
 ])
 param llmProvider string = ''
 
@@ -80,6 +81,30 @@ param azureOpenAiDeployment string = ''
 
 @description('Azure OpenAI API version for legacy Azure endpoints. Omit for /openai/v1 endpoints.')
 param azureOpenAiApiVersion string = ''
+
+@description('Codex App Server transport when LLM_PROVIDER=codex_app_server.')
+@allowed([
+  ''
+  'stdio'
+  'websocket'
+])
+param codexAppServerTransport string = ''
+
+@description('Codex App Server model when LLM_PROVIDER=codex_app_server.')
+param codexAppServerModel string = 'gpt-5.4'
+
+@description('Codex App Server turn timeout in milliseconds.')
+param codexAppServerTurnTimeoutMs string = '120000'
+
+@description('Codex App Server WebSocket URL when using websocket transport.')
+param codexAppServerWsUrl string = ''
+
+@description('Allow non-loopback Codex App Server WebSocket URLs. Use only with authenticated private/tunnel endpoints.')
+param codexAppServerWsAllowRemote bool = false
+
+@description('Bearer token for Codex App Server WebSocket auth.')
+@secure()
+param codexAppServerWsBearerToken string = ''
 
 @description('Optional revision suffix for the new deployment.')
 param revisionSuffix string = ''
@@ -150,6 +175,42 @@ var containerEnv = concat(
       name: 'AZURE_OPENAI_API_VERSION'
       value: azureOpenAiApiVersion
     }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerTransport != '' ? [
+    {
+      name: 'CODEX_APP_SERVER_TRANSPORT'
+      value: codexAppServerTransport
+    }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerModel != '' ? [
+    {
+      name: 'CODEX_APP_SERVER_MODEL'
+      value: codexAppServerModel
+    }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerTurnTimeoutMs != '' ? [
+    {
+      name: 'CODEX_APP_SERVER_TURN_TIMEOUT_MS'
+      value: codexAppServerTurnTimeoutMs
+    }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerWsUrl != '' ? [
+    {
+      name: 'CODEX_APP_SERVER_WS_URL'
+      value: codexAppServerWsUrl
+    }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerWsAllowRemote ? [
+    {
+      name: 'CODEX_APP_SERVER_WS_ALLOW_REMOTE'
+      value: 'true'
+    }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerWsBearerToken != '' ? [
+    {
+      name: 'CODEX_APP_SERVER_WS_BEARER_TOKEN'
+      secretRef: 'codex-app-server-ws-bearer-token'
+    }
   ] : []
 )
 
@@ -174,6 +235,12 @@ var containerSecrets = concat(
     {
       name: 'azure-openai-api-key'
       value: azureOpenAiApiKey
+    }
+  ] : [],
+  llmProvider == 'codex_app_server' && codexAppServerWsBearerToken != '' ? [
+    {
+      name: 'codex-app-server-ws-bearer-token'
+      value: codexAppServerWsBearerToken
     }
   ] : []
 )

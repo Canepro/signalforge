@@ -4,7 +4,7 @@ SignalForge keeps three roles separate:
 
 | Role | Purpose | Credential / runtime |
 | --- | --- | --- |
-| **Analysis brain** | One explanation pass over deterministic pre-findings | `LLM_PROVIDER=codex_app_server` spawns local `codex app-server` (stdio) |
+| **Analysis brain** | One explanation pass over deterministic pre-findings | `LLM_PROVIDER=codex_app_server` uses local stdio or an authenticated WebSocket Codex App Server |
 | **Automation agent** | External operator client: signals, diagnostic requests, fix-action requests | Source-bound token, such as `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` in Infisical |
 | **Execution agent** | Collection jobs and approved safe-fix apply | `signalforge-agent` source token |
 
@@ -17,24 +17,29 @@ source-bound automation-agent token.
 When `LLM_PROVIDER=codex_app_server`, SignalForge:
 
 1. Runs the deterministic adapter pipeline first (pre-findings, noise, incomplete detection).
-2. Starts an **ephemeral** Codex thread per analysis over stdio (`codex app-server` by default).
+2. Starts an **ephemeral** Codex thread per analysis over stdio (`codex app-server` by default) or an authenticated WebSocket transport.
 3. Sends a single `turn/start` with `outputSchema` matching `AuditReportSchema`, `sandboxPolicy: { type: "readOnly", networkAccess: false }`, and `approvalPolicy: "never"`.
 4. Parses strict JSON from the turn result; on failure, uses the same deterministic fallback as OpenAI/Azure misconfiguration.
 
 SignalForge does **not** expose Codex shell/file tools for analysis. If your app-server build cannot honor read-only turns, do not enable this provider until it can.
 
-WebSocket transport is opt-in and requires loopback URLs plus token files; stdio is the supported default.
+WebSocket transport is opt-in. Loopback URLs are allowed with a token file or
+bearer token. Non-loopback URLs require `CODEX_APP_SERVER_WS_ALLOW_REMOTE=true`
+and must be authenticated private/tunnel endpoints. Do not expose an
+unauthenticated Codex App Server listener.
 
 ### Environment
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `LLM_PROVIDER` | `openai` | Set to `codex_app_server` to use Codex App Server for the analysis explanation pass |
-| `CODEX_APP_SERVER_TRANSPORT` | `stdio` | `stdio` is supported; `websocket` is config-only and fails closed |
+| `CODEX_APP_SERVER_TRANSPORT` | `stdio` | `stdio` or `websocket` |
 | `CODEX_APP_SERVER_COMMAND` | `codex app-server` | Command used to start the local app-server process |
 | `CODEX_APP_SERVER_MODEL` | `gpt-5.4` | Model id passed to Codex App Server |
 | `CODEX_APP_SERVER_TURN_TIMEOUT_MS` | `120000` | Per-analysis wait before deterministic fallback |
 | `CODEX_APP_SERVER_WS_URL` | unset | Loopback WebSocket URL when testing websocket config |
+| `CODEX_APP_SERVER_WS_ALLOW_REMOTE` | unset | Set to `true` only for authenticated private/tunnel WebSocket endpoints |
+| `CODEX_APP_SERVER_WS_BEARER_TOKEN` | unset | Bearer token injected by the runtime secret store for WebSocket auth |
 | `CODEX_APP_SERVER_WS_TOKEN_FILE` | unset | Capability-token file for websocket config |
 | `CODEX_APP_SERVER_WS_SHARED_SECRET_FILE` | unset | Signed-bearer shared-secret file for websocket config |
 
@@ -47,6 +52,20 @@ bun run verify:codex-brain
 The fixture check does not inspect the current machine. Older Linux/WSL fixture names are historical artifact samples from prior development, not a claim about the operator's workstation.
 
 See [Codex App Server](https://developers.openai.com/codex/app-server) for upstream app-server behavior.
+
+## ACA Production Notes
+
+The ACA app cannot use stdio unless the container image contains Codex CLI plus
+a valid Codex auth session, which is not the current production shape. For ACA,
+use `LLM_PROVIDER=codex_app_server` only with:
+
+- `CODEX_APP_SERVER_TRANSPORT=websocket`
+- `CODEX_APP_SERVER_WS_URL=<authenticated private/tunnel endpoint>`
+- `CODEX_APP_SERVER_WS_ALLOW_REMOTE=true`
+- `CODEX_APP_SERVER_WS_BEARER_TOKEN=<from Infisical or ACA secret>`
+
+The deployed app health endpoint reports the selected provider, transport, and
+model, but never prints the bearer token.
 
 ## Automation Agent
 
