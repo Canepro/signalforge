@@ -12,6 +12,7 @@ import {
   contentHash,
   findArtifactByHash,
   deriveSeverityCounts,
+  deriveEnvTags,
   getArtifactById,
   findPreviousRunForSameArtifact,
   findPreviousRunForSameTarget,
@@ -247,6 +248,70 @@ describe("repository", () => {
     it("returns empty array when no runs exist", () => {
       const runs = listRuns(db);
       expect(runs).toEqual([]);
+    });
+
+    it("tags mac-diagnostics runs with the macOS platform, not Linux", async () => {
+      const content = readFileSync(join(FIXTURES, "mac-workstation-diagnostics.txt"), "utf-8");
+      const artifact = insertArtifact(db, {
+        artifact_type: "mac-diagnostics",
+        source_type: "api",
+        filename: "mac_diagnostics_operator-mac.local.txt",
+        content,
+      });
+
+      const result = await analyzeArtifact(content, { artifactType: "mac-diagnostics" });
+      insertRun(db, artifact.id, result, {
+        filename: "mac_diagnostics_operator-mac.local.txt",
+        source_type: "api",
+      });
+
+      const runs = listRuns(db);
+      expect(runs).toHaveLength(1);
+      expect(runs[0].env_tags).toContain("macOS");
+      expect(runs[0].env_tags).not.toContain("Linux");
+    });
+  });
+
+  describe("deriveEnvTags", () => {
+    it("derives the macOS platform from a Darwin environment", () => {
+      expect(
+        deriveEnvTags({
+          os: "macOS 26.5 (25F71)",
+          is_wsl: false,
+          is_container: false,
+          is_virtual_machine: false,
+        })
+      ).toEqual(["macOS"]);
+    });
+
+    it("derives Linux for a plain Linux host", () => {
+      expect(
+        deriveEnvTags({
+          os: "Ubuntu 22.04.3 LTS",
+          is_wsl: false,
+          is_container: false,
+          is_virtual_machine: false,
+        })
+      ).toEqual(["Linux"]);
+    });
+
+    it("derives Kubernetes from a cluster bundle environment", () => {
+      expect(
+        deriveEnvTags({
+          os: "Kubernetes (eks)",
+          is_wsl: false,
+          is_container: false,
+          is_virtual_machine: false,
+        })
+      ).toEqual(["Kubernetes"]);
+    });
+
+    it("keeps runtime qualifiers ahead of the OS fallback", () => {
+      expect(deriveEnvTags({ os: "Ubuntu 22.04", is_wsl: true })).toEqual(["WSL"]);
+      expect(deriveEnvTags({ os: "Container (docker)", is_container: true })).toEqual([
+        "Container",
+      ]);
+      expect(deriveEnvTags({ os: "Ubuntu 22.04", is_virtual_machine: true })).toEqual(["VM"]);
     });
   });
 
