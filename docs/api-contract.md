@@ -279,7 +279,7 @@ All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>
 
 **`PATCH /api/sources/[id]`** — partial JSON; **cannot** change `target_identifier`, `source_type`, `expected_artifact_type` in v1. Accepts `default_collection_scope` (or `null` to clear) with the same artifact-family validation as create. **200** source.
 
-**`POST /api/sources/[id]/collection-jobs`** — optional JSON: `request_reason`, `priority`, `idempotency_key` (24h dedupe per source), and typed `collection_scope` (`linux_host` / `container_target` / `kubernetes_scope`). Scope shape must match `source.expected_artifact_type`; mismatch returns **400** `invalid_collection_scope`. **201** new job, **200** same job on idempotent replay. **409** `source_disabled`.
+**`POST /api/sources/[id]/collection-jobs`** — optional JSON: `request_reason`, `priority`, `idempotency_key` (24h dedupe per source), and typed `collection_scope` (`linux_host` / `mac_host` / `container_target` / `kubernetes_scope`). Scope shape must match `source.expected_artifact_type`; mismatch returns **400** `invalid_collection_scope`. **201** new job, **200** same job on idempotent replay. **409** `source_disabled`.
 
 **`GET /api/sources/[id]/collection-jobs`** — optional `?status=`. Returns a read-model projection for expired leases (`claimed`→`queued`, `running`→`expired`) without mutating stored rows. Status filtering is applied after this projection. **200:** `{ "jobs": CollectionJob[] }`.
 

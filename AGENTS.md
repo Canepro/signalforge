@@ -50,7 +50,7 @@ SignalForge lives in its own repo:
 
 **Stack:** Next.js (App Router), Bun, TypeScript, React, Tailwind CSS, sql.js (SQLite local), Postgres/Neon (production), Vitest, GitHub Actions CI.
 
-**Deployment:** The repo now documents three deployment surfaces that agents should keep separate. Local development defaults to SQLite. Vercel remains the preview/review surface for branches and PRs. The app also has a committed containerized Azure Container Apps path (`Dockerfile`, `infra/aca/main.bicep`) that keeps `DATABASE_DRIVER=postgres` with Neon Postgres. The current app-hosting path is the ACA app documented in repo history and infra; some resource names still use `staging`, but treat those as legacy identifiers rather than the canonical environment vocabulary.
+**Deployment:** The repo now documents three deployment surfaces that agents should keep separate. Local development defaults to SQLite. Vercel is available only as an optional manual preview, not an automatic branch or PR deploy path. The app also has a committed containerized Azure Container Apps path (`Dockerfile`, `infra/aca/main.bicep`) that keeps `DATABASE_DRIVER=postgres` with Neon Postgres. The current app-hosting path is the ACA app documented in repo history and infra; some resource names still use `staging`, but treat those as legacy identifiers rather than the canonical environment vocabulary.
 
 **CI:** GitHub Actions (`.github/workflows/ci.yml`): typecheck, test, build on every push to `main` and on PRs; a separate Postgres parity job starts `postgres:16-alpine`, applies migrations, and runs `bun run test:parity`. Postgres schema changes follow the checked-in migration policy: [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
 

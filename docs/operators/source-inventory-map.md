@@ -29,6 +29,7 @@ For enrollment and wrapper details see:
 | value | meaning |
 | --- | --- |
 | `example-live` | Pattern has been proven in a private deployment; this row is still an anonymized example |
+| `live` | Source is active in a real (non-example) operator inventory |
 | `enrolled` | Source exists and tokens are issued, but a completed diagnostic has not been recorded yet |
 | `planned` | Fields are documented; Source is not created yet |
 

@@ -114,7 +114,7 @@ That makes it useful both for human checks and for shell or CI wrappers.
 
 ## External Agent Workflow
 
-Once the automation-agent token is set, the external agent has three normal operations.
+Once the automation-agent token is set, the external agent has three normal operations — **queue**, **poll**, and **wait** — detailed under [Diagnostic request operations](#diagnostic-request-operations) below. The example clients in the next two sections wrap these calls for you.
 
 ## Example Client
 
@@ -226,6 +226,10 @@ This keeps the trust boundary clean:
 - SignalForge diagnoses
 - the external agent recommends
 - neither example implies permission to execute fixes on the monitored device
+
+## Diagnostic request operations
+
+These are the three core operations behind the helper script and example clients.
 
 ### 1. Queue diagnostics
 

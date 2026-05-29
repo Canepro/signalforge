@@ -39,7 +39,7 @@ Observed on a live workstation (pre-PR #22 fail-closed fix):
 ## Deferred
 
 - **Automation-agent end-to-end verification** on live ACA remains blocked until production Postgres has `sources.automation_enabled` (migration drift).
-- **WebSocket Codex transport** remains unimplemented in SignalForge; stdio is the supported path.
+- **WebSocket Codex transport** was deferred at the time of this pass; it has since shipped as an opt-in transport (PR #35), documented in [`automation-agent-codex-app-server-integration.md`](./automation-agent-codex-app-server-integration.md). stdio remains the default local path.
 - Full live suite on CI agents without Codex CLI installed is intentionally skipped (`verify:codex-brain` exits 0 when `codex` is missing).
 
 ## Validation commands

@@ -1,4 +1,4 @@
-# Phase 9c stabilization pass (2026-05)
+# Phase 9c–9d stabilization pass (2026-05)
 
 Operator validation after Phase **9d** run-detail summary and PR **#18** dashboard Operational Watch lanes.
 

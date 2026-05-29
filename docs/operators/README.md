@@ -36,6 +36,8 @@ For automation-agent multi-source setup: [`source-inventory-map.md`](./source-in
 | [`automation-agent-source-wrappers.md`](./automation-agent-source-wrappers.md) | Per-source wrapper contract: naming convention, interface, token file, and health check |
 | [`automation-agent-wrapper-deployment-checklist.md`](./automation-agent-wrapper-deployment-checklist.md) | Deployment checklists, rollback procedures, and operator verification report template |
 | [`automation-agent-codex-app-server-integration.md`](./automation-agent-codex-app-server-integration.md) | Automation-agent vs Codex App Server analysis-brain role separation |
+| [`codex-brain-artifact-quality-pass.md`](./codex-brain-artifact-quality-pass.md) | Codex analysis-brain quality-pass notes and mandatory-fixture verification commands |
+| [`phase-9c-stabilization-pass.md`](./phase-9c-stabilization-pass.md) | Operator validation pass (repo gates + manual browser checks) for the Phase 9c–9d UI work |
 | [`../agent-deployment.md`](../agent-deployment.md) | Preferred long-running `signalforge-agent` deployment model and security baseline |
 | [`../api-contract.md`](../api-contract.md) | Route-level operator and agent HTTP contract |
 
