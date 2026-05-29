@@ -1,6 +1,6 @@
 # Getting Started With SignalForge
 
-This guide is for someone new to the repo who wants to get SignalForge running and complete a first successful run without needing to understand the whole codebase first.
+New to the repo? This guide gets SignalForge running and walks you through a first successful run — no need to understand the whole codebase first.
 
 > **Working with an AI agent?** The fastest path is to hand this repo to a coding agent. Point it at [`../AGENTS.md`](../AGENTS.md) and ask it to get SignalForge running and submit a sample artifact. For copy-paste prompts — both for operating SignalForge and for integrating it as an automation agent — see [`ai-agents.md`](./ai-agents.md).
 
@@ -184,7 +184,7 @@ In the UI, use **How to collect** in the sidebar (or **Collect externally** on t
 - push-first, where `signalforge-collectors` produces the artifact and submits it directly
 - job-driven, where `signalforge-agent` runs a collector from `signalforge-collectors` and uploads the result
 
-Today, Linux host collection is the cleanest fully general job-driven path and the preferred first operator workflow. Container and Kubernetes also have real collector support, but the honest environment-specific guidance lives under [`docs/operators/collection-paths.md`](./operators/collection-paths.md) instead of this first-run guide.
+Today, Linux host collection is the most broadly supported job-driven path and the best place to start. Container and Kubernetes also have collector support; their environment-specific guidance lives in [`docs/operators/collection-paths.md`](./operators/collection-paths.md), not this first-run guide.
 
 The simplest first run is one of the repo fixtures:
 
@@ -253,7 +253,7 @@ curl http://localhost:3000/api/runs/<run-id>/compare
 
 ## Step 6: Understand Reanalyze vs Compare
 
-These two actions sound similar, but they are different.
+Reanalyze and compare do different things:
 
 - **Reanalyze** means: run the analyzer again on the same stored artifact
 - **Compare** means: diff two runs and show what changed
