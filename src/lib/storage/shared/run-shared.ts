@@ -1,5 +1,5 @@
 import type { Finding } from "@/lib/analyzer/schema";
-import { deriveSeverityCounts, parseEnvironmentHostname } from "@/lib/db/repository";
+import { deriveEnvTags, deriveSeverityCounts, parseEnvironmentHostname } from "@/lib/db/repository";
 import type { RunSummary } from "@/types/api";
 
 export type RunSummaryRowShape = {
@@ -18,14 +18,8 @@ export type RunSummaryRowShape = {
 
 export function mapRunSummaryRow(row: RunSummaryRowShape): RunSummary {
   const hostname = parseEnvironmentHostname(row.environment_json);
-  const env = safeParseJson<Record<string, boolean>>(row.environment_json, {});
-  const env_tags: string[] = [];
-  if (env.is_wsl) env_tags.push("WSL");
-  if (env.is_container) env_tags.push("Container");
-  if (env.is_virtual_machine) env_tags.push("VM");
-  if (!env.is_wsl && !env.is_container && !env.is_virtual_machine && row.environment_json) {
-    env_tags.push("Linux");
-  }
+  const env = safeParseJson<Record<string, unknown>>(row.environment_json, {});
+  const env_tags = row.environment_json ? deriveEnvTags(env) : [];
 
   return {
     id: row.id,

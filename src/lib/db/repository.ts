@@ -258,11 +258,7 @@ export function listRuns(db: Database): RunSummary[] {
     let envTags: string[] = [];
     if (row.environment_json) {
       try {
-        const env = JSON.parse(row.environment_json);
-        if (env.is_wsl) envTags.push("WSL");
-        if (env.is_container) envTags.push("Container");
-        if (env.is_virtual_machine) envTags.push("VM");
-        if (!env.is_wsl && !env.is_container && !env.is_virtual_machine) envTags.push("Linux");
+        envTags = deriveEnvTags(JSON.parse(row.environment_json));
       } catch { /* skip */ }
     }
     return {
@@ -319,6 +315,36 @@ export function parseEnvironmentHostname(environmentJson: string | null): string
   } catch {
     return null;
   }
+}
+
+/**
+ * Base OS-family tag for the run list. The boolean environment flags only
+ * describe *where* a host runs (WSL/container/VM) — the OS family itself has to
+ * come from the analyzer's `os` string. Falling back to a hardcoded "Linux"
+ * mislabels non-Linux artifacts such as macOS and Kubernetes bundles.
+ */
+function platformTagFromOs(os: unknown): string {
+  const lower = typeof os === "string" ? os.toLowerCase() : "";
+  if (/macos|mac os|darwin|os x/.test(lower)) return "macOS";
+  if (lower.includes("windows")) return "Windows";
+  if (lower.startsWith("kubernetes")) return "Kubernetes";
+  return "Linux";
+}
+
+/**
+ * Environment qualifier tags shown beneath a run's target in the dashboard.
+ * WSL/Container/VM are mutually-exclusive runtime qualifiers; when none apply
+ * we surface the OS family parsed from `os`.
+ */
+export function deriveEnvTags(env: Record<string, unknown>): string[] {
+  const tags: string[] = [];
+  if (env.is_wsl) tags.push("WSL");
+  if (env.is_container) tags.push("Container");
+  if (env.is_virtual_machine) tags.push("VM");
+  if (!env.is_wsl && !env.is_container && !env.is_virtual_machine) {
+    tags.push(platformTagFromOs(env.os));
+  }
+  return tags;
 }
 
 /**
