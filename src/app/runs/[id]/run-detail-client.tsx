@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { SeveritySummary } from "@/components/severity-badge";
+import { StatusBadge } from "@/components/status-badge";
 import { TopActionsPanel } from "@/components/top-actions-panel";
 import { FindingsTable } from "@/components/findings-table";
 import { FindingsOverview } from "@/components/findings-overview";
@@ -34,6 +35,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [collectOpen, setCollectOpen] = useState(false);
   const [reanalyzePending, setReanalyzePending] = useState(false);
+  const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
   const [activeSignal, setActiveSignal] = useState<FindingSignal | "all">("all");
   const [activeSeverity, setActiveSeverity] = useState<Severity | "all">("all");
   const artifactFamily = getArtifactFamilyPresentation(run.artifact_type);
@@ -90,6 +92,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
 
   async function handleReanalyze() {
     setReanalyzePending(true);
+    setReanalyzeError(null);
     try {
       const res = await fetch(`/api/runs/${run.id}/reanalyze`, {
         method: "POST",
@@ -104,7 +107,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
       router.push(`/runs/${body.run_id}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      window.alert(msg);
+      setReanalyzeError(msg);
     } finally {
       setReanalyzePending(false);
     }
@@ -154,6 +157,25 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
             }
             reanalyzePending={reanalyzePending}
           />
+
+          {reanalyzeError ? (
+            <div role="alert" className="border-b border-danger/20 bg-danger-bg px-4 py-3 lg:px-5">
+              <div className="mx-auto flex max-w-[1440px] items-start justify-between gap-3">
+                <p className="text-sm text-danger">
+                  <span className="font-semibold">Reanalyze failed.</span>{" "}
+                  {reanalyzeError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReanalyzeError(null)}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-danger transition-colors hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/30"
+                  aria-label="Dismiss reanalyze error"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex-1 overflow-y-auto">
             {/* Run Identity Strip */}
@@ -248,8 +270,8 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
                       Run status
                     </div>
-                    <div className="mt-1 text-sm font-semibold text-on-surface">
-                      {run.status}
+                    <div className="mt-1.5">
+                      <StatusBadge status={run.status} />
                     </div>
                     <div className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                       {run.analysis_error
@@ -301,8 +323,17 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                           Expanded explanation for operators who want the model summary after reviewing the findings table.
                         </p>
                       </div>
-                      <span className="mt-0.5 shrink-0 rounded-md border border-outline-variant/20 bg-surface-container-low px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
-                        ▼
+                      <span className="mt-0.5 shrink-0 rounded-md border border-outline-variant/20 bg-surface-container-low p-1.5 text-on-surface-variant">
+                        <svg
+                          className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-180"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
                       </span>
                     </summary>
                     <div className="border-t border-outline-variant/10 px-4 py-4">
