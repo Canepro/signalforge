@@ -31,7 +31,7 @@ function CopyBlock({ label, text }: { label: string; text: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
           {label}
         </span>
         <button
@@ -285,12 +285,12 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs font-semibold text-on-surface">{family.label}</div>
-                    <code className="text-[10px] text-outline-variant">{family.value}</code>
+                    <code className="text-[10px] text-on-surface-muted">{family.value}</code>
                   </div>
                   <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant">
                     {family.description}
                   </p>
-                  <div className="mt-2 space-y-1 text-[11px] leading-snug text-outline-variant">
+                  <div className="mt-2 space-y-1 text-[11px] leading-snug text-on-surface-muted">
                     <div>Artifact shape: {family.uploadShape}</div>
                     <div>Compare hint: {family.targetIdentifierHint}</div>
                     <div>Target id example: <code className="font-mono">{family.targetIdentifierExample}</code></div>
@@ -310,7 +310,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               <div className="rounded-md border border-primary/15 bg-surface-container-lowest px-3 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs font-semibold text-on-surface">Linux and WSL host audit</div>
-                  <code className="text-[10px] text-outline-variant">linux-audit-log</code>
+                  <code className="text-[10px] text-on-surface-muted">linux-audit-log</code>
                 </div>
                 <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
                   <span className="font-semibold text-on-surface">Preferred long-running path:</span> installed host agent service.
@@ -322,7 +322,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               <div className="rounded-md border border-primary/15 bg-surface-container-lowest px-3 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs font-semibold text-on-surface">Container diagnostics</div>
-                  <code className="text-[10px] text-outline-variant">container-diagnostics</code>
+                  <code className="text-[10px] text-on-surface-muted">container-diagnostics</code>
                 </div>
                 <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
                   <span className="font-semibold text-on-surface">Preferred long-running path:</span> runtime-host agent service or containerized runner on the runtime host, with explicit runtime access.
@@ -334,7 +334,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
               <div className="rounded-md border border-primary/15 bg-surface-container-lowest px-3 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs font-semibold text-on-surface">Kubernetes bundle</div>
-                  <code className="text-[10px] text-outline-variant">kubernetes-bundle</code>
+                  <code className="text-[10px] text-on-surface-muted">kubernetes-bundle</code>
                 </div>
                 <div className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
                   <span className="font-semibold text-on-surface">Preferred long-running path:</span> cluster-side Kubernetes deployment of <code className="font-mono">signalforge-agent</code>.
@@ -439,7 +439,7 @@ export function CollectEvidenceModal({ open, onClose }: CollectEvidenceModalProp
 
           <CopyBlock label="Reference push: Kubernetes bundle" text={collectorPushKubernetes} />
 
-          <p className="text-xs leading-snug text-outline-variant">
+          <p className="text-xs leading-snug text-on-surface-muted">
             Docs: <span className="font-mono">docs/external-submit.md</span>,{" "}
             <span className="font-mono">docs/getting-started.md</span>,{" "}
             <span className="font-mono">docs/agent-deployment.md</span>,{" "}

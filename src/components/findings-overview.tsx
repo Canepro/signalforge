@@ -46,7 +46,7 @@ export function FindingsOverview({
       <section className="rounded-xl border border-outline-variant/15 bg-surface-container-low/55 px-3 py-3 sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
               Findings table filters
             </div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-on-surface-variant">
@@ -142,18 +142,18 @@ export function FindingsOverview({
               Filter the findings table by signal or severity while keeping the current visible count in view.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
             <span>{filteredCount} of {findings.length} visible</span>
-            <span className="text-outline-variant/60">·</span>
+            <span className="text-on-surface-muted/60">·</span>
             <span>{activeSignalLabel}</span>
-            <span className="text-outline-variant/60">·</span>
+            <span className="text-on-surface-muted/60">·</span>
             <span>{activeSeverity === "all" ? "All severities" : activeSeverity}</span>
           </div>
         </div>
       </div>
 
       <div className="space-y-3.5 px-4 py-3.5">
-        <div className="sf-kicker text-outline-variant">Filter by signal</div>
+        <div className="sf-kicker text-on-surface-muted">Filter by signal</div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {signalSummary.map((item) => {
             const selected = activeSignal === item.signal;
@@ -174,7 +174,7 @@ export function FindingsOverview({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="sf-kicker text-outline-variant">{item.label}</div>
+                    <div className="sf-kicker text-on-surface-muted">{item.label}</div>
                     <div className="mt-1 text-base font-bold leading-none text-on-surface">
                       {item.count}
                     </div>
@@ -182,7 +182,7 @@ export function FindingsOverview({
                   {item.highestSeverity ? (
                     <SeverityBadge severity={item.highestSeverity} />
                   ) : (
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                       Clear
                     </span>
                   )}
@@ -194,7 +194,7 @@ export function FindingsOverview({
 
         <div className="space-y-3 rounded-xl border border-outline-variant/15 bg-surface-container-low/55 px-3.5 py-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="sf-kicker text-outline-variant">Filter by severity</span>
+            <span className="sf-kicker text-on-surface-muted">Filter by severity</span>
             <button
               type="button"
               className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${

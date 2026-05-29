@@ -45,7 +45,7 @@ const toneBadgeLabel: Record<RunDetailSummaryTone, string> = {
 function StatCard({ stat }: { stat: RunDetailSummaryStat }) {
   return (
     <div className="rounded-lg border border-outline-variant/12 bg-surface-container-lowest px-3 py-2.5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
         {stat.label}
       </div>
       <div

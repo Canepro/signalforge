@@ -58,7 +58,7 @@ export function DashboardOperationalHighlights({
                     key={`${highlight.run_id}-${section.id}`}
                     className="rounded-md border border-outline-variant/10 bg-surface-container-lowest px-2 py-1.5"
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                       {section.title}
                     </div>
                     <div className="mt-0.5 space-y-0.5">

@@ -134,7 +134,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
               <Link href="/" className="hover:text-primary transition-colors">
                 Runs
               </Link>
-              <span className="text-outline-variant">/</span>
+              <span className="text-on-surface-muted">/</span>
               <span className="text-on-surface font-semibold truncate max-w-[200px]">
                 {run.filename}
               </span>
@@ -198,7 +198,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                         {run.environment.os ? (
                           <>
                             {" "}
-                            <span className="text-outline-variant">·</span>{" "}
+                            <span className="text-on-surface-muted">·</span>{" "}
                             {run.environment.os}
                           </>
                         ) : null}
@@ -221,7 +221,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                         { label: collectionTimeLabel, value: collectionTimeValue },
                       ] as Array<{ label: string; value: string; sub?: string | null; mono?: boolean }>).map((cell) => (
                         <div key={cell.label} className="border-b border-outline-variant/10 px-3 py-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                             {cell.label}
                           </div>
                           <div className={`mt-0.5 truncate text-sm font-medium text-on-surface ${cell.mono ? "font-mono" : ""}`}>
@@ -247,7 +247,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                         >
                           {run.parent_run.filename}
                         </Link>
-                        <span className="text-outline-variant ml-1 font-mono text-[10px]">
+                        <span className="text-on-surface-muted ml-1 font-mono text-[10px]">
                           ({run.parent_run.id.slice(0, 8)}…)
                         </span>
                       </p>
@@ -267,7 +267,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
                 <div className="space-y-3">
                   <SeveritySummary counts={run.severity_counts} compact />
                   <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-4 py-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                       Run status
                     </div>
                     <div className="mt-1.5">

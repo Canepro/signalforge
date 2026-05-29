@@ -29,13 +29,13 @@ export function EnvironmentBanner({ env }: EnvironmentBannerProps) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-y-1.5 text-[11px]">
-          <div className="text-outline-variant">Kernel</div>
+          <div className="text-on-surface-muted">Kernel</div>
           <div className="text-on-surface-variant font-mono text-right truncate">
             {env.kernel}
           </div>
           {env.uptime && (
             <>
-              <div className="text-outline-variant">Uptime</div>
+              <div className="text-on-surface-muted">Uptime</div>
               <div className="text-on-surface-variant font-mono text-right">
                 {env.uptime}
               </div>

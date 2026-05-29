@@ -320,7 +320,7 @@ export default async function SourceDetailPage({
                       <JobStatusBadge status={j.status} />
                       <span className="text-[11px] text-on-surface-variant">{shortTimestamp(j.created_at)}</span>
                     </div>
-                    <span className="font-mono text-[11px] text-outline-variant truncate select-all">{j.id}</span>
+                    <span className="font-mono text-[11px] text-on-surface-muted truncate select-all">{j.id}</span>
                   </div>
 
                   <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-on-surface-variant">

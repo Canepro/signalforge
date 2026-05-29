@@ -72,7 +72,7 @@ export default async function SourcesListPage({
             <p className="text-sm text-on-surface-variant">
               No sources yet. Create one to use <span className="font-semibold text-on-surface">Collect Fresh Evidence</span>.
             </p>
-            <p className="mt-1 text-xs text-outline-variant">
+            <p className="mt-1 text-xs text-on-surface-muted">
               A source represents an evidence target plus the execution surface that will collect it.
             </p>
           </div>
@@ -121,7 +121,7 @@ export default async function SourcesListPage({
                       </span>
                       <span>{getArtifactTypeLabel(s.expected_artifact_type)}</span>
                       {s.last_seen_at && (
-                        <span className="text-outline-variant/80">
+                        <span className="text-on-surface-muted/80">
                           seen {relativeTime(s.last_seen_at)}
                         </span>
                       )}
@@ -130,7 +130,7 @@ export default async function SourcesListPage({
                   <div className="shrink-0">
                     <SourceHealthDot status={s.health_status} />
                   </div>
-                  <svg className="h-4 w-4 shrink-0 text-outline-variant group-hover:text-primary group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="h-4 w-4 shrink-0 text-on-surface-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
                 </Link>
