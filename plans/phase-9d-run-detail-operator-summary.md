@@ -4,7 +4,7 @@
 
 ## Why this exists
 
-SignalForge now collects richer operational evidence across all three artifact
+SignalForge now collects richer operational evidence across all of its artifact
 families, but the run-detail experience still makes operators read too much
 before they understand the current state.
 
@@ -293,7 +293,7 @@ Implementation for this phase should include:
 
 - targeted component or helper tests for any new summary-module logic
 - `bun run typecheck`
-- browser verification of run detail on desktop and mobile for all three
+- browser verification of run detail on desktop and mobile for all
   artifact families
 - explicit review of empty and low-signal states so the redesign does not rely
   on fake charts or placeholder chrome

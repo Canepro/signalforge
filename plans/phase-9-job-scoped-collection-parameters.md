@@ -10,6 +10,8 @@ Phase 8 made three things true at once:
 - `signalforge-collectors` now ships first real producers for all three artifact families
 - `signalforge-agent` can now dispatch by artifact family
 
+(SignalForge has since added a fourth artifact family, `mac-diagnostics`; the three above describe the Phase 8 baseline this phase builds on.)
+
 That closes the obvious feature gap, but it exposes the next real contract problem:
 
 - Linux jobs work cleanly with the current source model
