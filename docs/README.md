@@ -11,6 +11,12 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 3. [`../plans/roadmap.md`](../plans/roadmap.md)
 4. [`../plans/current-plan.md`](../plans/current-plan.md)
 
+### I want to drive SignalForge with an AI agent
+
+1. [`ai-agents.md`](./ai-agents.md)
+2. [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md)
+3. [`api-contract.md`](./api-contract.md)
+
 ### I want to use the API or scripts
 
 1. [`api-contract.md`](./api-contract.md)
@@ -39,6 +45,7 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 | Document | Use it for |
 |---|---|
 | [`getting-started.md`](./getting-started.md) | Beginner-friendly setup and first successful run |
+| [`ai-agents.md`](./ai-agents.md) | Running SignalForge with a coding agent and integrating it as an automation agent, with copy-paste prompts |
 | [`operators/README.md`](./operators/README.md) | Operator docs entrypoint for Sources, agents, collection jobs, and current execution guidance |
 | [`operators/sources-and-agents.md`](./operators/sources-and-agents.md) | Sources UI, enrollment, collection-job lifecycle, and the control-plane / execution-plane split |
 | [`operators/automation-agent-integration.md`](./operators/automation-agent-integration.md) | Source-bound automation-agent setup, HTTP connection model, and helper-script workflow for external AI agents |
@@ -82,14 +89,14 @@ Use this folder as the documentation entrypoint after the top-level `README.md`.
 
 ## What SignalForge Covers Today
 
-SignalForge currently supports three artifact families in this checkout:
+SignalForge currently supports four artifact families in this checkout:
 
 - `linux-audit-log`
 - `container-diagnostics`
 - `kubernetes-bundle`
 - `mac-diagnostics`
 
-That includes Linux and WSL audit logs in the `signalforge-collectors` style, text-based container diagnostics, and UTF-8 JSON Kubernetes evidence bundles.
+That includes Linux and WSL audit logs in the `signalforge-collectors` style, text-based container diagnostics, UTF-8 JSON Kubernetes evidence bundles, and structured macOS workstation diagnostics.
 
 SignalForge is strongest today on:
 
