@@ -74,7 +74,12 @@ First enable the operator APIs by setting `SIGNALFORGE_ADMIN_TOKEN` (see
 [`getting-started.md`](./getting-started.md)). Then:
 
 1. Create a Source in the `/sources` UI.
-2. Enroll a **source-bound automation-agent token** for it. This is a separate
+2. Enroll and run the execution-plane agent for that Source. Use the `/sources`
+   **Enroll agent** flow and the `signalforge-agent` deployment steps in
+   [`agent-deployment.md`](./agent-deployment.md). This agent must be
+   heartbeating so it can claim queued collection jobs, run the collector, and
+   upload the artifact that SignalForge analyzes.
+3. Enroll a **source-bound automation-agent token** for it. This is a separate
    token from the `/sources` **Enroll agent** button (that one is for the
    execution agent). The bootstrap helper prints ready-to-export lines:
 
@@ -85,7 +90,7 @@ First enable the operator APIs by setting `SIGNALFORGE_ADMIN_TOKEN` (see
      --display-name operator-agent --print-exports
    ```
 
-3. Hand the agent the two values it needs — and nothing else:
+4. Hand the agent the two values it needs — and nothing else:
 
    ```bash
    export SIGNALFORGE_BASE_URL=https://your-signalforge.example
