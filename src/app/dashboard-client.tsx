@@ -177,7 +177,7 @@ export function DashboardClient({
         <main className="flex-1 overflow-y-auto p-4 lg:p-5">
           <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
           {/* Action Header */}
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
             <div>
               <p className="sf-kicker">Operator workstation</p>
               <h2 className="font-headline text-3xl font-bold text-on-surface tracking-tight">
