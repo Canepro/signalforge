@@ -21,7 +21,7 @@ Usage:
 
 Options:
   --url, -u BASE          API base URL (default: SIGNALFORGE_BASE_URL or SIGNALFORGE_URL, then http://localhost:3000)
-  --artifact-type VALUE   Optional explicit artifact family (linux-audit-log, container-diagnostics, kubernetes-bundle)
+  --artifact-type VALUE   Optional explicit artifact family (linux-audit-log, container-diagnostics, kubernetes-bundle, mac-diagnostics)
   --target-id VALUE       Optional stable target key (target_identifier; preferred for compare/baseline)
   --source-label VALUE    Optional human label (e.g. CI job, bastion)
   --collector-type VALUE  Optional implementation id (e.g. signalforge-collectors)
