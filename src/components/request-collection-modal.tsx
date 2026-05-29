@@ -214,7 +214,7 @@ export function RequestCollectionModal({
                             <div className="mt-1 truncate text-xs font-mono text-on-surface-variant">
                               {source.target_identifier}
                             </div>
-                            <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                            <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                               {getArtifactTypeLabel(source.expected_artifact_type)}
                             </div>
                           </div>
@@ -244,7 +244,7 @@ export function RequestCollectionModal({
                       {selectedSource.target_identifier}
                     </div>
                     <div className="mt-3 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-3 py-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                         Scope and artifact family
                       </div>
                       <div className="mt-1 text-sm text-on-surface">

@@ -13,6 +13,8 @@
   /* Text on surfaces */
   --color-on-surface: #2b3437;
   --color-on-surface-variant: #586064;
+  /* Muted tertiary text — AA-readable replacement for prior text-outline-variant misuse */
+  --color-on-surface-muted: #5f686d;
   --color-outline: #737c7f;
   --color-outline-variant: #abb3b7;
 
@@ -65,6 +67,7 @@
 
   --color-on-surface: #dce3e8;
   --color-on-surface-variant: #9aa5ad;
+  --color-on-surface-muted: #939ca3;
   --color-outline: #6b767d;
   --color-outline-variant: #4a545b;
 

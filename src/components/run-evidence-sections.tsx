@@ -44,7 +44,7 @@ export function RunEvidenceSections({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="sf-kicker text-outline-variant">
+                <div className="sf-kicker text-on-surface-muted">
                   {section.title}
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
@@ -59,7 +59,7 @@ export function RunEvidenceSections({
                   key={`${section.id}-${entry.label}-${entry.value}`}
                   className="rounded-lg border border-outline-variant/10 bg-surface-container-lowest px-2.5 py-1.5"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                     {entry.label}
                   </div>
                   <div

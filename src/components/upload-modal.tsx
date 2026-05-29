@@ -125,7 +125,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                 </div>
               ) : (
                 <>
-                  <svg className="mb-3 h-9 w-9 text-outline-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="mb-3 h-9 w-9 text-on-surface-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                   <div className="text-sm font-medium text-on-surface">
@@ -230,7 +230,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                       <>
                         <div className="font-semibold text-on-surface">{selectedFamily.label}</div>
                         <div className="mt-1">{selectedFamily.targetIdentifierHint}</div>
-                        <div className="mt-2 font-mono text-xs text-outline-variant">
+                        <div className="mt-2 font-mono text-xs text-on-surface-muted">
                           Example: {selectedFamily.targetIdentifierExample}
                         </div>
                       </>
@@ -264,12 +264,12 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-semibold text-on-surface">{family.label}</div>
-                      <code className="text-xs text-outline-variant">{family.value}</code>
+                      <code className="text-xs text-on-surface-muted">{family.value}</code>
                     </div>
                     <div className="mt-1 text-sm leading-relaxed text-on-surface-variant">
                       {family.description}
                     </div>
-                    <div className="mt-2 text-xs leading-relaxed text-outline-variant">
+                    <div className="mt-2 text-xs leading-relaxed text-on-surface-muted">
                       {family.uploadShape}
                     </div>
                   </div>

@@ -256,14 +256,14 @@ export function CompareClient({
               <Link href="/" className="hover:text-primary transition-colors">
                 Runs
               </Link>
-              <span className="text-outline-variant">/</span>
+              <span className="text-on-surface-muted">/</span>
               <Link
                 href={`/runs/${current.id}`}
                 className="hover:text-primary transition-colors truncate max-w-[140px]"
               >
                 {current.filename}
               </Link>
-              <span className="text-outline-variant">/</span>
+              <span className="text-on-surface-muted">/</span>
               <span className="text-on-surface font-semibold">Compare</span>
             </>
           }
@@ -321,7 +321,7 @@ export function CompareClient({
                     <div className="mt-1 text-sm text-on-surface-variant">
                       Target: <span className="font-semibold text-on-surface">{currentTargetName}</span>
                     </div>
-                    <div className="mt-2 text-xs font-mono text-outline-variant">
+                    <div className="mt-2 text-xs font-mono text-on-surface-muted">
                       {current.created_at_label}
                     </div>
                   </div>
@@ -333,7 +333,7 @@ export function CompareClient({
                     <div className="mt-1 text-sm text-on-surface-variant">
                       Target: <span className="font-semibold text-on-surface">{baselineTargetName}</span>
                     </div>
-                    <div className="mt-2 text-xs font-mono text-outline-variant">
+                    <div className="mt-2 text-xs font-mono text-on-surface-muted">
                       {baseline?.created_at_label ?? "Waiting for older same-target run"}
                     </div>
                   </div>
@@ -350,7 +350,7 @@ export function CompareClient({
 
                   {baselineCandidates.length > 0 ? (
                     <div className="mt-4 space-y-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                         Choose another older run
                       </div>
                       <div className="space-y-2">
@@ -490,7 +490,7 @@ export function CompareClient({
                                   key={key}
                                   className="rounded-xl border border-outline-variant/15 bg-surface-container-low px-3 py-3"
                                 >
-                                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                                     {prettyMetadataLabel(
                                       key as keyof EvidenceDeltaPayload["metadata"],
                                     )}
@@ -697,13 +697,13 @@ export function CompareClient({
                                     row.status === "severity_down") && (
                                     <>
                                       <div>
-                                        <span className="mr-1 text-outline-variant">
+                                        <span className="mr-1 text-on-surface-muted">
                                           was:
                                         </span>
                                         {evidenceSnippet(row.evidence_previous)}
                                       </div>
                                       <div>
-                                        <span className="mr-1 text-outline-variant">
+                                        <span className="mr-1 text-on-surface-muted">
                                           now:
                                         </span>
                                         {evidenceSnippet(row.evidence_current)}

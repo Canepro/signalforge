@@ -35,7 +35,7 @@ export function SourcesShell({ children }: { children: React.ReactNode }) {
           breadcrumb={
             <>
               <span className="text-on-surface font-semibold">Sources</span>
-              <span className="text-outline-variant">·</span>
+              <span className="text-on-surface-muted">·</span>
               <form action={logoutAdminAction} className="inline">
                 <button
                   type="submit"

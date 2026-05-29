@@ -33,7 +33,7 @@ export function RunTable({ runs }: RunTableProps) {
         <div className="text-sm font-medium text-on-surface-variant">
           No runs yet
         </div>
-        <div className="mt-1 text-xs text-outline-variant">
+        <div className="mt-1 text-xs text-on-surface-muted">
           Upload an artifact to begin analysis
         </div>
       </div>
@@ -91,7 +91,7 @@ export function RunTable({ runs }: RunTableProps) {
                 >
                   {run.filename.replace(/\.(log|txt|json)$/i, "")}
                 </Link>
-                <div className="mt-0.5 font-mono text-xs text-outline-variant break-all">
+                <div className="mt-0.5 font-mono text-xs text-on-surface-muted break-all">
                   {run.filename}
                 </div>
               </div>
@@ -170,7 +170,7 @@ export function RunTable({ runs }: RunTableProps) {
                     {run.filename.replace(/\.(log|txt|json)$/i, "")}
                   </Link>
                   <div
-                    className="mt-0.5 truncate font-mono text-xs text-outline-variant"
+                    className="mt-0.5 truncate font-mono text-xs text-on-surface-muted"
                     title={run.filename}
                   >
                     {run.filename}
@@ -212,7 +212,7 @@ export function RunTable({ runs }: RunTableProps) {
                       )}
                     </div>
                   ) : (
-                    <span className="text-xs text-outline-variant">—</span>
+                    <span className="text-xs text-on-surface-muted">—</span>
                   )}
                 </td>
                 <td className="hidden px-3 py-3 lg:table-cell">

@@ -17,7 +17,7 @@ export function FindingsTable({
 
   if (findings.length === 0) {
     return (
-      <div className="sf-empty-state px-6 py-10 text-sm text-outline-variant">
+      <div className="sf-empty-state px-6 py-10 text-sm text-on-surface-muted">
         {emptyMessage}
       </div>
     );
@@ -32,7 +32,7 @@ export function FindingsTable({
             Findings
           </h3>
         </div>
-        <span className="text-sm font-semibold text-outline-variant">
+        <span className="text-sm font-semibold text-on-surface-muted">
           {findings.length} {findings.length === 1 ? "finding" : "findings"}
         </span>
       </div>
@@ -59,7 +59,7 @@ export function FindingsTable({
                   <div className="text-sm font-bold text-on-surface leading-snug">
                     {f.title}
                   </div>
-                  <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                  <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                     {f.category}
                   </div>
                   <div className="mt-2 text-xs leading-relaxed text-on-surface-variant lg:hidden">
@@ -82,7 +82,7 @@ export function FindingsTable({
                 {/* Expand indicator */}
                 <div className="shrink-0 pt-0.5">
                   <svg
-                    className={`h-4 w-4 text-outline-variant transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    className={`h-4 w-4 text-on-surface-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -98,7 +98,7 @@ export function FindingsTable({
                 <div id={`finding-${f.id}`} className="px-5 pb-4 pt-0 ml-24 space-y-3">
                   {/* Evidence (shown here on small screens, always shown expanded for full text) */}
                   <div>
-                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                       Evidence Excerpt
                     </div>
                     <div className="rounded-lg border border-surface-container bg-surface-container-low px-3 py-2 font-mono text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap break-words">
@@ -108,7 +108,7 @@ export function FindingsTable({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                         Why It Matters
                       </div>
                       <p className="text-xs text-on-surface-variant leading-relaxed">
@@ -116,7 +116,7 @@ export function FindingsTable({
                       </p>
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                         Recommended Action
                       </div>
                       <p className="text-xs text-on-surface-variant leading-relaxed">

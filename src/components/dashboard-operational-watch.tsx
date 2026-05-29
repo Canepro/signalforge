@@ -50,7 +50,7 @@ export function DashboardOperationalWatch({
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="sf-kicker text-outline-variant">
+                <div className="sf-kicker text-on-surface-muted">
                   {lane.title}
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-on-surface-variant">
@@ -89,7 +89,7 @@ export function DashboardOperationalWatch({
                       {item.created_at_label}
                     </div>
                   </div>
-                  <div className="mt-1 truncate text-xs text-outline-variant">
+                  <div className="mt-1 truncate text-xs text-on-surface-muted">
                     {item.target_name}
                   </div>
                 </Link>

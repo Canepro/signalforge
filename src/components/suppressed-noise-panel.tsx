@@ -14,7 +14,7 @@ export function SuppressedNoisePanel({ items }: SuppressedNoisePanelProps) {
       <summary className="flex items-center justify-between p-4 cursor-pointer list-none hover:bg-surface-container-low/30 select-none">
         <div className="flex items-center gap-3">
           <svg
-            className="h-5 w-5 text-outline-variant"
+            className="h-5 w-5 text-on-surface-muted"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -31,7 +31,7 @@ export function SuppressedNoisePanel({ items }: SuppressedNoisePanelProps) {
           </span>
         </div>
         <svg
-          className="h-5 w-5 text-outline-variant group-open:rotate-180 transition-transform"
+          className="h-5 w-5 text-on-surface-muted group-open:rotate-180 transition-transform"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -45,7 +45,7 @@ export function SuppressedNoisePanel({ items }: SuppressedNoisePanelProps) {
         </svg>
       </summary>
       <div className="p-4 border-t border-surface-container-low space-y-2">
-        <p className="text-[11px] text-outline-variant mb-2">
+        <p className="text-[11px] text-on-surface-muted mb-2">
           These observations are classified as expected given the environment
           context. Excluded from findings to reduce alert fatigue.
         </p>
@@ -55,7 +55,7 @@ export function SuppressedNoisePanel({ items }: SuppressedNoisePanelProps) {
             className="flex justify-between text-[11px] text-on-surface-variant py-1.5 border-b border-surface-container-low last:border-0"
           >
             <span>{item.observation}</span>
-            <span className="italic text-outline-variant shrink-0 ml-4">
+            <span className="italic text-on-surface-muted shrink-0 ml-4">
               {item.related_environment}
             </span>
           </div>

@@ -145,7 +145,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
     <div className="sf-panel p-3">
       <h3 className="mb-2 flex items-center gap-2 text-sm font-bold tracking-tight text-on-surface">
         <svg
-          className="h-4 w-4 text-outline-variant"
+          className="h-4 w-4 text-on-surface-muted"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -180,7 +180,7 @@ export function RunMetadataPanel({ run }: RunMetadataPanelProps) {
                     key={row.label}
                     className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest px-3 py-2"
                   >
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                       {row.label}
                     </dt>
                     <dd className="mt-1 flex items-start justify-between gap-3">

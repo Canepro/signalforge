@@ -57,14 +57,14 @@ export function SeveritySummary({ counts, compact }: SeveritySummaryProps) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   if (visible.length === 0) {
-    return <span className="text-xs text-outline-variant">No findings</span>;
+    return <span className="text-xs text-on-surface-muted">No findings</span>;
   }
 
   if (compact) {
     return (
       <div className="flex items-center gap-1 rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm">
         <div className="border-r border-outline-variant/10 px-3 py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-outline-variant">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
             Findings
           </div>
           <div className="mt-0.5 text-base font-headline font-bold leading-none text-on-surface">
@@ -81,7 +81,7 @@ export function SeveritySummary({ counts, compact }: SeveritySummaryProps) {
               >
                 {c}
               </div>
-              <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-outline-variant">
+              <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface-muted">
                 {sev}
               </div>
             </div>
