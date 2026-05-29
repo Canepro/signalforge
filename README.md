@@ -38,7 +38,7 @@ No LLM key is required — SignalForge falls back to deterministic analysis. Ful
 
 ## Use it with an AI agent
 
-SignalForge is built to be driven by agents. There are two paths — both with copy-paste prompts in [docs/ai-agents.md](docs/ai-agents.md).
+An AI agent can run SignalForge or integrate with it over HTTP. Both paths have copy-paste prompts in [docs/ai-agents.md](docs/ai-agents.md).
 
 **Run or operate it.** Open the repo in a coding agent (Claude Code, Cursor, Codex) and point it at [AGENTS.md](AGENTS.md):
 

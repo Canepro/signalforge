@@ -1,7 +1,7 @@
 # Working with AI Agents
 
-SignalForge is built to be driven by agents, not just people. There are two
-distinct ways an agent fits in, and they use different entry points.
+SignalForge is built to be driven by AI agents. An agent fits in two ways, each
+with its own entry point:
 
 | You want an agent to… | Use | Start here |
 |---|---|---|
