@@ -1,6 +1,6 @@
 # ACA App Deployment
 
-This document is the Slice 2 deployment contract for moving SignalForge app hosting from Vercel to Azure Container Apps without changing the database provider or the agent contract.
+This document is the Slice 2 deployment contract for hosting the SignalForge app on Azure Container Apps without changing the database provider or the agent contract. (It originated in the Phase 10 migration off Vercel; see [history.md](./history.md) for that context.)
 
 ## Findings
 

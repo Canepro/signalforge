@@ -2,7 +2,7 @@
 
 This document is the repo-owned release and deploy contract for the SignalForge app.
 
-It keeps three concerns separate on purpose:
+It keeps four concerns separate on purpose:
 
 - browser review defaults to ACA or local, with Vercel kept as an intentional manual preview path only
 - app-image publishing happens on GHCR

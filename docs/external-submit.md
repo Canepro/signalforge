@@ -7,14 +7,14 @@ Use this document when you are sending evidence into SignalForge from:
 - a collector
 - another service or agent
 
-For the full HTTP surface, see `[api-contract.md](./api-contract.md)`.
+For the full HTTP surface, see [api-contract.md](./api-contract.md).
 
 SignalForge **analyzes** evidence; it does **not** collect it directly.
 Collectors run **outside** the app and push artifacts in over HTTP.
 
 This document describes the current `POST /api/runs` submission contract.
 
-**Collection jobs (Phase 6d):** agents complete a **running** job with `POST /api/collection-jobs/{id}/artifact` (`multipart/form-data`, same file + optional ingestion fields as below). Send `**instance_id`** as a form field or `**X-SignalForge-Agent-Instance-Id**` header matching the job lease. The server forces target/collector context from the bound **Source**; see `[api-contract.md](./api-contract.md)` (Phase 6d). Reference **pull-model** implementation (heartbeat, claim, collector run, upload): `signalforge-agent` (separate repo; collectors stay in **signalforge-collectors**).
+**Collection jobs (Phase 6d):** agents complete a **running** job with `POST /api/collection-jobs/{id}/artifact` (`multipart/form-data`, same file + optional ingestion fields as below). Send `instance_id` as a form field or `X-SignalForge-Agent-Instance-Id` header matching the job lease. The server forces target/collector context from the bound **Source**; see [api-contract.md](./api-contract.md) (Phase 6d). Reference **pull-model** implementation (heartbeat, claim, collector run, upload): `signalforge-agent` (separate repo; collectors stay in `signalforge-collectors`).
 
 ## Endpoint
 
@@ -148,7 +148,7 @@ cd signalforge-collectors
 
 ## Reference Collector (outside SignalForge)
 
-The `**signalforge-collectors**` repository includes a narrow **reference push path**: `submit-to-signalforge.sh` runs `first-audit.sh` (or accepts `--file` for an existing log) and POSTs to this contract with `collector_type=signalforge-collectors` and related metadata.
+The `signalforge-collectors` repository includes a narrow **reference push path**: `submit-to-signalforge.sh` runs `first-audit.sh` (or accepts `--file` for an existing log) and POSTs to this contract with `collector_type=signalforge-collectors` and related metadata.
 
 That same pattern can later be reused for:
 
@@ -181,4 +181,4 @@ SIGNALFORGE_BASE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y
 - No **auth** on this route in the current product (secure your deployment and network as needed).
 - **Source registration** exists via `/sources` (Phase 6c) for operator-managed targets and collection jobs. The `POST /api/runs` path described here remains available for direct submissions without source context.
 
-For product boundary and future collector direction, see `[../plans/phase-5-collector-architecture.md](../plans/phase-5-collector-architecture.md)`.
+For product boundary and future collector direction, see [../plans/phase-5-collector-architecture.md](../plans/phase-5-collector-architecture.md).
