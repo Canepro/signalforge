@@ -566,4 +566,69 @@ memory_percent: 96.50`
       ]),
     });
   });
+
+  it("de-duplicates filesystems captured by multiple df invocations, preferring df -h", async () => {
+    const fixture = await import("node:fs/promises").then((fs) =>
+      fs.readFile("tests/fixtures/linux-df-duplicate-mounts.log", "utf8")
+    );
+    const run = mkRun({
+      artifact_type: "linux-audit-log",
+      report: {
+        summary: ["Summary"],
+        findings: [],
+        environment_context: mkRun().environment!,
+        noise_or_expected: [],
+        top_actions_now: [],
+      },
+    });
+
+    const modules = buildRunDetailSummaryModules(run, fixture);
+    const storage = modules.find((module) => module.id === "host-storage-watch");
+    const bars = storage?.kind === "bar-list" ? storage.bars : [];
+
+    // Each filesystem must appear exactly once even though the audit captured it
+    // via `df -h`, `df` (1K-blocks), and `df -i` (inodes).
+    const labels = bars.map((bar) => bar.label);
+    expect(labels).toEqual([...new Set(labels)]);
+    expect(labels).toEqual(["/dev/sdb1 (/mnt/data)", "/dev/sda1 (/)"]);
+
+    // The surviving row carries the human-readable `df -h` percentage (75%),
+    // not the 1K-blocks (15%) or inode (2%) reading for the same mount.
+    expect(bars.map((bar) => bar.value_label)).toEqual(["92%", "75%"]);
+    const rootBar = bars.find((bar) => bar.label === "/dev/sda1 (/)");
+    expect(rootBar?.value).toBe(75);
+
+    // Peak disk use in the snapshot stat tracks the deduped df -h percentage.
+    const snapshot = modules.find((module) => module.id === "host-pressure-snapshot");
+    expect(snapshot).toMatchObject({
+      kind: "stat-grid",
+      stats: expect.arrayContaining([
+        expect.objectContaining({ label: "Peak disk use", value: "92%" }),
+      ]),
+    });
+  });
+
+  it("collapses df -h and df -i rows for the same mount in real WSL audits", async () => {
+    const fixture = await import("node:fs/promises").then((fs) =>
+      fs.readFile("tests/fixtures/wsl-mar2026-full.log", "utf8")
+    );
+    const run = mkRun({
+      artifact_type: "linux-audit-log",
+      report: {
+        summary: ["Summary"],
+        findings: [],
+        environment_context: mkRun().environment!,
+        noise_or_expected: [],
+        top_actions_now: [],
+      },
+    });
+
+    const modules = buildRunDetailSummaryModules(run, fixture);
+    const storage = modules.find((module) => module.id === "host-storage-watch");
+    const bars = storage?.kind === "bar-list" ? storage.bars : [];
+
+    const rootBars = bars.filter((bar) => bar.label === "/dev/sdd (/)");
+    expect(rootBars).toHaveLength(1);
+    expect(rootBars[0]?.value_label).toBe("5%");
+  });
 });
