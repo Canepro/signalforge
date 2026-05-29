@@ -158,7 +158,7 @@ export default async function SourceDetailPage({
           <div key={prop.label} className="sf-panel relative overflow-hidden p-3">
             <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary/30" />
             <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">{prop.label}</dt>
-            <dd className="text-sm font-medium text-on-surface mt-1 truncate">{prop.value}</dd>
+            <dd className="text-sm font-medium text-on-surface mt-1 truncate" title={prop.value}>{prop.value}</dd>
           </div>
         ))}
       </div>
@@ -247,7 +247,7 @@ export default async function SourceDetailPage({
               ].map((prop) => (
                 <div key={prop.label} className="rounded-xl bg-surface-container-low px-3 py-2.5">
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">{prop.label}</dt>
-                  <dd className="text-xs font-medium text-on-surface mt-0.5 truncate font-mono">{prop.value}</dd>
+                  <dd className="text-xs font-medium text-on-surface mt-0.5 truncate font-mono" title={prop.value}>{prop.value}</dd>
                 </div>
               ))}
             </div>

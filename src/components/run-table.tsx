@@ -185,6 +185,12 @@ export function RunTable({ runs }: RunTableProps) {
                       {run.target_identifier ?? run.hostname}
                     </div>
                   ) : null}
+                  {/* Status column is hidden at xl; surface non-complete runs inline so failures stay visible */}
+                  {run.status !== "complete" ? (
+                    <div className="mt-1.5 hidden xl:block">
+                      <StatusBadge status={run.status} />
+                    </div>
+                  ) : null}
                 </td>
                 <td className="hidden px-3 py-3 md:table-cell">
                   {run.hostname || run.target_identifier ? (
