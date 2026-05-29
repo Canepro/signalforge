@@ -2,6 +2,8 @@
 
 This guide is for someone new to the repo who wants to get SignalForge running and complete a first successful run without needing to understand the whole codebase first.
 
+> **Working with an AI agent?** The fastest path is to hand this repo to a coding agent. Point it at [`../AGENTS.md`](../AGENTS.md) and ask it to get SignalForge running and submit a sample artifact. For copy-paste prompts — both for operating SignalForge and for integrating it as an automation agent — see [`ai-agents.md`](./ai-agents.md).
+
 ## What You Will Do
 
 By the end of this guide, you will:
@@ -20,14 +22,14 @@ SignalForge analyzes infrastructure evidence artifacts and turns them into:
 - top actions
 - drift comparisons between runs
 
-Today, the shipped analyzer supports three artifact families:
+Today, the shipped analyzer supports four artifact families:
 
 - `linux-audit-log`
 - `container-diagnostics`
 - `kubernetes-bundle`
 - `mac-diagnostics`
 
-That currently means Linux and WSL audit logs generated in the `signalforge-collectors` style, plus text-based container diagnostics and UTF-8 JSON Kubernetes evidence bundles.
+That currently means Linux and WSL audit logs generated in the `signalforge-collectors` style, text-based container diagnostics, UTF-8 JSON Kubernetes evidence bundles, and structured macOS workstation diagnostics.
 
 ## Before You Start
 
