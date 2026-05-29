@@ -791,9 +791,15 @@ function buildContainerModules(_run: RunDetail, artifactContent: string): RunDet
   return modules;
 }
 
+// A `df -h` row carries a unit suffix on its size column (e.g. "193G"), while
+// `df` in 1K-blocks ("26083328") and `df -i` inodes ("67108864") use plain
+// integers. We use this to prefer the human-readable percentage when the same
+// mount is captured by more than one `df` invocation.
+const HUMAN_READABLE_SIZE = /^\d+(?:\.\d+)?[KMGTPE]i?B?$/i;
+
 function extractLinuxDiskUsage(sections: Record<string, string>) {
   const block = sections["DISK & MEMORY USAGE"] ?? "";
-  return block
+  const rows = block
     .split("\n")
     .filter((line) => line.trim() && /(\d+)%/.test(line))
     .filter((line) => line.trim().startsWith("/") || line.trim().match(/^[A-Z]:\\/))
@@ -805,10 +811,28 @@ function extractLinuxDiskUsage(sections: Record<string, string>) {
         filesystem: parts[0] ?? "unknown",
         mount: parts[parts.length - 1] ?? "unknown",
         usagePercent: usageMatch ? Number.parseInt(usageMatch[1]!, 10) : 0,
+        humanReadable: HUMAN_READABLE_SIZE.test(parts[1] ?? ""),
         raw: line.trim(),
       };
-    })
-    .sort((a, b) => b.usagePercent - a.usagePercent);
+    });
+
+  // The host audit can capture the same mount from several `df` invocations —
+  // `df -h` (human-readable), `df` (1K-blocks), and `df -i` (inodes) — which would
+  // otherwise render one bar per invocation with contradictory percentages for the
+  // same filesystem (e.g. "/dev/sda1 (/)" at both 75% and 15%). Keep a single row
+  // per device + mount, preferring the human-readable `df -h` percentage as the
+  // most reliable single source. Insertion order is preserved so equal-usage rows
+  // stay deterministic under the stable sort below.
+  const byFilesystem = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    const key = `${row.filesystem}\t${row.mount}`;
+    const existing = byFilesystem.get(key);
+    if (!existing || (row.humanReadable && !existing.humanReadable)) {
+      byFilesystem.set(key, row);
+    }
+  }
+
+  return [...byFilesystem.values()].sort((a, b) => b.usagePercent - a.usagePercent);
 }
 
 function extractLinuxMemoryUsage(sections: Record<string, string>) {

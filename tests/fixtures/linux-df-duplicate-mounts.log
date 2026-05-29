@@ -1,0 +1,36 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[SYSTEM IDENTITY]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Hostname: db-prod-01
+ 16:04:12 up 9 days,  3:21,  2 users,  load average: 0.42, 0.51, 0.55
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[DISK & MEMORY USAGE]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+→ Disk Usage
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1       193G  143G   50G  75% /
+/dev/sdb1       1.0T  920G   80G  92% /mnt/data
+tmpfs           7.8G  1.2M  7.8G   1% /run
+snapfuse         64M   64M     0 100% /snap/core20/2686
+
+→ Disk Usage (1K-blocks)
+Filesystem     1K-blocks    Used Available Use% Mounted on
+/dev/sda1       26083328 3804448  22278880  15% /
+/dev/sdb1     1073741824 964689920 104857600  92% /mnt/data
+tmpfs            8126464    1228   8125236   1% /run
+
+→ Disk Inodes
+Filesystem        Inodes   IUsed     IFree IUse% Mounted on
+/dev/sda1       12902400  215433  12686967    2% /
+/dev/sdb1       67108864  118250  66990614    1% /mnt/data
+
+→ Memory Usage
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi        12Gi        4.0Gi      512Mi        15Gi        18Gi
+Swap:          8.0Gi       256Mi       7.7Gi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[RECENT ERRORS & LOGS]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+No recent errors captured.
