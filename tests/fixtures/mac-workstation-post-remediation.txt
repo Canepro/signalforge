@@ -1,0 +1,26 @@
+=== mac-diagnostics ===
+hostname: operator-mac.local
+os_name: macOS
+os_version: 26.5
+build_version: 25F71
+kernel: 25.5.0
+architecture: arm64
+uptime: up 4 days, 2:15
+current_user: operator
+ran_as_root: false
+sip_status: System Integrity Protection status: enabled.
+filevault_status: On
+firewall_state: On
+remote_login: Off
+remote_management: Off
+stealth_mode: On
+remote_login_systemsetup: You need administrator access to run systemsetup -getremotelogin
+screen_sharing_launchctl: Bad request - service not found
+remote_management_plist: not found
+screen_sharing_plist: not found
+vnc_settings_txt: not found
+listening_tcp_json: [{"command":"rapportd","pid":101,"protocol":"TCP","address":"*","port":55718,"executable":"/usr/libexec/rapportd","signing_authority":"Apple Software Signing"},{"command":"ControlCenter","pid":102,"protocol":"TCP","address":"*","port":5000,"executable":"/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter","signing_authority":"Apple Code Signing Certification Authority"},{"command":"ControlCenter","pid":102,"protocol":"TCP","address":"*","port":7000,"executable":"/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter","signing_authority":"Apple Code Signing Certification Authority"}]
+file_sharing_json: [{"name":"Public Folder","protocol":"smb","guest_access":true,"listener_active":false,"path":"/Users/Shared"}]
+disk_root_used_percent: 72.4
+brew_outdated_count: 0
+mdm_enrollment: unknown

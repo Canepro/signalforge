@@ -465,6 +465,18 @@ function summarizeFallbackFinding(finding: Finding): string {
   }
   if (finding.category === "network") {
     const t = finding.title.toLowerCase();
+    if (t.includes("apple continuity/airplay listeners")) {
+      return `${finding.title}; expected macOS continuity/AirPlay exposure — review Apple sharing settings if LAN reachability is not intended.`;
+    }
+    if (t.includes("local development listeners on all interfaces")) {
+      return `${finding.title}; stop the dev or VM process or bind it to loopback if remote reachability is not required.`;
+    }
+    if (t.includes("remote access posture")) {
+      return `${finding.title}; use the listed pass/fail/not-verified checks to distinguish absent listeners from enabled services and admin-only gaps.`;
+    }
+    if (t.includes("guest access but no listener is active")) {
+      return `${finding.title}; configured share drift without active network exposure — remove guest access or disable the share if it is no longer needed.`;
+    }
     if (t.includes("loopback only") || t.includes("not reachable remotely")) {
       return `${finding.title}; local-only — confirm it is expected tooling, not accidental exposure elsewhere.`;
     }

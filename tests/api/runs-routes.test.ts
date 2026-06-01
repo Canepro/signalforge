@@ -414,7 +414,7 @@ brew_outdated_count: 2
       report.findings.some((f: { title: string }) => f.title.includes("firewall is disabled"))
     ).toBe(true);
     expect(
-      report.findings.some((f: { title: string }) => f.title.includes("Remote Login"))
+      report.findings.some((f: { title: string }) => f.title.includes("Remote access posture"))
     ).toBe(true);
   });
 
