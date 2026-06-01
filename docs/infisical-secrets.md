@@ -24,7 +24,7 @@ Workflow:
 3. the workflow maps those secrets into the existing ACA deploy helper contract
 4. the helper writes them into ACA secrets and deploys or updates the app
 
-The deploy workflow now forces JavaScript actions onto Node 24 so the Infisical action path is validated ahead of the hosted-runner Node 20 removal window.
+The deploy workflow pins `Infisical/secrets-action@v1.0.16` or newer, which runs on the action's native `node24` runtime. The workflow also sets `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` as a belt-and-suspenders guard for any remaining JavaScript actions on the deploy job.
 
 The app still reads normal ACA environment variables such as `DATABASE_URL` and `SIGNALFORGE_ADMIN_TOKEN`.
 

@@ -73,7 +73,7 @@ jobs:
 
       - name: Fetch deploy secrets from Infisical
         if: ${{ inputs.secret_source == 'infisical' }}
-        uses: Infisical/secrets-action@v1.0.15
+        uses: Infisical/secrets-action@v1.0.16
         with:
           method: "oidc"
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
