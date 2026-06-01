@@ -1,6 +1,13 @@
 import type { ArtifactAdapter } from "../types";
 import type { EnvironmentContext, NoiseItem, PreFinding } from "../../analyzer/schema";
 import {
+  extractLoopbackDevListenerFindings,
+  extractWildcardListenerFindings,
+  type MacListeningSocket,
+} from "./listeners";
+import { extractRemoteAccessFindings } from "./remote-access";
+import { extractFileSharingFindings } from "./sharing";
+import {
   macValueFor,
   parseMacBoolean,
   parseMacFloat,
@@ -8,15 +15,6 @@ import {
   parseMacJson,
   parseMacSections,
 } from "./parse";
-
-type ListeningSocket = {
-  command?: string | null;
-  pid?: number | string | null;
-  user?: string | null;
-  protocol?: string | null;
-  address?: string | null;
-  port?: number | string | null;
-};
 
 function stateIsDisabled(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -28,12 +26,9 @@ function stateIsEnabled(value: string): boolean {
   return ["on", "enabled", "true", "yes", "1"].includes(normalized);
 }
 
-function severityForOpenPorts(sockets: ListeningSocket[]): "medium" | "high" {
-  const publicListeners = sockets.filter((socket) => {
-    const address = String(socket.address ?? "").trim();
-    return address && !address.startsWith("127.") && address !== "::1" && address !== "localhost";
-  });
-  return publicListeners.length > 0 ? "high" : "medium";
+function parseListeningSockets(sections: Record<string, string>): MacListeningSocket[] {
+  const parsedSockets = parseMacJson<unknown>(sections.listening_tcp_json);
+  return Array.isArray(parsedSockets) ? (parsedSockets as MacListeningSocket[]) : [];
 }
 
 export class MacDiagnosticsAdapter implements ArtifactAdapter {
@@ -92,15 +87,10 @@ export class MacDiagnosticsAdapter implements ArtifactAdapter {
     const firewallState = macValueFor(sections, "firewall_state");
     const filevaultState = macValueFor(sections, "filevault_status");
     const sipState = macValueFor(sections, "sip_status");
-    const remoteLogin = macValueFor(sections, "remote_login");
-    const remoteManagement = macValueFor(sections, "remote_management");
     const stealthMode = macValueFor(sections, "stealth_mode");
     const diskUsedPercent = parseMacFloat(sections.disk_root_used_percent);
     const brewOutdated = parseMacInteger(sections.brew_outdated_count);
-    const parsedSockets = parseMacJson<unknown>(sections.listening_tcp_json);
-    const sockets: ListeningSocket[] = Array.isArray(parsedSockets)
-      ? (parsedSockets as ListeningSocket[])
-      : [];
+    const sockets = parseListeningSockets(sections);
 
     if (firewallState && stateIsDisabled(firewallState)) {
       findings.push({
@@ -135,28 +125,6 @@ export class MacDiagnosticsAdapter implements ArtifactAdapter {
       });
     }
 
-    if (remoteLogin && stateIsEnabled(remoteLogin)) {
-      findings.push({
-        title: "Remote Login is enabled",
-        severity_hint: "medium",
-        category: "network",
-        section_source: "remote_login",
-        evidence: remoteLogin,
-        rule_id: "mac.remote_login_enabled",
-      });
-    }
-
-    if (remoteManagement && stateIsEnabled(remoteManagement)) {
-      findings.push({
-        title: "Remote Management is enabled",
-        severity_hint: "high",
-        category: "network",
-        section_source: "remote_management",
-        evidence: remoteManagement,
-        rule_id: "mac.remote_management_enabled",
-      });
-    }
-
     if (stealthMode && stateIsDisabled(stealthMode) && firewallState && stateIsEnabled(firewallState)) {
       findings.push({
         title: "Firewall stealth mode is disabled",
@@ -168,16 +136,10 @@ export class MacDiagnosticsAdapter implements ArtifactAdapter {
       });
     }
 
-    if (sockets.length > 0) {
-      findings.push({
-        title: `Mac has ${sockets.length} listening TCP service${sockets.length === 1 ? "" : "s"}`,
-        severity_hint: severityForOpenPorts(sockets),
-        category: "network",
-        section_source: "listening_tcp_json",
-        evidence: JSON.stringify(sockets.slice(0, 8)),
-        rule_id: "mac.listening_tcp_services",
-      });
-    }
+    findings.push(...extractWildcardListenerFindings(sockets));
+    findings.push(...extractLoopbackDevListenerFindings(sockets));
+    findings.push(...extractRemoteAccessFindings(sections, sockets));
+    findings.push(...extractFileSharingFindings(sections));
 
     if (diskUsedPercent !== null && diskUsedPercent >= 85) {
       findings.push({

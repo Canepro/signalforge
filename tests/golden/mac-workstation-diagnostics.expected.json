@@ -19,12 +19,12 @@
       "category": "network"
     },
     {
-      "title_contains": "Remote Login is enabled",
-      "severity": "medium",
+      "title_contains": "Remote access posture",
+      "severity": "high",
       "category": "network"
     },
     {
-      "title_contains": "listening TCP services",
+      "title_contains": "Unsigned or unclassified listeners",
       "severity": "high",
       "category": "network"
     },
@@ -35,6 +35,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 5,
-  "max_findings": 5
+  "min_findings": 6,
+  "max_findings": 8
 }

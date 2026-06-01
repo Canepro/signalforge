@@ -50,14 +50,19 @@ describe("MacDiagnosticsAdapter", () => {
           rule_id: "mac.firewall_disabled",
         }),
         expect.objectContaining({
-          title: "Remote Login is enabled",
-          severity_hint: "medium",
-          rule_id: "mac.remote_login_enabled",
+          title: expect.stringContaining("Remote access posture"),
+          severity_hint: "high",
+          rule_id: "mac.remote_access_posture",
         }),
         expect.objectContaining({
-          title: "Mac has 2 listening TCP services",
+          title: expect.stringContaining("Unsigned or unclassified listeners"),
           severity_hint: "high",
-          rule_id: "mac.listening_tcp_services",
+          rule_id: "mac.wildcard_listeners_unknown",
+        }),
+        expect.objectContaining({
+          title: expect.stringContaining("Local development listeners on loopback"),
+          severity_hint: "low",
+          rule_id: "mac.loopback_local_dev_listeners",
         }),
         expect.objectContaining({
           title: "Mac root volume usage is elevated (91.2%)",
@@ -73,6 +78,37 @@ describe("MacDiagnosticsAdapter", () => {
     );
   });
 
+  it("post-remediation Apple-only listeners stay low severity with evidence-specific remote access", () => {
+    const postRemediation = readFileSync(
+      join(FIXTURES, "mac-workstation-post-remediation.txt"),
+      "utf-8"
+    );
+    const postSections = adapter.parseSections(adapter.stripNoise(postRemediation));
+    const env = adapter.detectEnvironment(postSections);
+    const findings = adapter.extractPreFindings(postSections, env);
+
+    const wildcardFindings = findings.filter((finding) =>
+      finding.rule_id.startsWith("mac.wildcard_listeners_")
+    );
+    expect(wildcardFindings).toHaveLength(1);
+    expect(wildcardFindings[0]).toMatchObject({
+      rule_id: "mac.wildcard_listeners_apple_continuity",
+      severity_hint: "medium",
+    });
+    expect(
+      findings.some((finding) => finding.rule_id === "mac.wildcard_listeners_local_dev")
+    ).toBe(false);
+
+    const posture = findings.find((finding) => finding.rule_id === "mac.remote_access_posture");
+    expect(posture?.title).toContain("administrator verification");
+    expect(posture?.evidence).toContain("SSH (22/tcp)");
+    expect(posture?.evidence).toContain("not verified");
+
+    expect(
+      findings.some((finding) => finding.rule_id === "mac.file_sharing_guest_inactive")
+    ).toBe(true);
+  });
+
   it("ignores non-array listener JSON instead of throwing", () => {
     const malformedSections = {
       ...sections,
@@ -84,7 +120,7 @@ describe("MacDiagnosticsAdapter", () => {
     expect(
       adapter
         .extractPreFindings(malformedSections, env)
-        .some((finding) => finding.rule_id === "mac.listening_tcp_services")
+        .some((finding) => finding.rule_id.startsWith("mac.wildcard_listeners_"))
     ).toBe(false);
   });
 
