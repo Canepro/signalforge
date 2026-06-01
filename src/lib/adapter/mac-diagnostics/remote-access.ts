@@ -1,6 +1,6 @@
 import type { PreFinding } from "../../analyzer/schema";
 import { parseMacJson } from "./parse";
-import type { MacListeningSocket } from "./listeners";
+import { isLoopbackBind, type MacListeningSocket } from "./listeners";
 
 export type RemoteAccessCheckStatus = "pass" | "fail" | "not_verified" | "not_applicable";
 
@@ -16,6 +16,8 @@ export type RemoteAccessPosture = {
   summary?: string | null;
 };
 
+export type CollectorEnabledState = "enabled" | "disabled" | "admin_required" | "unknown";
+
 const REMOTE_ACCESS_PORTS: Array<{ port: number; label: string }> = [
   { port: 22, label: "SSH (22/tcp)" },
   { port: 139, label: "SMB NetBIOS (139/tcp)" },
@@ -25,13 +27,66 @@ const REMOTE_ACCESS_PORTS: Array<{ port: number; label: string }> = [
   { port: 5900, label: "VNC/Screen Sharing (5900/tcp)" },
 ];
 
-function stateIsEnabled(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  return ["on", "enabled", "true", "yes", "1"].includes(normalized);
+function socketsOnPort(sockets: MacListeningSocket[], port: number): MacListeningSocket[] {
+  return sockets.filter(
+    (socket) => Number.parseInt(String(socket.port ?? ""), 10) === port
+  );
 }
 
-function listenerUsesPort(sockets: MacListeningSocket[], port: number): boolean {
-  return sockets.some((socket) => Number.parseInt(String(socket.port ?? ""), 10) === port);
+/** True when the port is bound on a non-loopback address (wildcard or interface-specific). */
+export function listenerUsesRemotelyReachablePort(
+  sockets: MacListeningSocket[],
+  port: number
+): boolean {
+  return socketsOnPort(sockets, port).some((socket) => {
+    const address = String(socket.address ?? "").trim();
+    return Boolean(address) && !isLoopbackBind(address);
+  });
+}
+
+function listenerPortCheck(
+  sockets: MacListeningSocket[],
+  port: number
+): Pick<RemoteAccessCheck, "status" | "detail"> {
+  const onPort = socketsOnPort(sockets, port);
+  if (onPort.length === 0) {
+    return { status: "pass", detail: "no listener observed" };
+  }
+  if (listenerUsesRemotelyReachablePort(sockets, port)) {
+    return { status: "fail", detail: "remotely reachable listener present" };
+  }
+  return { status: "pass", detail: "loopback-only listener present" };
+}
+
+/** Parses collector booleans and raw systemsetup-style lines such as `Remote Login: On`. */
+export function parseCollectorEnabledState(value: string): CollectorEnabledState {
+  const trimmed = value.trim();
+  if (!trimmed) return "unknown";
+  if (/administrator|admin access|requires root/i.test(trimmed)) {
+    return "admin_required";
+  }
+
+  const normalized = trimmed.toLowerCase();
+  if (["on", "enabled", "true", "yes", "1"].includes(normalized)) return "enabled";
+  if (["off", "disabled", "false", "no", "0"].includes(normalized)) return "disabled";
+
+  const remoteLoginMatch = trimmed.match(/remote\s+login\s*:\s*(on|off)\b/i);
+  if (remoteLoginMatch) {
+    return remoteLoginMatch[1]!.toLowerCase() === "on" ? "enabled" : "disabled";
+  }
+
+  const colonMatch = trimmed.match(/:\s*(on|off)\s*$/i);
+  if (colonMatch) {
+    return colonMatch[1]!.toLowerCase() === "on" ? "enabled" : "disabled";
+  }
+
+  return "unknown";
+}
+
+function enabledStateToCheckStatus(state: CollectorEnabledState): RemoteAccessCheckStatus {
+  if (state === "enabled") return "fail";
+  if (state === "disabled") return "pass";
+  return "not_verified";
 }
 
 function summarizeChecks(checks: RemoteAccessCheck[]): string {
@@ -69,21 +124,22 @@ function synthesizeChecksFromSections(
   const checks: RemoteAccessCheck[] = [];
 
   for (const { port, label } of REMOTE_ACCESS_PORTS) {
-    const present = listenerUsesPort(sockets, port);
+    const portCheck = listenerPortCheck(sockets, port);
     checks.push({
       id: `listener_${port}`,
       label: `${label} listener`,
-      status: present ? "fail" : "pass",
-      detail: present ? "listener present" : "no listener observed",
+      status: portCheck.status,
+      detail: portCheck.detail,
     });
   }
 
   const remoteLogin = sections.remote_login?.trim() ?? "";
   if (remoteLogin) {
+    const loginState = parseCollectorEnabledState(remoteLogin);
     checks.push({
       id: "remote_login",
       label: "Remote Login (collector)",
-      status: stateIsEnabled(remoteLogin) ? "fail" : "pass",
+      status: enabledStateToCheckStatus(loginState),
       detail: remoteLogin,
     });
   } else {
@@ -97,10 +153,11 @@ function synthesizeChecksFromSections(
 
   const remoteManagement = sections.remote_management?.trim() ?? "";
   if (remoteManagement) {
+    const managementState = parseCollectorEnabledState(remoteManagement);
     checks.push({
       id: "remote_management",
       label: "Remote Management (collector)",
-      status: stateIsEnabled(remoteManagement) ? "fail" : "pass",
+      status: enabledStateToCheckStatus(managementState),
       detail: remoteManagement,
     });
   }
@@ -117,15 +174,11 @@ function synthesizeChecksFromSections(
 
   const remoteLoginSystemsetup = sections.remote_login_systemsetup?.trim() ?? "";
   if (remoteLoginSystemsetup) {
-    const needsAdmin = /administrator|admin access|requires root/i.test(remoteLoginSystemsetup);
+    const systemsetupState = parseCollectorEnabledState(remoteLoginSystemsetup);
     checks.push({
       id: "remote_login_systemsetup",
       label: "Remote Login (systemsetup)",
-      status: needsAdmin
-        ? "not_verified"
-        : stateIsEnabled(remoteLoginSystemsetup)
-          ? "fail"
-          : "pass",
+      status: enabledStateToCheckStatus(systemsetupState),
       detail: remoteLoginSystemsetup,
     });
   }
