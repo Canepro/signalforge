@@ -59,7 +59,7 @@ That keeps release and deploy separate and makes the first deployment action non
 ### 2. Azure auth uses OIDC
 
 The deploy workflow uses `azure/login` with GitHub OIDC.
-It now pins `azure/login@v3` and forces JavaScript actions onto Node 24 so the deploy path is ahead of the GitHub-hosted Node 20 deprecation window.
+It now pins `azure/login@v3`, `Infisical/secrets-action@v1.0.16` (native `node24` runtime), and sets `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` on the deploy job so the path stays ahead of the GitHub-hosted Node 20 deprecation window.
 
 Required GitHub environment vars in the deploy environment:
 
