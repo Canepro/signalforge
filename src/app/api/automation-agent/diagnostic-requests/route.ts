@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildAutomationDiagnosticRequestAcceptedResponse } from "@/lib/api/automation-diagnostic-response";
 import { resolveAutomationAgentRequest } from "@/lib/api/automation-agent-auth";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import {
+  isCollectionScope,
+  validateCollectionScopeForArtifactType,
+  type CollectionScope,
+} from "@/lib/collection-scope";
 import { getStorage } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
@@ -19,6 +24,27 @@ export async function POST(request: NextRequest) {
 
     const storage = await getStorage();
     try {
+      let collectionScope: CollectionScope | null = null;
+      if (body.collection_scope !== undefined && body.collection_scope !== null) {
+        if (!isCollectionScope(body.collection_scope)) {
+          return NextResponse.json(
+            { error: "Invalid collection_scope payload", code: "invalid_collection_scope" },
+            { status: 400 }
+          );
+        }
+        const validation = validateCollectionScopeForArtifactType(
+          body.collection_scope,
+          ctx.source.expected_artifact_type
+        );
+        if (!validation.ok) {
+          return NextResponse.json(
+            { error: validation.error, code: "invalid_collection_scope" },
+            { status: 400 }
+          );
+        }
+        collectionScope = body.collection_scope;
+      }
+
       const { row, inserted } = await storage.withTransaction((tx) =>
         (async () => {
           const triggerSignalId =
@@ -41,6 +67,7 @@ export async function POST(request: NextRequest) {
             request_reason: typeof body.request_reason === "string" ? body.request_reason : null,
             idempotency_key:
               typeof body.idempotency_key === "string" ? body.idempotency_key : null,
+            collection_scope: collectionScope,
             requested_by: `automation_agent:${ctx.registration.id}`,
             trigger_signal_id: triggerSignalId || null,
           });
@@ -73,6 +100,15 @@ export async function POST(request: NextRequest) {
             code: "unsupported_artifact_type",
           },
           { status: 409 }
+        );
+      }
+      if (code === "invalid_collection_scope") {
+        return NextResponse.json(
+          {
+            error: "Invalid collection_scope for this source artifact type",
+            code: "invalid_collection_scope",
+          },
+          { status: 400 }
         );
       }
       if (code === "signal_not_found") {

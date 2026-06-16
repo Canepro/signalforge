@@ -52,6 +52,19 @@ describe("inferCollectedAtForStoredRun", () => {
     expect(collectedAt).toBe("2026-03-29T00:11:55.000Z");
   });
 
+  it("infers collected_at from Mac diagnostics collector filenames", () => {
+    const collectedAt = inferCollectedAtForStoredRun({
+      id: "r-mac",
+      artifact_type: "mac-diagnostics",
+      filename: "mac_diagnostics_canepro-mac.mynet_20260616_002203.txt",
+      content: "raw-mac-diagnostics",
+      created_at: "2026-06-16T00:25:00.000Z",
+      source_label: "agent:mac",
+    });
+
+    expect(collectedAt).toBe("2026-06-16T00:22:03.000Z");
+  });
+
   it("falls back to run created_at for agent-produced rows without better hints", () => {
     const collectedAt = inferCollectedAtForStoredRun({
       id: "r3",

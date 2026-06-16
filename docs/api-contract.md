@@ -334,8 +334,9 @@ All routes below require `Authorization: Bearer <automation_agent_token>` from r
 - `request_reason?: string`
 - `idempotency_key?: string`
 - `trigger_signal_id?: string`
+- `collection_scope?: CollectionScope`
 
-The token's bound source is always the target. The route does **not** accept `source_id`, `artifact_type`, or `collection_scope` overrides. SignalForge queues a normal `CollectionJob` for that source using its configured artifact family and default collection scope. **201** on insert or **200** on idempotent replay: `{ request_id, collection_job_id, source_id, status, poll_url }`.
+The token's bound source is always the target. The route does **not** accept `source_id` or `artifact_type` overrides. When `collection_scope` is provided, the shape must match the bound source's `expected_artifact_type`; mismatch returns **400** `invalid_collection_scope`. When omitted, SignalForge queues a normal `CollectionJob` for that source using its configured artifact family and default collection scope. **201** on insert or **200** on idempotent replay: `{ request_id, collection_job_id, source_id, status, poll_url }`.
 
 When `trigger_signal_id` is provided, it must belong to the token's bound Source. The queued collection job stores that trigger and the signal moves to `diagnostic_requested`.
 

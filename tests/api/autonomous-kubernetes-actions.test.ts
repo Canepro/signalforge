@@ -7,7 +7,10 @@ import { getTestDb } from "@/lib/db/client";
 import * as dbClient from "@/lib/db/client";
 import * as analyzer from "@/lib/analyzer/index";
 import { POST as POST_SOURCES } from "@/app/api/sources/route";
-import { POST as POST_SOURCE_JOBS } from "@/app/api/sources/[id]/collection-jobs/route";
+import {
+  GET as GET_SOURCE_JOBS,
+  POST as POST_SOURCE_JOBS,
+} from "@/app/api/sources/[id]/collection-jobs/route";
 import { POST as POST_AGENT_REG } from "@/app/api/agent/registrations/route";
 import { POST as POST_AUTOMATION_REG } from "@/app/api/automation-agent/registrations/route";
 import { POST as POST_HEARTBEAT } from "@/app/api/agent/heartbeat/route";
@@ -103,6 +106,27 @@ async function createKubeSource() {
         auto_fix_enabled: true,
         allowed_fix_policy_ids: [POLICY_DISABLE_SERVICE_ACCOUNT_TOKEN_AUTOMOUNT],
         default_collection_scope: { kind: "kubernetes_scope", scope_level: "namespace", namespace: "payments" },
+      }),
+    })
+  );
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  return body.id as string;
+}
+
+async function createContainerSource() {
+  process.env.SIGNALFORGE_ADMIN_TOKEN = ADMIN;
+  const res = await POST_SOURCES(
+    new NextRequest("http://localhost/api/sources", {
+      method: "POST",
+      headers: { ...adminAuth, "content-type": "application/json" },
+      body: JSON.stringify({
+        display_name: "Mac Podman container host",
+        target_identifier: "container-host:canepro-mac-podman",
+        source_type: "linux_host",
+        expected_artifact_type: "container-diagnostics",
+        capabilities: ["collect:container-diagnostics"],
+        automation_enabled: true,
       }),
     })
   );
@@ -215,6 +239,61 @@ describe("autonomous Kubernetes actions", () => {
     db.close();
     vi.restoreAllMocks();
     delete process.env.SIGNALFORGE_ADMIN_TOKEN;
+  });
+
+  it("queues automation-agent diagnostics with explicit container collection scope", async () => {
+    const sourceId = await createContainerSource();
+    const automationToken = await enrollAutomationAgent(sourceId);
+
+    const diagnostic = await POST_AUTOMATION_REQUEST(
+      new NextRequest("http://localhost/api/automation-agent/diagnostic-requests", {
+        method: "POST",
+        headers: { ...automationAuth(automationToken), "content-type": "application/json" },
+        body: JSON.stringify({
+          request_reason: "check Mac Podman container hygiene",
+          collection_scope: {
+            kind: "container_target",
+            runtime: "podman",
+            container_ref: "signalforge-pg",
+            host_hint: "canepro-mac",
+          },
+        }),
+      })
+    );
+    expect(diagnostic.status).toBe(201);
+
+    const jobs = await GET_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    expect(jobs.status).toBe(200);
+    const body = await jobs.json();
+    expect(body.jobs[0].collection_scope).toMatchObject({
+      kind: "container_target",
+      runtime: "podman",
+      container_ref: "signalforge-pg",
+      host_hint: "canepro-mac",
+    });
+  });
+
+  it("rejects automation-agent diagnostics with collection scope for the wrong artifact family", async () => {
+    const sourceId = await createContainerSource();
+    const automationToken = await enrollAutomationAgent(sourceId);
+
+    const diagnostic = await POST_AUTOMATION_REQUEST(
+      new NextRequest("http://localhost/api/automation-agent/diagnostic-requests", {
+        method: "POST",
+        headers: { ...automationAuth(automationToken), "content-type": "application/json" },
+        body: JSON.stringify({
+          request_reason: "bad scope",
+          collection_scope: { kind: "linux_host" },
+        }),
+      })
+    );
+    expect(diagnostic.status).toBe(400);
+    expect((await diagnostic.json()).code).toBe("invalid_collection_scope");
   });
 
   it("derives a signal, triggers diagnostics, queues a safe fix, records execution, and verifies post-fix evidence", async () => {

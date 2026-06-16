@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import { parseKubernetesBundle } from "@/lib/adapter/kubernetes-bundle/parse";
 
 const COLLECTOR_FILENAME_TIME_RE =
-  /^(?:server_audit|container[-_]diagnostics|kubernetes[-_]bundle)(?:_[a-z0-9._-]+)?_(\d{8})_(\d{6})\.[a-z0-9]+$/i;
+  /^(?:server_audit|container[-_]diagnostics|kubernetes[-_]bundle|mac[-_]diagnostics)(?:_[a-z0-9._-]+)?_(\d{8})_(\d{6})\.[a-z0-9]+$/i;
 
 type BackfillRow = {
   id: string;
