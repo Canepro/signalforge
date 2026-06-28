@@ -43,6 +43,12 @@ If the supplied or inferred `artifact_type` is unsupported, the route returns **
 
 For `kubernetes-bundle`, `content` should be a UTF-8 JSON manifest with `schema_version: "kubernetes-bundle.v1"` and a `documents` array of named text documents. Raw archives are not accepted in this v1 contract.
 
+For `mac-diagnostics`, the artifact is structured text. Additive workstation
+metadata is allowed as extra `key: value` lines as long as the core Mac fields
+stay intact. That includes bounded local cleanup metadata such as cleanup
+freshness, reclaimed-space totals, retained-review summary counts, and
+protected large-store summaries.
+
 Current normalized Kubernetes document kinds include:
 
 - service exposure

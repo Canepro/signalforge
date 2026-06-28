@@ -75,6 +75,11 @@ const FIXTURE_FILES = [
     golden: "mac-workstation-diagnostics.expected.json",
     adapter: new MacDiagnosticsAdapter(),
   },
+  {
+    log: "mac-workstation-diagnostics-cleanup-enriched.txt",
+    golden: "mac-workstation-diagnostics-cleanup-enriched.expected.json",
+    adapter: new MacDiagnosticsAdapter(),
+  },
 ];
 
 describe("Deterministic pipeline (golden-sample evaluation)", () => {

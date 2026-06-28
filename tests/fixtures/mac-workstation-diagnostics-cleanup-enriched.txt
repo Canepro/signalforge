@@ -1,0 +1,36 @@
+=== mac-diagnostics ===
+hostname: operator-mac.local
+os_name: macOS
+os_version: 26.5
+build_version: 25F71
+kernel: 25.5.0
+architecture: arm64
+uptime: up 4 days, 2:15
+current_user: operator
+ran_as_root: false
+sip_status: System Integrity Protection status: enabled.
+filevault_status: On
+firewall_state: Off
+remote_login: On
+remote_management: Off
+stealth_mode: Off
+listening_tcp_json: [{"command":"sshd","pid":123,"user":"root","protocol":"TCP","address":"0.0.0.0","port":22},{"command":"node","pid":456,"user":"operator","protocol":"TCP","address":"127.0.0.1","port":3000}]
+disk_root_used_percent: 91.2
+memory_pressure: System-wide memory free percentage: 21%
+brew_outdated_count: 12
+mdm_enrollment: unknown
+daily_cleanup_report_status: stale
+daily_cleanup_report_run_id: daily-cleanup-20260628T110210Z
+daily_cleanup_report_finished_at: 2026-06-28T11:02:10Z
+daily_cleanup_report_age_hours: 52.4
+daily_cleanup_initial_free_bytes: 225386639360
+daily_cleanup_final_free_bytes: 225385250816
+daily_cleanup_free_space_delta_bytes: -1388544
+daily_cleanup_cache_paths_removed_count: 1
+daily_cleanup_worktrees_removed_count: 0
+daily_cleanup_active_cache_skips_count: 2
+daily_cleanup_needs_review_count: 20
+daily_cleanup_reclaimed_by_category_json: {"npm":221184}
+daily_cleanup_needs_review_summary_json: {"total":20,"by_reason":{"not clearly merged, upstream-gone temp, or stale temp work":2,"outside home":10,"path missing; git worktree prune may be enough":1,"too recent or age unknown":7},"by_repo":{"\/Users\/canepro\/src\/articles":1,"\/Users\/canepro\/src\/codex-skills":1,"\/Users\/canepro\/src\/launchpad":1,"\/Users\/canepro\/src\/rc-support-agent":1,"\/Users\/canepro\/src\/rocketchat-k8s":1,"\/Users\/canepro\/src\/support-ai":7,"\/Users\/canepro\/src\/velora-infra":8},"review_buckets":{"missing_path_prune_candidate":1,"other":0,"protected_outside_home":10,"recent_or_unknown_age":7,"stale_candidate":2},"priority_review_candidates":[{"age_days":53.0,"path":"\/Users\/canepro\/src\/support-ai\/.claude\/worktrees\/exciting-heisenberg-6743e7","reason":"not clearly merged, upstream-gone temp, or stale temp work","repo":"\/Users\/canepro\/src\/support-ai","suggested_follow_up":"review branch fate, then remove manually if confirmed obsolete","upstream_gone":true},{"age_days":52.9,"path":"\/Users\/canepro\/src\/support-ai\/.claude\/worktrees\/mystifying-kare-228fe8","reason":"not clearly merged, upstream-gone temp, or stale temp work","repo":"\/Users\/canepro\/src\/support-ai","suggested_follow_up":"review branch fate, then remove manually if confirmed obsolete","upstream_gone":true},{"path":"\/Users\/canepro\/src\/codex-skills\/.claude\/worktrees\/condescending-poincare-73ad42","reason":"path missing; git worktree prune may be enough","repo":"\/Users\/canepro\/src\/codex-skills","suggested_follow_up":"run git worktree prune in the owning repo"}]}
+daily_cleanup_retained_large_stores_json: [{"path":"\/Users\/canepro\/.codex","reason":"large store measured but protected from automatic deletion","size_bytes":6648254464}]
+collected_at: 2026-06-28T12:03:49Z

@@ -5,6 +5,7 @@ import {
   extractWildcardListenerFindings,
   type MacListeningSocket,
 } from "./listeners";
+import { extractDailyCleanupFindings } from "./cleanup";
 import { extractRemoteAccessFindings } from "./remote-access";
 import { extractFileSharingFindings } from "./sharing";
 import {
@@ -140,6 +141,7 @@ export class MacDiagnosticsAdapter implements ArtifactAdapter {
     findings.push(...extractLoopbackDevListenerFindings(sockets));
     findings.push(...extractRemoteAccessFindings(sections, sockets));
     findings.push(...extractFileSharingFindings(sections));
+    findings.push(...extractDailyCleanupFindings(sections, diskUsedPercent));
 
     if (diskUsedPercent !== null && diskUsedPercent >= 85) {
       findings.push({

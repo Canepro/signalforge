@@ -1,0 +1,60 @@
+{
+  "environment": {
+    "is_wsl": false,
+    "is_container": false,
+    "ran_as_root": false,
+    "os_contains": "macOS"
+  },
+  "must_be_noise": [
+    "Mac diagnostics collected without root privileges",
+    "MDM enrollment state unavailable"
+  ],
+  "must_not_be_findings": [
+    "MDM enrollment state unavailable"
+  ],
+  "must_be_findings": [
+    {
+      "title_contains": "application firewall is disabled",
+      "severity": "medium",
+      "category": "network"
+    },
+    {
+      "title_contains": "Remote access posture",
+      "severity": "high",
+      "category": "network"
+    },
+    {
+      "title_contains": "Unsigned or unclassified listeners",
+      "severity": "high",
+      "category": "network"
+    },
+    {
+      "title_contains": "root volume usage is elevated",
+      "severity": "medium",
+      "category": "resource"
+    },
+    {
+      "title_contains": "Daily cleanup metadata is stale",
+      "severity": "medium",
+      "category": "resource"
+    },
+    {
+      "title_contains": "stale manual review candidates",
+      "severity": "low",
+      "category": "resource"
+    },
+    {
+      "title_contains": "prune candidate",
+      "severity": "low",
+      "category": "resource"
+    },
+    {
+      "title_contains": "Protected retained stores remain large",
+      "severity": "medium",
+      "category": "resource"
+    }
+  ],
+  "is_incomplete": false,
+  "min_findings": 10,
+  "max_findings": 12
+}
