@@ -85,7 +85,7 @@ Store app-runtime names in Infisical rather than GitHub-specific names:
 - optional `AZURE_OPENAI_API_KEY`
 - optional `AZURE_OPENAI_ENDPOINT`
 - optional `AZURE_OPENAI_DEPLOYMENT`
-- optional `AZURE_OPENAI_API_VERSION` for legacy Azure endpoints only
+- optional `AZURE_OPENAI_API_VERSION` for legacy Azure endpoints only; omit it for `/openai/v1` and Foundry project endpoint URLs
 - optional Codex App Server transport settings (`CODEX_APP_SERVER_*`) when using the Codex App Server analysis brain
 - optional `CODEX_APP_SERVER_WS_BEARER_TOKEN` for authenticated WebSocket Codex App Server endpoints; do not commit or print this value
 - optional `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` — source-bound automation-agent token; see [`operators/automation-agent-multi-source-enrollment.md`](./operators/automation-agent-multi-source-enrollment.md)

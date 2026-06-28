@@ -71,6 +71,7 @@ SignalForge runs on SQLite with no configuration. The common settings:
 | `DATABASE_URL` | — | Postgres connection string when `DATABASE_DRIVER=postgres` |
 | `SIGNALFORGE_ADMIN_TOKEN` | — | Enables the Sources UI and operator / agent APIs |
 | `LLM_PROVIDER` | `openai` | Optional: `openai` or `azure`; omit to use deterministic fallback |
+| `AZURE_OPENAI_ENDPOINT` | — | Azure Responses endpoint when `LLM_PROVIDER=azure`; legacy, `/openai/v1`, and Foundry project endpoint shapes are supported |
 
 LLM setup and the full environment reference: [.env.example](.env.example), [docs/getting-started.md](docs/getting-started.md), and [docs/aca-env-contract.md](docs/aca-env-contract.md).
 

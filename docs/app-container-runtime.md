@@ -33,6 +33,7 @@ SignalForge still boots without LLM credentials and falls back to deterministic 
 - OpenAI direct: `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, optional `OPENAI_MODEL`
 - Azure OpenAI legacy: `LLM_PROVIDER=azure`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION`
 - Azure OpenAI `/openai/v1`: `LLM_PROVIDER=azure`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`
+- Azure AI Foundry project endpoint (`...services.ai.azure.com/api/projects/<project>`): `LLM_PROVIDER=azure`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT`
 - Codex App Server over authenticated WebSocket: `LLM_PROVIDER=codex_app_server`, `CODEX_APP_SERVER_TRANSPORT=websocket`, `CODEX_APP_SERVER_WS_URL`, `CODEX_APP_SERVER_WS_ALLOW_REMOTE=true`, and `CODEX_APP_SERVER_WS_BEARER_TOKEN`
 
 ### Runtime bind variables

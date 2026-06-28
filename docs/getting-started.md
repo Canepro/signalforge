@@ -165,6 +165,17 @@ DATABASE_DRIVER=sqlite
 DATABASE_PATH=./signalforge.db
 ```
 
+**Azure AI Foundry project endpoint** (`...services.ai.azure.com/api/projects/<project>`). SignalForge appends `/openai/v1` internally. **Omit `AZURE_OPENAI_API_VERSION`** for this shape too.
+
+```env
+LLM_PROVIDER=azure
+AZURE_OPENAI_ENDPOINT=https://your-resource.services.ai.azure.com/api/projects/your-project
+AZURE_OPENAI_API_KEY=your_key_here
+AZURE_OPENAI_DEPLOYMENT=gpt-5.4
+DATABASE_DRIVER=sqlite
+DATABASE_PATH=./signalforge.db
+```
+
 If you are just trying the app locally, it is fine to leave the LLM settings unset and use fallback behavior first.
 
 ## Step 3: Start the App

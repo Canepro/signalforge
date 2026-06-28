@@ -81,7 +81,7 @@ describe("llm-provider", () => {
     });
   });
 
-  it("azure openai_v1: API version in env is stored but not sent on the wire (v1 bases reject api-version)", () => {
+  it("azure openai_v1: API version in env is ignored because v1 bases reject api-version", () => {
     process.env.LLM_PROVIDER = "azure";
     process.env.AZURE_OPENAI_ENDPOINT = "https://res.openai.azure.com/openai/v1";
     process.env.AZURE_OPENAI_API_KEY = "k";
@@ -91,7 +91,24 @@ describe("llm-provider", () => {
     expect(r).toMatchObject({
       ready: true,
       endpointStyle: "openai_v1",
-      apiVersion: "2025-04-01-preview",
+      apiVersion: null,
+    });
+  });
+
+  it("azure Foundry project endpoint: ready without API version", () => {
+    process.env.LLM_PROVIDER = "azure";
+    process.env.AZURE_OPENAI_ENDPOINT =
+      "https://signalforge-resource.services.ai.azure.com/api/projects/signalforge";
+    process.env.AZURE_OPENAI_API_KEY = "k";
+    process.env.AZURE_OPENAI_DEPLOYMENT = "gpt-5.4";
+    process.env.AZURE_OPENAI_API_VERSION = "2026-03-05";
+    const r = resolveLlmConfig(process.env);
+    expect(r).toMatchObject({
+      ready: true,
+      provider: "azure",
+      model: "gpt-5.4",
+      endpointStyle: "foundry_project",
+      apiVersion: null,
     });
   });
 
@@ -170,6 +187,25 @@ describe("llm-provider", () => {
     ).toEqual({});
   });
 
+  it("createOpenAIClient appends /openai/v1 for Foundry project endpoints", () => {
+    const cfg = {
+      ready: true as const,
+      provider: "azure" as const,
+      apiKey: "k",
+      model: "gpt-5.4",
+      endpoint: "https://signalforge-resource.services.ai.azure.com/api/projects/signalforge",
+      endpointStyle: "foundry_project" as const,
+      apiVersion: null,
+    };
+    const client = createOpenAIClient(cfg);
+    expect(client.baseURL).toBe(
+      "https://signalforge-resource.services.ai.azure.com/api/projects/signalforge/openai/v1"
+    );
+    expect(
+      (client as unknown as { _options: { defaultQuery?: Record<string, string> } })._options.defaultQuery ?? {}
+    ).toEqual({});
+  });
+
   it("legacy openai.azure.com host without /openai/v1 path still uses /openai suffix", () => {
     const cfg = {
       ready: true as const,
@@ -212,5 +248,14 @@ describe("detectAzureEndpointStyle", () => {
 
   it("classifies longer v1 paths as openai_v1", () => {
     expect(detectAzureEndpointStyle("https://x.openai.azure.com/openai/v1/foo")).toBe("openai_v1");
+  });
+
+  it("classifies Foundry project endpoints", () => {
+    expect(
+      detectAzureEndpointStyle("https://signalforge-resource.services.ai.azure.com/api/projects/signalforge")
+    ).toBe("foundry_project");
+    expect(
+      detectAzureEndpointStyle("https://signalforge-resource.services.ai.azure.com/api/projects/signalforge/")
+    ).toBe("foundry_project");
   });
 });

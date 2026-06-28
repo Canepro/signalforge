@@ -3,7 +3,7 @@ import OpenAI from "openai";
 export type LlmProviderId = "openai" | "azure";
 
 /** How we interpret `AZURE_OPENAI_ENDPOINT` for routing and query params. */
-export type AzureEndpointStyle = "legacy" | "openai_v1";
+export type AzureEndpointStyle = "legacy" | "openai_v1" | "foundry_project";
 
 export type ResolveLlmOverrides = {
   /** Overrides env API key for the active provider. */
@@ -29,7 +29,7 @@ export type ResolvedLlmReady =
       endpointStyle: AzureEndpointStyle;
       /**
        * Legacy (`*.cognitiveservices.azure.com` or `*.openai.azure.com` without `/openai/v1`): required, sent as `api-version` query.
-       * OpenAI v1 base URL (`.../openai/v1`): optional; included in defaultQuery only when set.
+       * OpenAI v1 and Foundry project endpoints: ignored because the v1 route rejects `api-version`.
        */
       apiVersion: string | null;
     };
@@ -39,8 +39,9 @@ export type ResolvedLlmConfig = ResolvedLlmReady | { ready: false; reason: strin
 /**
  * Detect Azure endpoint style from `AZURE_OPENAI_ENDPOINT`.
  *
- * - **openai_v1**: path is `/openai/v1` or starts with `/openai/v1/` — do not append `/openai`; API version optional.
- * - **legacy**: resource root (e.g. `https://res.cognitiveservices.azure.com`) — append `/openai`; API version required.
+ * - **openai_v1**: path is `/openai/v1` or starts with `/openai/v1/` - do not append `/openai`; API version ignored.
+ * - **foundry_project**: `*.services.ai.azure.com/api/projects/<project>` - append `/openai/v1`; API version ignored.
+ * - **legacy**: resource root (e.g. `https://res.cognitiveservices.azure.com`) - append `/openai`; API version required.
  */
 export function detectAzureEndpointStyle(endpoint: string): AzureEndpointStyle {
   const trimmed = endpoint.trim();
@@ -50,6 +51,10 @@ export function detectAzureEndpointStyle(endpoint: string): AzureEndpointStyle {
     const path = u.pathname.replace(/\/+$/, "") || "/";
     if (path === "/openai/v1" || path.startsWith("/openai/v1/")) {
       return "openai_v1";
+    }
+    const isFoundryHost = u.hostname.toLowerCase().endsWith(".services.ai.azure.com");
+    if (isFoundryHost && /^\/api\/projects\/[^/]+(?:\/.*)?$/.test(path)) {
+      return "foundry_project";
     }
   } catch {
     return "legacy";
@@ -64,6 +69,7 @@ export function detectAzureEndpointStyle(endpoint: string): AzureEndpointStyle {
  * Azure:
  * - **Legacy** endpoint: `AZURE_OPENAI_API_VERSION` is required.
  * - **`/openai/v1` base URL**: omit `AZURE_OPENAI_API_VERSION` (v1 rejects `api-version` on the wire; any env value is ignored when building the client).
+ * - **Foundry project endpoint**: use `https://<resource>.services.ai.azure.com/api/projects/<project>` and omit `AZURE_OPENAI_API_VERSION`.
  */
 export function resolveLlmConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -107,7 +113,7 @@ export function resolveLlmConfig(
       return {
         ready: false,
         reason:
-          "Azure legacy endpoint: set AZURE_OPENAI_API_VERSION (e.g. 2025-04-01-preview). If your URL ends with /openai/v1, use that full base URL — API version is then optional.",
+          "Azure legacy endpoint: set AZURE_OPENAI_API_VERSION (e.g. 2025-04-01-preview). If your URL ends with /openai/v1 or is a Foundry project endpoint, API version is not used.",
       };
     }
     return {
@@ -127,8 +133,8 @@ export function resolveLlmConfig(
     apiKey,
     model: deployment,
     endpoint,
-    endpointStyle: "openai_v1",
-    apiVersion: apiVersionRaw || null,
+    endpointStyle,
+    apiVersion: null,
   };
 }
 
@@ -138,7 +144,8 @@ export function resolveLlmConfig(
  * Uses `client.responses.create(...)` against:
  * - OpenAI: default platform URL
  * - Azure legacy: `{endpoint}/openai` + `api-version` query (required)
- * - Azure v1 base: `{endpoint}` as given (typically `.../openai/v1`) + optional `api-version`
+ * - Azure v1 base: `{endpoint}` as given (typically `.../openai/v1`) with no `api-version`
+ * - Azure Foundry project: `{endpoint}/openai/v1` with no `api-version`
  *
  * The deployment name is sent as the `model` field in the request body.
  */
@@ -150,6 +157,15 @@ export function createOpenAIClient(cfg: ResolvedLlmReady): OpenAI {
   if (cfg.endpointStyle === "openai_v1") {
     const baseURL = cfg.endpoint.replace(/\/$/, "");
     // Azure `/openai/v1/` Foundry-style bases do not use `api-version`; sending it returns 400 "API version not supported".
+    return new OpenAI({
+      apiKey: cfg.apiKey,
+      baseURL,
+      defaultHeaders: { "api-key": cfg.apiKey },
+    });
+  }
+
+  if (cfg.endpointStyle === "foundry_project") {
+    const baseURL = `${cfg.endpoint.replace(/\/$/, "")}/openai/v1`;
     return new OpenAI({
       apiKey: cfg.apiKey,
       baseURL,

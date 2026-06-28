@@ -51,7 +51,7 @@ These values must be present on the ACA app before treating the deployment as va
 | `AZURE_OPENAI_ENDPOINT` | Yes | No | endpoint URL | Keep the existing endpoint style rules from `README.md` |
 | `AZURE_OPENAI_API_KEY` | Yes | Yes | provider secret | Store as an ACA secret |
 | `AZURE_OPENAI_DEPLOYMENT` | Yes | No | deployment name | Passed as the model value on the Responses API call |
-| `AZURE_OPENAI_API_VERSION` | Legacy endpoints only | No | `2025-04-01-preview` or current approved value | Omit for `/openai/v1` base URLs |
+| `AZURE_OPENAI_API_VERSION` | Legacy endpoints only | No | `2025-04-01-preview` or current approved value | Omit for `/openai/v1` and Foundry project endpoint URLs |
 
 ## Runtime bind behavior
 
@@ -90,7 +90,7 @@ Keep these as plain environment values:
 - `OPENAI_MODEL`
 - `AZURE_OPENAI_ENDPOINT`
 - `AZURE_OPENAI_DEPLOYMENT`
-- `AZURE_OPENAI_API_VERSION` when relevant
+- `AZURE_OPENAI_API_VERSION` when relevant for legacy Azure endpoint URLs
 
 ## Non-goals for Slice 2
 
