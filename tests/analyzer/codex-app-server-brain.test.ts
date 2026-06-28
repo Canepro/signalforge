@@ -10,6 +10,7 @@ import {
 } from "@/lib/analyzer/codex-app-server/config";
 import { CodexAppServerSession } from "@/lib/analyzer/codex-app-server/client";
 import {
+  extractCodexTurnFailureMessage,
   extractAuditEnrichmentFromCodexTurnPayload,
   extractAuditReportFromCodexTurnPayload,
 } from "@/lib/analyzer/codex-app-server/extract-report";
@@ -236,6 +237,31 @@ describe("extractAuditEnrichmentFromCodexTurnPayload", () => {
     });
 
     expect(extracted).toEqual(sampleEnrichment);
+  });
+});
+
+describe("extractCodexTurnFailureMessage", () => {
+  it("surfaces failed turn errors before payload parsing", () => {
+    const message = extractCodexTurnFailureMessage({
+      notifications: [
+        {
+          method: "turn/completed",
+          params: {
+            turn: {
+              status: "failed",
+              error: {
+                message: "Quota exceeded. Check your plan and billing details.",
+                codexErrorInfo: "usageLimitExceeded",
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(message).toBe(
+      "Quota exceeded. Check your plan and billing details. (usageLimitExceeded)"
+    );
   });
 });
 

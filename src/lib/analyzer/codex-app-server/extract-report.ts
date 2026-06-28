@@ -117,6 +117,40 @@ function collectStrings(value: unknown, out: string[], depth = 0): void {
   }
 }
 
+function collectTurnFailureMessages(value: unknown, out: string[], depth = 0): void {
+  if (depth > 8 || value === null || value === undefined) return;
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectTurnFailureMessages(item, out, depth + 1);
+    return;
+  }
+
+  if (typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  const error = record.error;
+  if (error && typeof error === "object") {
+    const errorRecord = error as Record<string, unknown>;
+    if (typeof errorRecord.message === "string" && errorRecord.message.trim()) {
+      const codexInfo =
+        typeof errorRecord.codexErrorInfo === "string" && errorRecord.codexErrorInfo.trim()
+          ? ` (${errorRecord.codexErrorInfo.trim()})`
+          : "";
+      out.push(`${errorRecord.message.trim()}${codexInfo}`);
+    }
+  }
+
+  for (const child of Object.values(record)) {
+    collectTurnFailureMessages(child, out, depth + 1);
+  }
+}
+
+export function extractCodexTurnFailureMessage(payload: unknown): string | null {
+  const messages: string[] = [];
+  collectTurnFailureMessages(payload, messages);
+  return messages[0] ?? null;
+}
+
 /**
  * Extract a strict audit report from Codex app-server turn notifications/responses.
  */

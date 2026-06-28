@@ -10,6 +10,7 @@ import {
   type CodexAppServerWebSocketConfig,
 } from "./config";
 import {
+  extractCodexTurnFailureMessage,
   extractAuditEnrichmentFromCodexTurnPayload,
   extractAuditReportFromCodexTurnPayload,
 } from "./extract-report";
@@ -235,6 +236,11 @@ export class CodexAppServerSession {
     prompts: CodexBrainPrompt
   ): Promise<CodexBrainResult> {
     const { output, tokensUsed } = await this.runTurn(config, prompts, auditReportJsonSchema());
+    const failureMessage = extractCodexTurnFailureMessage(output);
+    if (failureMessage) {
+      throw new Error(`Codex App Server turn failed: ${failureMessage}`);
+    }
+
     const report = extractAuditReportFromCodexTurnPayload(output);
 
     if (!report) {
@@ -253,6 +259,11 @@ export class CodexAppServerSession {
       prompts,
       auditEnrichmentJsonSchema()
     );
+    const failureMessage = extractCodexTurnFailureMessage(output);
+    if (failureMessage) {
+      throw new Error(`Codex App Server turn failed: ${failureMessage}`);
+    }
+
     const enrichment = extractAuditEnrichmentFromCodexTurnPayload(output);
 
     if (!enrichment) {
