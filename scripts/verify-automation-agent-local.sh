@@ -20,6 +20,10 @@ show_help() {
   cat <<'EOF'
 Run a local end-to-end verification for the automation-agent diagnostics flow.
 
+This script is for local contract testing. It does not prove that runs appear
+in the hosted SignalForge frontend unless you explicitly point it at the live
+deployment.
+
 This proves the full path:
   automation agent request
   -> queued collection job
@@ -55,6 +59,17 @@ Success output includes:
   request_status
   final top action
 EOF
+}
+
+is_local_base_url() {
+  case "$1" in
+    http://127.0.0.1:*|http://localhost:*|https://127.0.0.1:*|https://localhost:*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 require_cmd() {
@@ -206,6 +221,10 @@ else
   fi
 fi
 
+if is_local_base_url "$BASE_URL"; then
+  echo "note: local verification surface only; runs here do not prove hosted frontend visibility" >&2
+fi
+
 BASE="${BASE_URL%/}"
 INSTANCE_ID="signalforge-verification-$(date +%s)"
 
@@ -313,3 +332,7 @@ printf 'claim_status=%s\n' "$(printf '%s' "$claim_resp" | json_get 'status')"
 printf 'start_status=%s\n' "$(printf '%s' "$start_resp" | json_get 'status')"
 printf 'artifact_run_status=%s\n' "$(printf '%s' "$artifact_resp" | json_get 'run_status')"
 printf 'top_action=%s\n' "$TOP_ACTION"
+
+if is_local_base_url "$BASE_URL"; then
+  echo "note: verify the hosted app separately if you need proof in the real frontend" >&2
+fi

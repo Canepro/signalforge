@@ -70,7 +70,7 @@ That split is intentional:
 - stdout stays safe for another agent or script to parse as JSON
 - stderr can still carry human-friendly export lines when you want a quick shell setup
 
-## Local End-To-End Verification
+## Local Contract Verification (Test Surface Only)
 
 When you want to prove the full contract locally, including the execution-agent side, use the repo verification script:
 
@@ -87,6 +87,11 @@ That script can:
 - satisfy that job through the execution-agent HTTP routes
 - upload a real fixture artifact
 - poll the final structured findings envelope back through the automation-agent API
+
+Use this when the question is "does the automation-agent contract work in this
+checkout?" Do not use it as proof that the hosted SignalForge UI will show the
+run. A temporary local app or localhost dev server writes to its own storage,
+not the live operator surface.
 
 The default fixture is:
 
@@ -111,6 +116,39 @@ The verification output prints stable summary lines such as:
 - `top_action`
 
 That makes it useful both for human checks and for shell or CI wrappers.
+
+## Live Operator Verification (Actual Surface)
+
+Default to the live deployment for operator-visible verification. Use a
+temporary local app only when you are explicitly doing repo-local contract
+testing, CI, or implementation debugging.
+
+When the claim is about the real SignalForge frontend or operator workflow, use
+the live deployment instead of a temporary local app.
+
+Minimum rule:
+
+- set `SIGNALFORGE_BASE_URL` to the hosted app origin
+- use the real Source and its enrolled execution-agent / automation-agent path
+- confirm the resulting `run_id` in the hosted UI at `/runs/<run-id>`
+
+Example operator flow:
+
+```bash
+export SIGNALFORGE_BASE_URL=https://signalforge.canepro.me
+export SIGNALFORGE_AUTOMATION_AGENT_TOKEN=<source-bound live token>
+./scripts/signalforge-automation-agent.sh request --reason "live operator verification"
+```
+
+Then:
+
+1. Let the real execution agent claim and submit the job.
+2. Poll until `result_run_id` is present.
+3. Open `https://signalforge.canepro.me/runs/<result_run_id>` in the hosted UI.
+
+Use the local verification script only for repo-local testing, CI, or contract
+debugging. Use the hosted deployment for any proof about frontend visibility,
+production routing, live tokens, or real operator experience.
 
 ## External Agent Workflow
 
