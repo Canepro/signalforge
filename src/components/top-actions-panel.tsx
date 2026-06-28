@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
+import type { TopActionItem } from "@/lib/analyzer/schema";
 
 interface TopActionsPanelProps {
   actions: string[];
+  actionItems?: TopActionItem[];
   onReanalyze?: () => void | Promise<void>;
   onExport?: () => void;
   onCopyFindings?: () => void;
@@ -13,8 +15,16 @@ interface TopActionsPanelProps {
   reanalyzePending?: boolean;
 }
 
+type DisplayTopAction = {
+  rank: number;
+  action_gate: TopActionItem["action_gate"] | null;
+  label: string | null;
+  text: string;
+};
+
 export function TopActionsPanel({
   actions,
+  actionItems,
   onReanalyze,
   onExport,
   onCopyFindings,
@@ -23,7 +33,16 @@ export function TopActionsPanel({
   reanalyzePending,
 }: TopActionsPanelProps) {
   const showToolbar = Boolean(onReanalyze || onExport || compareHref);
-  const showGrid = actions.length > 0;
+  const displayActions: DisplayTopAction[] =
+    actionItems && actionItems.length > 0
+      ? actionItems
+      : actions.map((action, index) => ({
+          rank: index + 1,
+          action_gate: null,
+          label: null,
+          text: action,
+        }));
+  const showGrid = displayActions.length > 0;
   if (!showToolbar && !showGrid) return null;
 
   return (
@@ -49,7 +68,7 @@ export function TopActionsPanel({
               </div>
               {showGrid ? (
                 <div className="text-[11px] text-on-surface-variant">
-                  {actions.length} ranked recommendation{actions.length === 1 ? "" : "s"} · execute outside SignalForge
+                  {displayActions.length} ranked recommendation{displayActions.length === 1 ? "" : "s"} · execute outside SignalForge
                 </div>
               ) : null}
             </div>
@@ -150,7 +169,7 @@ export function TopActionsPanel({
 
       {showGrid ? (
         <div className="grid grid-cols-1 divide-y divide-surface-container-low md:grid-cols-3 md:divide-x md:divide-y-0">
-          {actions.map((action, i) => (
+          {displayActions.map((action, i) => (
             <div key={i} className="flex gap-2.5 px-4 py-2.5 lg:px-5">
               <div
                 className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
@@ -161,7 +180,14 @@ export function TopActionsPanel({
               >
                 {String(i + 1).padStart(2, "0")}
               </div>
-              <p className="text-xs font-semibold leading-snug text-on-surface">{action}</p>
+              <div className="min-w-0">
+                {action.action_gate ? (
+                  <div className="mb-1 inline-flex rounded-md border border-outline-variant/20 bg-surface-container-low px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant">
+                    {action.label ?? action.action_gate}
+                  </div>
+                ) : null}
+                <p className="text-xs font-semibold leading-snug text-on-surface">{action.text}</p>
+              </div>
             </div>
           ))}
         </div>

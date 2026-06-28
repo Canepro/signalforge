@@ -24,6 +24,7 @@ export type NoiseItem = z.infer<typeof NoiseItemSchema>;
 
 export const FindingSchema = z.object({
   id: z.string(),
+  rule_id: z.string().optional(),
   title: z.string(),
   severity: SeveritySchema,
   category: z.string(),
@@ -31,8 +32,54 @@ export const FindingSchema = z.object({
   evidence: z.string(),
   why_it_matters: z.string(),
   recommended_action: z.string(),
+  action_gate: z.enum(["safe-immediate", "review-required", "operator-verify"]).optional(),
+  risk_domain: z
+    .enum(["housekeeping", "availability_risk", "security", "network", "resource", "unknown"])
+    .optional(),
 });
 export type Finding = z.infer<typeof FindingSchema>;
+
+export const TopActionItemSchema = z.object({
+  rank: z.number().int().min(1).max(3),
+  action_gate: z.enum(["safe-immediate", "review-required", "operator-verify"]),
+  label: z.string(),
+  text: z.string(),
+  source_rule_id: z.string().optional(),
+});
+export type TopActionItem = z.infer<typeof TopActionItemSchema>;
+
+export const MacDiskPressureReportContextSchema = z.object({
+  kind: z.literal("mac-disk-cleanup"),
+  root_volume: z.object({
+    used_percent: z.number().nullable(),
+    capacity_band: z.enum(["normal", "warning", "urgent", "unknown"]),
+    final_free_bytes: z.number().nullable(),
+    free_space_band: z.enum(["normal", "warning", "urgent", "unknown"]),
+  }),
+  daily_cleanup: z.object({
+    report_status: z.string(),
+    age_hours: z.number().nullable(),
+    freshness: z.enum(["fresh", "stale", "missing", "invalid", "unknown"]),
+    final_free_bytes: z.number().nullable(),
+    free_space_delta_bytes: z.number().nullable(),
+    needs_review_count: z.number().nullable(),
+    stale_manual_review_candidates: z.number(),
+    missing_path_prune_candidates: z.number(),
+  }),
+  finding_domains: z.array(
+    z.object({
+      rule_id: z.string(),
+      domain: z.enum(["housekeeping", "availability_risk"]),
+      reason: z.string(),
+    })
+  ),
+});
+export type MacDiskPressureReportContext = z.infer<typeof MacDiskPressureReportContextSchema>;
+
+export const ReportContextSchema = z.object({
+  mac_disk_cleanup: MacDiskPressureReportContextSchema.optional(),
+});
+export type ReportContext = z.infer<typeof ReportContextSchema>;
 
 export const AuditReportSchema = z.object({
   summary: z.array(z.string()).min(1).max(7),
@@ -40,6 +87,8 @@ export const AuditReportSchema = z.object({
   environment_context: EnvironmentContextSchema,
   noise_or_expected: z.array(NoiseItemSchema),
   top_actions_now: z.array(z.string()).length(3),
+  top_action_items: z.array(TopActionItemSchema).length(3).optional(),
+  report_context: ReportContextSchema.optional(),
 });
 export type AuditReport = z.infer<typeof AuditReportSchema>;
 

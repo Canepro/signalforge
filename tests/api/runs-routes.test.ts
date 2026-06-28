@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { POST, GET } from "@/app/api/runs/route";
 import { GET as GET_RUN } from "@/app/api/runs/[id]/route";
 import { GET as GET_REPORT } from "@/app/api/runs/[id]/report/route";
+import { GET as GET_LATEST_RUN } from "@/app/api/runs/latest/route";
 import * as repository from "@/lib/db/repository";
 import * as dbClient from "@/lib/db/client";
 import * as domainEvents from "@/lib/domain-events";
@@ -24,6 +25,7 @@ describe("API /api/runs", () => {
     vi.restoreAllMocks();
     delete process.env.SIGNALFORGE_RUNS_API_TOKEN;
     delete process.env.SIGNALFORGE_RUNS_REQUIRE_AUTH;
+    delete process.env.SIGNALFORGE_ADMIN_TOKEN;
   });
 
   it("POST returns generic 500 without leaking exception details", async () => {
@@ -75,6 +77,23 @@ describe("API /api/runs", () => {
     const res = await GET(req);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toHaveProperty("runs");
+  });
+
+  it("GET /api/runs/[id]/report explains the expected auth path when locked down", async () => {
+    process.env.SIGNALFORGE_RUNS_REQUIRE_AUTH = "true";
+    process.env.SIGNALFORGE_ADMIN_TOKEN = "admin-route-token";
+
+    const res = await GET_REPORT(new NextRequest("http://localhost/api/runs/x/report"), {
+      params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
+    });
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({
+      code: "unauthorized",
+      auth_required: {
+        login_path: "/sources/login",
+      },
+    });
   });
 
   it("POST JSON returns 400 for invalid JSON", async () => {
@@ -503,6 +522,71 @@ brew_outdated_count: 2
     expect(
       report.findings.some((f: { title: string }) => f.title.includes("Remote access posture"))
     ).toBe(true);
+  });
+
+  it("GET /api/runs/latest resolves the newest Mac source-backed run for a target", async () => {
+    const macContent = (hostname: string) => `=== mac-diagnostics ===
+hostname: ${hostname}
+os_name: macOS
+os_version: 26.5
+kernel: 25.5.0
+ran_as_root: false
+uptime: up 4 days
+firewall_state: On
+filevault_status: On
+remote_login: Off
+remote_management: Off
+listening_tcp_json: []
+disk_root_used_percent: 72.1
+`;
+
+    const older = await POST(
+      new NextRequest("http://localhost/api/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          artifact_type: "mac-diagnostics",
+          filename: "mac-upload.txt",
+          source_type: "api",
+          target_identifier: "mac:canepro-mac",
+          collected_at: "2026-06-28T09:00:00.000Z",
+          content: macContent("upload-shadow.local"),
+        }),
+      })
+    );
+    expect(older.status).toBe(200);
+
+    const newer = await POST(
+      new NextRequest("http://localhost/api/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          artifact_type: "mac-diagnostics",
+          filename: "mac-source-backed.txt",
+          source_type: "mac",
+          target_identifier: "mac:canepro-mac",
+          collected_at: "2026-06-28T12:00:00.000Z",
+          content: macContent("canepro-mac.local"),
+        }),
+      })
+    );
+    expect(newer.status).toBe(200);
+    const newerBody = (await newer.json()) as { run_id: string };
+
+    const latest = await GET_LATEST_RUN(
+      new NextRequest(
+        "http://localhost/api/runs/latest?target_identifier=mac:canepro-mac&source_type=mac&artifact_type=mac-diagnostics"
+      )
+    );
+    expect(latest.status).toBe(200);
+    const body = await latest.json();
+    expect(body.latest_by_source_target).toMatchObject({
+      target_identifier: "mac:canepro-mac",
+      source_type: "mac",
+      artifact_type: "mac-diagnostics",
+    });
+    expect(body.run.id).toBe(newerBody.run_id);
+    expect(body.run.filename).toBe("mac-source-backed.txt");
   });
 
   it("POST JSON emits run lifecycle events after persistence", async () => {

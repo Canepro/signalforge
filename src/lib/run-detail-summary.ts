@@ -233,6 +233,94 @@ function formatBytesToGi(value: number | null | undefined): string {
   return `${(value / 1024 ** 3).toFixed(1)} GiB`;
 }
 
+function cleanupContextTone(band: string | undefined, freshness: string | undefined): RunDetailSummaryTone {
+  if (band === "urgent" || freshness === "missing" || freshness === "invalid") return "critical";
+  if (band === "warning" || freshness === "stale") return "warning";
+  return "neutral";
+}
+
+function buildMacCleanupModules(run: RunDetail): RunDetailSummaryModule[] {
+  const context = run.report?.report_context?.mac_disk_cleanup;
+  if (!context) return [];
+
+  const capacityTone = cleanupContextTone(
+    context.root_volume.capacity_band,
+    context.daily_cleanup.freshness
+  );
+  const stale = context.daily_cleanup.stale_manual_review_candidates;
+  const prune = context.daily_cleanup.missing_path_prune_candidates;
+  const age = context.daily_cleanup.age_hours;
+  const ageDetail =
+    age === null ? context.daily_cleanup.report_status : `${age.toFixed(1)}h old (${context.daily_cleanup.report_status})`;
+  const modules: RunDetailSummaryModule[] = [
+    {
+      id: "mac-cleanup-disk-context",
+      title: "Mac Cleanup Context",
+      summary: "Disk pressure and local daily-cleanup evidence carried by the mac-diagnostics artifact.",
+      tone: capacityTone,
+      prominence: "primary",
+      kind: "stat-grid",
+      stats: [
+        {
+          label: "Capacity band",
+          value: context.root_volume.capacity_band,
+          detail: `Root used: ${percentLabel(context.root_volume.used_percent)}`,
+          tone: cleanupContextTone(context.root_volume.capacity_band, undefined),
+        },
+        {
+          label: "Free space",
+          value: formatBytesToGi(context.root_volume.final_free_bytes),
+          detail: `Free-space band: ${context.root_volume.free_space_band}`,
+          tone: cleanupContextTone(context.root_volume.free_space_band, undefined),
+        },
+        {
+          label: "Cleanup freshness",
+          value: context.daily_cleanup.freshness,
+          detail: ageDetail,
+          tone: cleanupContextTone(undefined, context.daily_cleanup.freshness),
+        },
+        {
+          label: "Review queue",
+          value: `${stale} stale / ${prune} prune`,
+          detail: `${context.daily_cleanup.needs_review_count ?? 0} total needs-review item(s)`,
+          tone: prune > 0 || stale > 0 ? "warning" : "neutral",
+        },
+      ],
+    },
+  ];
+
+  const housekeeping = context.finding_domains.filter((item) => item.domain === "housekeeping");
+  const availability = context.finding_domains.filter((item) => item.domain === "availability_risk");
+  const callouts: RunDetailSummaryCallout[] = [];
+  if (housekeeping.length > 0) {
+    callouts.push({
+      title: "Housekeeping findings",
+      body: `${housekeeping.length} cleanup-related finding(s) describe local backlog or retained stores. SignalForge detects and prioritizes; Mira/Codex owns workstation action.`,
+      tone: "warning",
+    });
+  }
+  if (availability.length > 0) {
+    callouts.push({
+      title: "Availability risk context",
+      body: `${availability.length} finding(s) connect disk pressure or cleanup yield to write, build, package, or automation headroom.`,
+      tone: capacityTone === "critical" ? "critical" : "warning",
+    });
+  }
+  if (callouts.length > 0) {
+    modules.push({
+      id: "mac-cleanup-risk-context",
+      title: "Cleanup Risk Domains",
+      summary: "Separates local housekeeping backlog from root-volume availability risk.",
+      tone: callouts.some((callout) => callout.tone === "critical") ? "critical" : "warning",
+      prominence: "supporting",
+      kind: "callout-list",
+      callouts,
+    });
+  }
+
+  return modules;
+}
+
 function buildKubernetesModules(run: RunDetail, artifactContent: string): RunDetailSummaryModule[] {
   const manifest = parseKubernetesBundle(artifactContent);
   if (!manifest) return [];
@@ -1092,6 +1180,10 @@ export function buildRunDetailSummaryModules(
     modules.push(...buildContainerModules(run, artifactContent!));
   } else if (hasArtifactBytes && run.artifact_type === "linux-audit-log") {
     modules.push(...buildLinuxModules(run, artifactContent!));
+  }
+
+  if (run.artifact_type === "mac-diagnostics") {
+    modules.push(...buildMacCleanupModules(run));
   }
 
   const hasFamilyPrimary = modules.some((module) => module.prominence === "primary");

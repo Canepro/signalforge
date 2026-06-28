@@ -559,6 +559,50 @@ for (const backend of backends) {
       expect(detail!.status).toBe("complete");
     });
 
+    it("getLatestBySourceTarget returns the newest matching source run", async () => {
+      await storage.withTransaction(async (tx) => {
+        await tx.runs.persistAnalyzedRun({
+          artifactType: "mac-diagnostics",
+          sourceType: "api",
+          filename: "mac-upload-shadow.txt",
+          content: "older",
+          ingestion: {
+            target_identifier: "mac:canepro-mac",
+            source_label: null,
+            collector_type: null,
+            collector_version: null,
+            collected_at: "2026-06-28T09:00:00.000Z",
+          },
+          analysis: fakeAnalysisWithoutFindings(),
+        });
+        await tx.runs.persistAnalyzedRun({
+          artifactType: "mac-diagnostics",
+          sourceType: "mac",
+          filename: "mac-source-backed.txt",
+          content: "newer",
+          ingestion: {
+            target_identifier: "mac:canepro-mac",
+            source_label: "Canepro Mac",
+            collector_type: "signalforge-agent",
+            collector_version: "local",
+            collected_at: "2026-06-28T12:00:00.000Z",
+          },
+          analysis: fakeAnalysisWithoutFindings(),
+        });
+      });
+
+      const latest = await storage.runs.getLatestBySourceTarget({
+        targetIdentifier: "mac:canepro-mac",
+        sourceType: "mac",
+        artifactType: "mac-diagnostics",
+      });
+
+      expect(latest).not.toBeNull();
+      expect(latest!.filename).toBe("mac-source-backed.txt");
+      expect(latest!.source_type).toBe("mac");
+      expect(latest!.target_identifier).toBe("mac:canepro-mac");
+    });
+
     it("getReport returns parsed report", async () => {
       const runs = await storage.runs.listSummaries();
       const runWithFindings =

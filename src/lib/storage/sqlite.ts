@@ -285,6 +285,31 @@ class SqliteRunsStore implements RunsStore {
     return row ? toRunDetailJson(row) : null;
   }
 
+  async getLatestBySourceTarget(input: Parameters<RunsStore["getLatestBySourceTarget"]>[0]) {
+    const targetIdentifier = input.targetIdentifier.trim();
+    if (!targetIdentifier) return null;
+
+    const row = getOne<ReturnType<typeof getRunWithArtifact>>(
+      this.db,
+      `SELECT r.*, a.artifact_type, a.content AS artifact_content
+       FROM runs r
+       JOIN artifacts a ON r.artifact_id = a.id
+       WHERE r.target_identifier = ?
+         AND (? IS NULL OR r.source_type = ?)
+         AND (? IS NULL OR a.artifact_type = ?)
+       ORDER BY COALESCE(r.collected_at, r.created_at) DESC, r.created_at DESC
+       LIMIT 1`,
+      [
+        targetIdentifier,
+        input.sourceType ?? null,
+        input.sourceType ?? null,
+        input.artifactType ?? null,
+        input.artifactType ?? null,
+      ]
+    );
+    return row ? toRunDetailJson(row) : null;
+  }
+
   async getPageDetail(id: string) {
     const row = getRunWithArtifact(this.db, id);
     if (!row) return null;

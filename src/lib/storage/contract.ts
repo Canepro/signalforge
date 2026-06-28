@@ -49,6 +49,12 @@ export interface DashboardSignalRun {
   findings: Finding[];
 }
 
+export interface LatestRunBySourceTargetInput {
+  targetIdentifier: string;
+  sourceType?: string | null;
+  artifactType?: string | null;
+}
+
 export interface RunsStore {
   listSummaries(): Promise<RunSummary[]>;
   countRuns(): Promise<number>;
@@ -61,6 +67,7 @@ export interface RunsStore {
   listDashboardSignalRuns(limit: number): Promise<DashboardSignalRun[]>;
   countSuppressedNoise(): Promise<number>;
   getApiDetail(id: string): Promise<GetRunDetailResponse | null>;
+  getLatestBySourceTarget(input: LatestRunBySourceTargetInput): Promise<GetRunDetailResponse | null>;
   getPageDetail(id: string): Promise<RunDetail | null>;
   getReport(id: string): Promise<unknown | null>;
   getComparePayload(

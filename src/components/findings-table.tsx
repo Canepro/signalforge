@@ -9,6 +9,14 @@ interface FindingsTableProps {
   emptyMessage?: string;
 }
 
+function FindingChip({ children }: { children: string }) {
+  return (
+    <span className="inline-flex rounded-md border border-outline-variant/20 bg-surface-container-low px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant">
+      {children}
+    </span>
+  );
+}
+
 export function FindingsTable({
   findings,
   emptyMessage = "No findings for this run.",
@@ -62,6 +70,12 @@ export function FindingsTable({
                   <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-muted">
                     {f.category}
                   </div>
+                  {f.action_gate || f.risk_domain ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {f.action_gate ? <FindingChip>{f.action_gate}</FindingChip> : null}
+                      {f.risk_domain ? <FindingChip>{f.risk_domain}</FindingChip> : null}
+                    </div>
+                  ) : null}
                   <div className="mt-2 text-xs leading-relaxed text-on-surface-variant lg:hidden">
                     {f.evidence.length > 110 ? `${f.evidence.slice(0, 110)}…` : f.evidence}
                   </div>

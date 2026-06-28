@@ -34,9 +34,37 @@ describe("mac top actions for Mira/Codex", () => {
       expect(result.meta.llm_succeeded).toBe(false);
       const actions = result.report?.top_actions_now ?? [];
       expect(actions).toHaveLength(3);
-      expect(actions.every((action) => /^\[(safe-immediate|review-required|authority-gated)\] /.test(action))).toBe(
+      expect(actions.every((action) => /^\[(safe-immediate|review-required|operator-verify)\] /.test(action))).toBe(
         true
       );
+      expect(result.report?.top_action_items).toEqual(
+        actions.map((action, index) =>
+          expect.objectContaining({
+            rank: index + 1,
+            action_gate: action.match(/^\[([^\]]+)\]/)?.[1],
+            text: action.replace(/^\[[^\]]+\]\s+/, ""),
+          })
+        )
+      );
+      expect(
+        result.report?.findings.find(
+          (finding) => finding.rule_id === "mac.daily_cleanup_stale_review_candidates"
+        )
+      ).toMatchObject({
+        action_gate: "review-required",
+        risk_domain: "housekeeping",
+      });
+      expect(result.report?.report_context?.mac_disk_cleanup).toMatchObject({
+        root_volume: {
+          capacity_band: "warning",
+          free_space_band: "normal",
+        },
+        daily_cleanup: {
+          freshness: "stale",
+          stale_manual_review_candidates: 2,
+          missing_path_prune_candidates: 1,
+        },
+      });
       expect(actions.some((action) => action.includes("operator-mac.local"))).toBe(true);
       expect(actions.every((action) => action.toLowerCase().includes("resubmit mac-diagnostics"))).toBe(true);
     } finally {
@@ -93,7 +121,7 @@ describe("mac top actions for Mira/Codex", () => {
       });
 
       const actions = result.report?.top_actions_now ?? [];
-      expect(actions[0]).toMatch(/^\[(review-required|authority-gated)\]/);
+      expect(actions[0]).toMatch(/^\[(review-required|operator-verify)\]/);
       expect(actions[0]).toContain("urgent disk pressure");
     } finally {
       for (const key of Object.keys(process.env)) {
@@ -150,7 +178,7 @@ describe("mac top actions for Mira/Codex", () => {
 
       const actions = result.report?.top_actions_now ?? [];
       expect(actions.some((action) => action.toLowerCase().includes("disk pressure"))).toBe(true);
-      expect(actions.every((action) => /^\[(safe-immediate|review-required|authority-gated)\] /.test(action))).toBe(
+      expect(actions.every((action) => /^\[(safe-immediate|review-required|operator-verify)\] /.test(action))).toBe(
         true
       );
     } finally {
@@ -213,7 +241,7 @@ describe("mac top actions for Mira/Codex", () => {
       expect(result.meta.llm_succeeded).toBe(true);
       const actions = result.report?.top_actions_now ?? [];
       expect(actions).not.toContain("Do something vague on the host");
-      expect(actions.every((action) => /^\[(safe-immediate|review-required|authority-gated)\] /.test(action))).toBe(
+      expect(actions.every((action) => /^\[(safe-immediate|review-required|operator-verify)\] /.test(action))).toBe(
         true
       );
     } finally {
@@ -237,6 +265,40 @@ describe("mac top actions for Mira/Codex", () => {
       (finding) => finding.rule_id === "mac.daily_cleanup_prune_candidates"
     );
     expect(pruneIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it("keeps actioned cleanup reports focused on stale manual-review worktrees", async () => {
+    const envSnap = { ...process.env };
+    try {
+      clearLlmEnv();
+
+      const raw = readFileSync(
+        join(FIXTURES, "mac-workstation-diagnostics-cleanup-actioned.txt"),
+        "utf-8"
+      );
+      const result = await analyzeArtifact(raw, {
+        apiKey: undefined,
+        artifactType: "mac-diagnostics",
+      });
+
+      const findings = result.report?.findings ?? [];
+      expect(findings.some((finding) => finding.rule_id === "mac.daily_cleanup_prune_candidates")).toBe(false);
+      expect(
+        findings.find((finding) => finding.rule_id === "mac.daily_cleanup_stale_review_candidates")
+      ).toMatchObject({
+        action_gate: "review-required",
+        risk_domain: "housekeeping",
+      });
+      expect(result.report?.report_context?.mac_disk_cleanup?.daily_cleanup).toMatchObject({
+        stale_manual_review_candidates: 2,
+        missing_path_prune_candidates: 0,
+      });
+    } finally {
+      for (const key of Object.keys(process.env)) {
+        if (!(key in envSnap)) delete process.env[key];
+      }
+      Object.assign(process.env, envSnap);
+    }
   });
 
   it("uses carried mac rule ids when finding ids are not positional", () => {

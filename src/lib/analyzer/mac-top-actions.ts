@@ -1,12 +1,12 @@
-import type { EnvironmentContext, Finding, PreFinding, Severity } from "./schema";
+import type { EnvironmentContext, Finding, PreFinding, Severity, TopActionItem } from "./schema";
 
-export type MacActionGate = "safe-immediate" | "review-required" | "authority-gated";
+export type MacActionGate = "safe-immediate" | "review-required" | "operator-verify";
 export type RuleScopedFinding = Finding & { rule_id?: string };
 
 const GATE_LABEL: Record<MacActionGate, string> = {
   "safe-immediate": "safe-immediate",
   "review-required": "review-required",
-  "authority-gated": "authority-gated",
+  "operator-verify": "operator-verify",
 };
 
 const CLEANUP_RERUN_RULE_IDS = new Set([
@@ -33,7 +33,10 @@ function severityWeight(severity: Severity): number {
   return { critical: 4, high: 3, medium: 2, low: 1 }[severity];
 }
 
-function gateForMacRule(ruleId: string | undefined, finding: Finding): MacActionGate {
+export function actionGateForMacRule(
+  ruleId: string | undefined,
+  finding: Pick<Finding, "category">
+): MacActionGate {
   switch (ruleId) {
     case "mac.daily_cleanup_prune_candidates":
       return "safe-immediate";
@@ -46,17 +49,17 @@ function gateForMacRule(ruleId: string | undefined, finding: Finding): MacAction
     case "mac.daily_cleanup_report_missing":
     case "mac.daily_cleanup_report_invalid":
     case "mac.daily_cleanup_ineffective_under_pressure":
-      return "authority-gated";
+      return "operator-verify";
     case "mac.filevault_disabled":
     case "mac.sip_disabled":
-      return "authority-gated";
+      return "operator-verify";
     case "mac.firewall_disabled":
     case "mac.remote_access_posture":
     case "mac.wildcard_listeners_unknown":
     case "mac.wildcard_listeners_local_dev":
       return "review-required";
     default:
-      if (finding.category === "security") return "authority-gated";
+      if (finding.category === "security") return "operator-verify";
       if (finding.category === "network") return "review-required";
       return "review-required";
   }
@@ -124,7 +127,7 @@ function extractRepoFromEvidence(evidence: string): string | null {
 
 function buildUnifiedCleanupRerunAction(env: EnvironmentContext): string {
   return formatMacTopAction(
-    "authority-gated",
+    "operator-verify",
     `On ${env.hostname}: rerun the local daily-cleanup script, review protected retained stores and the manual-review backlog, then resubmit mac-diagnostics so SignalForge can re-score cleanup freshness and disk delta.`
   );
 }
@@ -134,7 +137,7 @@ function buildMacActionForFinding(
   ruleId: string | undefined,
   env: EnvironmentContext
 ): string {
-  const gate = gateForMacRule(ruleId, finding);
+  const gate = actionGateForMacRule(ruleId, finding);
   const tl = finding.title.toLowerCase();
   const evidence = finding.evidence;
 
@@ -321,7 +324,7 @@ export function buildMacTopActions(
   ) {
     actions.unshift(
       formatMacTopAction(
-        "authority-gated",
+        "operator-verify",
         `On ${env.hostname}: rerun mac-diagnostics with elevated privileges or complete missing sections, then resubmit so SignalForge can restore full workstation visibility.`
       )
     );
@@ -349,6 +352,32 @@ export function buildMacTopActions(
   return actions.slice(0, 3) as [string, string, string];
 }
 
+export function parseMacActionGate(action: string): MacActionGate | null {
+  const match = action.match(/^\[(safe-immediate|review-required|operator-verify|authority-gated)\]\s+/);
+  if (!match) return null;
+  const gate = match[1];
+  if (gate === "authority-gated") return "operator-verify";
+  return gate as MacActionGate;
+}
+
+export function stripMacActionGate(action: string): string {
+  return action.replace(/^\[(safe-immediate|review-required|operator-verify|authority-gated)\]\s+/, "");
+}
+
+export function buildMacTopActionItems(
+  actions: [string, string, string]
+): [TopActionItem, TopActionItem, TopActionItem] {
+  return actions.map((action, index) => {
+    const action_gate = parseMacActionGate(action) ?? "review-required";
+    return {
+      rank: index + 1,
+      action_gate,
+      label: GATE_LABEL[action_gate],
+      text: stripMacActionGate(action),
+    };
+  }) as [TopActionItem, TopActionItem, TopActionItem];
+}
+
 export function resolveMacTopActions(
   preFindings: PreFinding[],
   env: EnvironmentContext,
@@ -360,4 +389,14 @@ export function resolveMacTopActions(
   }
   const findings = findingsForMacActionResolution(preFindings, reconciledFindings);
   return buildMacTopActions(findings, preFindings, env, incomplete);
+}
+
+export function resolveMacTopActionItems(
+  preFindings: PreFinding[],
+  env: EnvironmentContext,
+  incomplete: boolean,
+  reconciledFindings?: Finding[]
+): [TopActionItem, TopActionItem, TopActionItem] | null {
+  const actions = resolveMacTopActions(preFindings, env, incomplete, reconciledFindings);
+  return actions ? buildMacTopActionItems(actions) : null;
 }

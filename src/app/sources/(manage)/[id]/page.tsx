@@ -92,17 +92,22 @@ export default async function SourceDetailPage({
   const { id } = await params;
   const sp = await searchParams;
   const storage = await getStorage();
-  const { source, jobs, registration, signals, fixActions } = await storage.withTransaction(async (tx) => {
+  const { source, jobs, registration, signals, fixActions, latestRun } = await storage.withTransaction(async (tx) => {
     const source = await tx.sources.getById(id);
     if (!source) {
-      return { source: null, jobs: [], registration: null, signals: [], fixActions: [] };
+      return { source: null, jobs: [], registration: null, signals: [], fixActions: [], latestRun: null };
     }
 
     const jobs = await tx.jobs.listForSource(id);
     const registration = await tx.agents.getRegistrationBySourceId(id);
     const signals = await tx.automationSignals.listNextForSource(id, 10);
     const fixActions = await tx.fixActionRuns.listForSource(id, 10);
-    return { source, jobs, registration, signals, fixActions };
+    const latestRun = await tx.runs.getLatestBySourceTarget({
+      targetIdentifier: source.target_identifier,
+      sourceType: source.source_type,
+      artifactType: source.expected_artifact_type,
+    });
+    return { source, jobs, registration, signals, fixActions, latestRun };
   });
   if (!source) {
     return (
@@ -168,6 +173,34 @@ export default async function SourceDetailPage({
           <span className="font-semibold text-on-surface">Artifact</span> and collection scope describe what evidence it collects.
         </p>
       ) : null}
+
+      <section className="sf-panel grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="min-w-0">
+          <p className="sf-kicker">Source-backed verification</p>
+          <h2 className="mt-1 font-headline text-base font-bold tracking-tight text-on-surface">
+            Latest source run
+          </h2>
+          {latestRun ? (
+            <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+              Resolved by target{" "}
+              <code className="sf-inline-code">{source.target_identifier}</code> and artifact{" "}
+              <code className="sf-inline-code">{source.expected_artifact_type}</code>. Latest run:{" "}
+              <span className="font-mono text-on-surface">{latestRun.id}</span>{" "}
+              ({shortTimestamp(latestRun.collected_at ?? latestRun.created_at)}).
+            </p>
+          ) : (
+            <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+              No run currently resolves for this source target. The API resolver is{" "}
+              <code className="sf-inline-code">/api/runs/latest?target_identifier={source.target_identifier}</code>.
+            </p>
+          )}
+        </div>
+        {latestRun ? (
+          <Link href={`/runs/${latestRun.id}`} className="sf-btn-secondary justify-center">
+            Open latest run
+          </Link>
+        ) : null}
+      </section>
 
       {/* Alerts */}
       {sp.error === "disabled" && (

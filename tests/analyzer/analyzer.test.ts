@@ -498,7 +498,7 @@ mdm_enrollment: unknown
       ).toBe(true);
       expect(
         result.report!.top_actions_now.every((action) =>
-          /^\[(safe-immediate|review-required|authority-gated)\] /.test(action)
+          /^\[(safe-immediate|review-required|operator-verify)\] /.test(action)
         )
       ).toBe(true);
     } finally {

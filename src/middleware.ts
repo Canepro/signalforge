@@ -20,7 +20,13 @@ function isStaticAssetPath(pathname: string): boolean {
 }
 
 function isPublicPath(pathname: string): boolean {
-  return pathname === "/" || pathname.startsWith("/sources/login") || pathname === "/api/health";
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/sources/login") ||
+    pathname === "/api/health" ||
+    pathname === "/auth.md" ||
+    pathname.startsWith("/.well-known/")
+  );
 }
 
 function isMachineRoute(pathname: string): boolean {

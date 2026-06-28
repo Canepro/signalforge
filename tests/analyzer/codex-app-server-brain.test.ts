@@ -345,7 +345,7 @@ describe("analyzeArtifact with codex_app_server", () => {
     expect(result.meta.llm_succeeded).toBe(true);
     const actions = result.report?.top_actions_now ?? [];
     expect(actions).not.toContain("Vague cleanup action");
-    expect(actions.every((action) => /^\[(safe-immediate|review-required|authority-gated)\] /.test(action))).toBe(
+    expect(actions.every((action) => /^\[(safe-immediate|review-required|operator-verify)\] /.test(action))).toBe(
       true
     );
     expect(actions.some((action) => action.toLowerCase().includes("remote-login"))).toBe(true);

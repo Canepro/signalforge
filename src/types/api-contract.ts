@@ -39,6 +39,20 @@ export type GetRunDetailResponse = RunDetail & {
   links: { compare_ui: string; compare_api: string };
 };
 
+/** `GET /api/runs/latest` — 200 body for source-target latest-run resolution. */
+export interface GetLatestRunBySourceTargetResponse {
+  latest_by_source_target: {
+    target_identifier: string;
+    source_type: string | null;
+    artifact_type: string | null;
+  };
+  run: GetRunDetailResponse;
+  links: {
+    run_ui: string;
+    report_api: string;
+  };
+}
+
 /** `GET /api/runs/[id]/report` — 200 body is the raw `AuditReport` JSON (not wrapped). */
 export type GetRunReportResponse = AuditReport;
 

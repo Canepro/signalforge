@@ -31,6 +31,7 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | `POST /api/runs` | Submit new evidence |
 | `GET /api/health` | Read runtime health for container and operator checks |
 | `GET /api/runs` | List known runs |
+| `GET /api/runs/latest?target_identifier=...` | Resolve newest run for a source target |
 | `GET /api/runs/[id]` | Read a run and its stored report |
 | `GET /api/runs/[id]/report` | Read raw report JSON only |
 | `GET /api/runs/[id]/compare` | Read deterministic compare data between runs |
@@ -162,6 +163,24 @@ TypeScript: `GetRunsListResponse`. Schema: `docs/schemas/get-runs-list-response.
 
 ---
 
+### `GET /api/runs/latest`
+
+Resolve the newest run for a source target. This is intended for source-backed verification paths where direct uploads for the same host must not hide the latest agent-collected run.
+
+Query:
+
+- `target_identifier` (required), for example `mac:canepro-mac`
+- `source_type` (optional), for example `mac`
+- `artifact_type` (optional), for example `mac-diagnostics`
+
+Ordering uses `collected_at` when present, then `created_at`.
+
+**200:** `{ "latest_by_source_target": { ... }, "run": GetRunDetailResponse, "links": { ... } }`
+**400:** `{ "code": "target_identifier_required", ... }`
+**404:** `{ "code": "latest_run_not_found", ... }`
+
+---
+
 ### `GET /api/runs/[id]`
 
 Full run detail including embedded report JSON and ingestion metadata.
@@ -182,6 +201,7 @@ TypeScript: `GetRunDetailResponse`. Schema: `docs/schemas/run-detail-response.sc
 Raw audit report only, with no run wrapper.
 
 **200:** Body is the `AuditReport` JSON object (not wrapped in `{ report: ... }`).
+**401:** Protected deployments return `{ "code": "unauthorized", "auth_required": { "login_path": "/sources/login", ... } }`; browser operators should sign in to create the admin session cookie, and API consumers should send a runs/admin Bearer token.
 **404:** `{ "error": "..." }` if run missing or no report.
 
 TypeScript: `GetRunReportResponse` (= `AuditReport`).

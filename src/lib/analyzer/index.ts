@@ -12,6 +12,7 @@ import {
   type Finding,
   type NoiseItem,
   type PreFinding,
+  type TopActionItem,
 } from "./schema";
 import {
   COMPACT_LLM_FINDING_LIMIT,
@@ -26,10 +27,13 @@ import {
 import { createOpenAIClient, resolveBrainProvider } from "./brain-provider";
 import { auditEnrichmentResponseFormat, auditReportResponseFormat } from "./response-format";
 import {
+  actionGateForMacRule,
   buildMacTopActions,
   compareMacPreFindingsByActionPriority,
   resolveMacTopActions,
+  resolveMacTopActionItems,
 } from "./mac-top-actions";
+import { buildReportContext, riskDomainForPreFinding } from "./report-context";
 
 export interface AnalyzeOptions {
   apiKey?: string;
@@ -43,6 +47,10 @@ export interface AnalyzeOptions {
 
 const COMPACT_LLM_FINDING_THRESHOLD = 80;
 const COMPACT_LLM_EVIDENCE_CHAR_THRESHOLD = 50_000;
+
+function topActionStringsFromItems(items: [TopActionItem, TopActionItem, TopActionItem]): [string, string, string] {
+  return items.map((item) => `[${item.action_gate}] ${item.text}`) as [string, string, string];
+}
 
 function displayModelForMeta(options: AnalyzeOptions): string {
   const provider = (process.env.LLM_PROVIDER ?? "openai").trim().toLowerCase();
@@ -94,6 +102,8 @@ export async function analyzeArtifact(
         env,
         noise,
         preFindings,
+        artifactType,
+        sections,
         incomplete,
         reason,
         metaModel,
@@ -125,14 +135,23 @@ export async function analyzeArtifact(
           noise,
           preFindings
         );
+        const macTopActionItems = resolveMacTopActionItems(
+          preFindings,
+          env,
+          incomplete,
+          codexReport.findings
+        );
+        const reportContext = buildReportContext(artifactType, sections, preFindings);
         const mergedReport: AuditReport = {
           summary: codexReport.summary,
           findings: codexReport.findings,
           environment_context: env,
           noise_or_expected: noise,
           top_actions_now:
-            resolveMacTopActions(preFindings, env, incomplete, codexReport.findings) ??
+            (macTopActionItems ? topActionStringsFromItems(macTopActionItems) : null) ??
             codexReport.top_actions_now,
+          top_action_items: macTopActionItems ?? undefined,
+          report_context: reportContext,
         };
         return {
           report: mergedReport,
@@ -154,6 +173,8 @@ export async function analyzeArtifact(
           env,
           noise,
           preFindings,
+          artifactType,
+          sections,
           incomplete,
           reason,
           metaModel,
@@ -174,9 +195,14 @@ export async function analyzeArtifact(
       : await callLlm(client, model, env, noise, preFindings, sections, incomplete, reason);
     const duration = Date.now() - startMs;
 
-    const reconciledFindings = useCompactLlm
-      ? llmReport.findings
-      : reconcileSeverity(llmReport.findings, preFindings);
+    const reconciledFindings = reconcileSeverity(llmReport.findings, preFindings);
+    const macTopActionItems = resolveMacTopActionItems(
+      preFindings,
+      env,
+      incomplete,
+      reconciledFindings
+    );
+    const reportContext = buildReportContext(artifactType, sections, preFindings);
 
     const mergedReport: AuditReport = {
       summary: llmReport.summary,
@@ -184,8 +210,10 @@ export async function analyzeArtifact(
       environment_context: env,
       noise_or_expected: noise,
       top_actions_now:
-        resolveMacTopActions(preFindings, env, incomplete, reconciledFindings) ??
+        (macTopActionItems ? topActionStringsFromItems(macTopActionItems) : null) ??
         llmReport.top_actions_now,
+      top_action_items: macTopActionItems ?? undefined,
+      report_context: reportContext,
     };
 
     return {
@@ -204,7 +232,18 @@ export async function analyzeArtifact(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return buildFallbackResult(env, noise, preFindings, incomplete, reason, model, startMs, message);
+    return buildFallbackResult(
+      env,
+      noise,
+      preFindings,
+      artifactType,
+      sections,
+      incomplete,
+      reason,
+      model,
+      startMs,
+      message
+    );
   }
 }
 
@@ -222,6 +261,7 @@ function findingFromPreFinding(
 ): Finding {
   const base: Finding = {
     id: `F${String(index + 1).padStart(3, "0")}`,
+    rule_id: pf.rule_id,
     title: pf.title,
     severity: pf.severity_hint,
     category: pf.category,
@@ -247,6 +287,20 @@ function findingFromPreFinding(
     ...base,
     why_it_matters: note?.why_it_matters?.trim() || summarizeFallbackFinding(base),
     recommended_action: note?.recommended_action?.trim() || base.recommended_action,
+    action_gate: pf.rule_id.startsWith("mac.") ? actionGateForMacRule(pf.rule_id, base) : undefined,
+    risk_domain: riskDomainForPreFinding(pf),
+  };
+}
+
+function addDeterministicFindingMetadata(finding: Finding, pf: PreFinding): Finding {
+  return {
+    ...finding,
+    rule_id: finding.rule_id ?? pf.rule_id,
+    severity: pf.severity_hint,
+    action_gate: pf.rule_id.startsWith("mac.")
+      ? finding.action_gate ?? actionGateForMacRule(pf.rule_id, finding)
+      : finding.action_gate,
+    risk_domain: finding.risk_domain ?? riskDomainForPreFinding(pf),
   };
 }
 
@@ -283,6 +337,8 @@ function buildFallbackResult(
   env: EnvironmentContext,
   noise: NoiseItem[],
   preFindings: PreFinding[],
+  artifactType: string,
+  sections: Record<string, string>,
   incomplete: boolean,
   incompleteReason: string | undefined,
   model: string,
@@ -290,12 +346,7 @@ function buildFallbackResult(
   error: string
 ): AnalysisResult {
   const fallbackFindings = preFindings.map((pf, i) => ({
-    id: `F${String(i + 1).padStart(3, "0")}`,
-    title: pf.title,
-    severity: pf.severity_hint,
-    category: pf.category,
-    section_source: pf.section_source,
-    evidence: pf.evidence,
+    ...findingFromPreFinding(pf, i, env),
     why_it_matters: "(LLM explanation unavailable)",
     recommended_action: "(LLM recommendation unavailable)",
   }));
@@ -309,6 +360,8 @@ function buildFallbackResult(
     error
   );
   const topActions = buildFallbackActions(fallbackFindings, preFindings, env, incomplete);
+  const macTopActionItems = resolveMacTopActionItems(preFindings, env, incomplete, fallbackFindings);
+  const reportContext = buildReportContext(artifactType, sections, preFindings);
 
   return {
     report: {
@@ -317,6 +370,8 @@ function buildFallbackResult(
       environment_context: env,
       noise_or_expected: noise,
       top_actions_now: topActions,
+      top_action_items: macTopActionItems ?? undefined,
+      report_context: reportContext,
     },
     environment: env,
     noise,
@@ -344,7 +399,7 @@ function reconcileSeverity(llmFindings: Finding[], preFindings: PreFinding[]): F
     const match = matchByTitle ?? matchById;
 
     if (match) {
-      return { ...f, severity: match.severity_hint };
+      return addDeterministicFindingMetadata(f, match);
     }
     return f;
   });

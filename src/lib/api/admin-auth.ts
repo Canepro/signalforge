@@ -101,7 +101,7 @@ export async function requireRunsApiRequest(request: NextRequest): Promise<NextR
   const auth = request.headers.get("authorization");
   if (auth) {
     if (!auth.toLowerCase().startsWith("bearer ")) {
-      return NextResponse.json({ error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+      return NextResponse.json(runsApiUnauthorizedBody(), { status: 401 });
     }
     const provided = auth.slice(7).trim();
     if (
@@ -118,7 +118,19 @@ export async function requireRunsApiRequest(request: NextRequest): Promise<NextR
     return null;
   }
 
-  return NextResponse.json({ error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+  return NextResponse.json(runsApiUnauthorizedBody(), { status: 401 });
+}
+
+function runsApiUnauthorizedBody() {
+  return {
+    error: "Unauthorized",
+    code: "unauthorized",
+    auth_required: {
+      browser: "Sign in at /sources/login, then use the admin session cookie",
+      api: "Send Authorization: Bearer with SIGNALFORGE_RUNS_API_TOKEN or SIGNALFORGE_ADMIN_TOKEN",
+      login_path: "/sources/login",
+    },
+  };
 }
 
 const COOKIE_SALT = "signalforge_admin_cookie_v1";

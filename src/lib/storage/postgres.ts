@@ -377,6 +377,26 @@ async function getRunWithArtifactById(q: Queryable, id: string): Promise<PgRunWi
   );
 }
 
+async function getLatestRunBySourceTarget(
+  q: Queryable,
+  input: Parameters<RunsStore["getLatestBySourceTarget"]>[0]
+): Promise<PgRunWithArtifactRow | null> {
+  const targetIdentifier = input.targetIdentifier.trim();
+  if (!targetIdentifier) return null;
+  return one<PgRunWithArtifactRow>(
+    q,
+    `SELECT r.*, a.artifact_type, a.content AS artifact_content
+     FROM runs r
+     JOIN artifacts a ON a.id = r.artifact_id
+     WHERE r.target_identifier = $1
+       AND ($2::text IS NULL OR r.source_type = $2)
+       AND ($3::text IS NULL OR a.artifact_type = $3)
+     ORDER BY COALESCE(r.collected_at, r.created_at) DESC, r.created_at DESC
+     LIMIT 1`,
+    [targetIdentifier, input.sourceType ?? null, input.artifactType ?? null]
+  );
+}
+
 async function findPreviousRunForSameTarget(q: Queryable, currentRunId: string): Promise<RunWithArtifactRow | null> {
   const current = await getRunWithArtifactById(q, currentRunId);
   if (!current) return null;
@@ -646,6 +666,11 @@ class PostgresRunsStore implements RunsStore {
 
   async getApiDetail(id: string) {
     const row = await getRunWithArtifactById(this.q, id);
+    return row ? toRunDetailJson(row) : null;
+  }
+
+  async getLatestBySourceTarget(input: Parameters<RunsStore["getLatestBySourceTarget"]>[0]) {
+    const row = await getLatestRunBySourceTarget(this.q, input);
     return row ? toRunDetailJson(row) : null;
   }
 

@@ -45,6 +45,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
   const findings = report?.findings ?? [];
   const noise = run.noise ?? report?.noise_or_expected ?? [];
   const topActions = report?.top_actions_now ?? [];
+  const topActionItems = report?.top_action_items ?? [];
   const summaryModules = run.summary_modules ?? [];
   const hasOperatorSummary = summaryModules.length > 0;
   const filteredFindings = findings.filter((finding) => {
@@ -146,6 +147,7 @@ export function RunDetailClient({ run }: RunDetailClientProps) {
           {/* Top Actions Panel */}
           <TopActionsPanel
             actions={topActions}
+            actionItems={topActionItems}
             onReanalyze={handleReanalyze}
             onExport={handleExport}
             onCopyFindings={findings.length > 0 ? handleCopyFindings : undefined}

@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MacDiagnosticsAdapter } from "@/lib/adapter/mac-diagnostics/index";
+
+const FIXTURES = join(__dirname, "../fixtures");
 
 function findingsFor(raw: string) {
   const adapter = new MacDiagnosticsAdapter();
@@ -97,5 +101,25 @@ daily_cleanup_report_error: Expecting value: line 1 column 1 (char 0)
     expect(invalidReport?.severity_hint).toBe("high");
     expect(invalidReport?.category).toBe("resource");
     expect(invalidReport?.evidence).toContain("could not be parsed");
+  });
+
+  it("drops the missing-path prune finding after action while stale manual-review worktrees remain", () => {
+    const before = findingsFor(
+      readFileSync(join(FIXTURES, "mac-workstation-diagnostics-cleanup-enriched.txt"), "utf-8")
+    );
+    const after = findingsFor(
+      readFileSync(join(FIXTURES, "mac-workstation-diagnostics-cleanup-actioned.txt"), "utf-8")
+    );
+
+    expect(before.some((finding) => finding.rule_id === "mac.daily_cleanup_prune_candidates")).toBe(true);
+    expect(after.some((finding) => finding.rule_id === "mac.daily_cleanup_prune_candidates")).toBe(false);
+
+    const staleAfter = after.find(
+      (finding) => finding.rule_id === "mac.daily_cleanup_stale_review_candidates"
+    );
+    expect(staleAfter?.evidence).toContain("exciting-heisenberg-6743e7");
+    expect(staleAfter?.evidence).toContain("mystifying-kare-228fe8");
+    expect(staleAfter?.evidence).toContain("needs_review_count=19");
+    expect(staleAfter?.evidence).not.toContain("condescending-poincare-73ad42");
   });
 });

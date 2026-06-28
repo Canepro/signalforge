@@ -68,15 +68,23 @@ describe("private app middleware", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it("does not expose discovery documents with a fake Bearer header", async () => {
+  it("keeps discovery documents public without opening protected machine routes", async () => {
     process.env.SIGNALFORGE_PUBLIC_LANDING_ONLY = "true";
     process.env.SIGNALFORGE_ADMIN_TOKEN = "admin-token";
 
-    const res = await middleware(
+    const authMd = await middleware(
       new NextRequest("http://localhost/auth.md", {
         headers: { authorization: "Bearer anything" },
       })
     );
-    expect(res.status).toBe(401);
+    expect(authMd.headers.get("x-middleware-next")).toBe("1");
+
+    const wellKnown = await middleware(
+      new NextRequest("http://localhost/.well-known/oauth-protected-resource")
+    );
+    expect(wellKnown.headers.get("x-middleware-next")).toBe("1");
+
+    const runs = await middleware(new NextRequest("http://localhost/api/runs"));
+    expect(runs.status).toBe(401);
   });
 });
