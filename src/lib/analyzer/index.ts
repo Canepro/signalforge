@@ -25,7 +25,11 @@ import {
 } from "./codex-app-server/brain";
 import { createOpenAIClient, resolveBrainProvider } from "./brain-provider";
 import { auditEnrichmentResponseFormat, auditReportResponseFormat } from "./response-format";
-import { buildMacTopActions, resolveMacTopActions } from "./mac-top-actions";
+import {
+  buildMacTopActions,
+  compareMacPreFindingsByActionPriority,
+  resolveMacTopActions,
+} from "./mac-top-actions";
 
 export interface AnalyzeOptions {
   apiKey?: string;
@@ -127,7 +131,7 @@ export async function analyzeArtifact(
           environment_context: env,
           noise_or_expected: noise,
           top_actions_now:
-            resolveMacTopActions(codexReport.findings, preFindings, env, incomplete) ??
+            resolveMacTopActions(preFindings, env, incomplete, codexReport.findings) ??
             codexReport.top_actions_now,
         };
         return {
@@ -180,7 +184,7 @@ export async function analyzeArtifact(
       environment_context: env,
       noise_or_expected: noise,
       top_actions_now:
-        resolveMacTopActions(reconciledFindings, preFindings, env, incomplete) ??
+        resolveMacTopActions(preFindings, env, incomplete, reconciledFindings) ??
         llmReport.top_actions_now,
     };
 
@@ -976,7 +980,7 @@ function buildFallbackActions(
   env: EnvironmentContext,
   incomplete: boolean
 ): [string, string, string] {
-  const macActions = resolveMacTopActions(findings, preFindings, env, incomplete);
+  const macActions = resolveMacTopActions(preFindings, env, incomplete, findings);
   if (macActions) {
     return macActions;
   }
@@ -1056,13 +1060,21 @@ function selectCompactFindings(
   preFindings: PreFinding[],
   env: EnvironmentContext
 ): Array<{ finding: PreFinding; originalIndex: number }> {
+  const useMacPriority =
+    env.os.toLowerCase().includes("macos") &&
+    preFindings.some((finding) => finding.rule_id.startsWith("mac."));
+
   return preFindings
     .map((finding, originalIndex) => ({
       finding,
       originalIndex,
       sortFinding: findingFromPreFinding(finding, originalIndex, env),
     }))
-    .sort((a, b) => compareFindingsForFallback(a.sortFinding, b.sortFinding))
+    .sort((a, b) =>
+      useMacPriority ?
+        compareMacPreFindingsByActionPriority(a.finding, b.finding)
+      : compareFindingsForFallback(a.sortFinding, b.sortFinding)
+    )
     .slice(0, COMPACT_LLM_FINDING_LIMIT)
     .map(({ finding, originalIndex }) => ({ finding, originalIndex }));
 }

@@ -87,10 +87,6 @@ function parseRetainedLargeStores(raw: string): RetainedLargeStore[] {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-function pressureBandLabel(band: DiskPressureBand): string {
-  return band;
-}
-
 function formatBytes(bytes: number | null | undefined): string {
   if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes <= 0) {
     return "unknown size";
@@ -130,7 +126,7 @@ function reclaimedSummary(reclaimedByCategory: Record<string, number>): string {
     .join(", ");
 }
 
-export function readDailyCleanupInfo(sections: Record<string, string>): DailyCleanupInfo | null {
+function readDailyCleanupInfo(sections: Record<string, string>): DailyCleanupInfo | null {
   const status = parseCleanupStatus(macValueFor(sections, "daily_cleanup_report_status"));
   if (!status) return null;
 
@@ -175,7 +171,7 @@ export function extractDailyCleanupFindings(
       : `cleanup report status is ${cleanup.status}`;
 
     findings.push({
-      title: `Daily cleanup metadata is ${cleanup.status} while root volume disk pressure is ${pressureBandLabel(pressureBand)}`,
+      title: `Daily cleanup metadata is ${cleanup.status} while root volume disk pressure is ${pressureBand}`,
       severity_hint: pressureSeverity!,
       category: "resource",
       section_source: "daily_cleanup_report_status",
@@ -234,7 +230,7 @@ export function extractDailyCleanupFindings(
       .map((store) => `${store.path ?? "unknown store"} (${formatBytes(store.size_bytes)})`)
       .join("; ");
     findings.push({
-      title: `Protected retained stores remain large while root volume disk pressure is ${pressureBandLabel(pressureBand)}`,
+      title: `Protected retained stores remain large while root volume disk pressure is ${pressureBand}`,
       severity_hint: pressureSeverity!,
       category: "resource",
       section_source: "daily_cleanup_retained_large_stores_json",

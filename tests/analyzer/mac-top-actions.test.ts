@@ -102,6 +102,64 @@ describe("mac top actions for Mira/Codex", () => {
     }
   });
 
+  it("still ranks disk cleanup actions when the LLM returns a partial findings list", async () => {
+    const envSnap = { ...process.env };
+    try {
+      process.env.OPENAI_API_KEY = "sk-test-fake";
+
+      const raw = readFileSync(
+        join(FIXTURES, "mac-workstation-diagnostics-cleanup-enriched.txt"),
+        "utf-8"
+      );
+      const adapter = new MacDiagnosticsAdapter();
+      const sections = adapter.parseSections(adapter.stripNoise(raw));
+      const env = adapter.detectEnvironment(sections);
+      const preFindings = adapter.extractPreFindings(sections, env);
+      const partialFindings = preFindings.slice(0, 2).map((pf, index) => ({
+        id: `F${String(index + 1).padStart(3, "0")}`,
+        title: pf.title,
+        severity: pf.severity_hint,
+        category: pf.category,
+        section_source: pf.section_source,
+        evidence: pf.evidence,
+        why_it_matters: "mock",
+        recommended_action: "mock",
+      }));
+
+      const mockClient = {
+        responses: {
+          create: async () => ({
+            output_text: JSON.stringify({
+              summary: ["Mocked mac summary"],
+              findings: partialFindings,
+              environment_context: env,
+              noise_or_expected: [],
+              top_actions_now: ["Vague action 1", "Vague action 2", "Vague action 3"],
+            }),
+            usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 },
+          }),
+        },
+      } as never;
+
+      const result = await analyzeArtifact(raw, {
+        apiKey: "sk-test-fake",
+        artifactType: "mac-diagnostics",
+        _openaiClient: mockClient,
+      });
+
+      const actions = result.report?.top_actions_now ?? [];
+      expect(actions.some((action) => action.toLowerCase().includes("disk pressure"))).toBe(true);
+      expect(actions.every((action) => /^\[(safe-immediate|review-required|authority-gated)\] /.test(action))).toBe(
+        true
+      );
+    } finally {
+      for (const key of Object.keys(process.env)) {
+        if (!(key in envSnap)) delete process.env[key];
+      }
+      Object.assign(process.env, envSnap);
+    }
+  });
+
   it("overrides mocked LLM top actions with deterministic gated mac recommendations", async () => {
     const envSnap = { ...process.env };
     try {

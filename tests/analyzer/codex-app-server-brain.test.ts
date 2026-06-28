@@ -325,6 +325,32 @@ describe("analyzeArtifact with codex_app_server", () => {
     expect(result.report).not.toBeNull();
   });
 
+  it("replaces Codex mac top_actions_now with deterministic gated recommendations on success", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    process.env.LLM_PROVIDER = "codex_app_server";
+    const raw = readFileSync(join(FIXTURES, "mac-workstation-diagnostics-cleanup-enriched.txt"), "utf-8");
+
+    const result = await analyzeArtifact(raw, {
+      _codexEnrichmentBrainFactory: async () => ({
+        enrichment: {
+          summary: ["Mocked mac posture summary"],
+          top_actions_now: ["Vague cleanup action", "Check logs", "Review later"],
+          finding_notes: [],
+        },
+        tokensUsed: 12,
+        modelLabel: "codex-app-server:gpt-5.4",
+      }),
+    });
+
+    expect(result.meta.llm_succeeded).toBe(true);
+    const actions = result.report?.top_actions_now ?? [];
+    expect(actions).not.toContain("Vague cleanup action");
+    expect(actions.every((action) => /^\[(safe-immediate|review-required|authority-gated)\] /.test(action))).toBe(
+      true
+    );
+    expect(actions.some((action) => action.toLowerCase().includes("remote-login"))).toBe(true);
+  });
+
   it("preserves mac daily cleanup findings when Codex enrichment fails", async () => {
     const { analyzeArtifact } = await import("@/lib/analyzer/index");
     process.env.LLM_PROVIDER = "codex_app_server";

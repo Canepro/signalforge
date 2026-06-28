@@ -241,6 +241,47 @@ export function isMacDiagnosticsRun(preFindings: PreFinding[]): boolean {
   return preFindings.some((finding) => finding.rule_id.startsWith("mac."));
 }
 
+function preFindingToScoringFinding(pf: PreFinding): Finding {
+  return {
+    id: "",
+    title: pf.title,
+    severity: pf.severity_hint,
+    category: pf.category,
+    section_source: pf.section_source,
+    evidence: pf.evidence,
+    why_it_matters: "",
+    recommended_action: "",
+  };
+}
+
+export function compareMacPreFindingsByActionPriority(a: PreFinding, b: PreFinding): number {
+  const byScore =
+    effectiveMacActionScore(b.rule_id, preFindingToScoringFinding(b)) -
+    effectiveMacActionScore(a.rule_id, preFindingToScoringFinding(a));
+  if (byScore !== 0) return byScore;
+  return severityWeight(b.severity_hint) - severityWeight(a.severity_hint);
+}
+
+export function findingsForMacActionResolution(
+  preFindings: PreFinding[],
+  reconciledFindings?: Finding[]
+): Finding[] {
+  return preFindings.map((pf, index) => {
+    const id = `F${String(index + 1).padStart(3, "0")}`;
+    const reconciled = reconciledFindings?.find((finding) => finding.id === id);
+    return {
+      id,
+      title: pf.title,
+      severity: pf.severity_hint,
+      category: pf.category,
+      section_source: pf.section_source,
+      evidence: pf.evidence,
+      why_it_matters: reconciled?.why_it_matters ?? "",
+      recommended_action: reconciled?.recommended_action ?? "",
+    };
+  });
+}
+
 export function buildMacTopActions(
   findings: Finding[],
   preFindings: PreFinding[],
@@ -302,13 +343,14 @@ export function buildMacTopActions(
 }
 
 export function resolveMacTopActions(
-  findings: Finding[],
   preFindings: PreFinding[],
   env: EnvironmentContext,
-  incomplete: boolean
+  incomplete: boolean,
+  reconciledFindings?: Finding[]
 ): [string, string, string] | null {
   if (!isMacDiagnosticsRun(preFindings)) {
     return null;
   }
+  const findings = findingsForMacActionResolution(preFindings, reconciledFindings);
   return buildMacTopActions(findings, preFindings, env, incomplete);
 }
