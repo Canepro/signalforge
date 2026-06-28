@@ -577,7 +577,7 @@ for (const backend of backends) {
         });
         await tx.runs.persistAnalyzedRun({
           artifactType: "mac-diagnostics",
-          sourceType: "mac",
+          sourceType: "agent",
           filename: "mac-source-backed.txt",
           content: "newer",
           ingestion: {
@@ -593,13 +593,12 @@ for (const backend of backends) {
 
       const latest = await storage.runs.getLatestBySourceTarget({
         targetIdentifier: "mac:canepro-mac",
-        sourceType: "mac",
         artifactType: "mac-diagnostics",
       });
 
       expect(latest).not.toBeNull();
       expect(latest!.filename).toBe("mac-source-backed.txt");
-      expect(latest!.source_type).toBe("mac");
+      expect(latest!.source_type).toBe("agent");
       expect(latest!.target_identifier).toBe("mac:canepro-mac");
     });
 

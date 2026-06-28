@@ -18,6 +18,7 @@ import {
   getSourceExecutionSurfaceLabel,
   type ArtifactType,
 } from "@/lib/source-catalog";
+import { latestRunLookupForSource } from "@/lib/sources/latest-run-lookup";
 import { shouldEnableOperatorLiveRefresh } from "@/lib/runtime/vercel-environment";
 import { getStorage } from "@/lib/storage";
 
@@ -102,11 +103,7 @@ export default async function SourceDetailPage({
     const registration = await tx.agents.getRegistrationBySourceId(id);
     const signals = await tx.automationSignals.listNextForSource(id, 10);
     const fixActions = await tx.fixActionRuns.listForSource(id, 10);
-    const latestRun = await tx.runs.getLatestBySourceTarget({
-      targetIdentifier: source.target_identifier,
-      sourceType: source.source_type,
-      artifactType: source.expected_artifact_type,
-    });
+    const latestRun = await tx.runs.getLatestBySourceTarget(latestRunLookupForSource(source));
     return { source, jobs, registration, signals, fixActions, latestRun };
   });
   if (!source) {

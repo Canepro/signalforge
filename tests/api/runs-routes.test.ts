@@ -563,7 +563,7 @@ disk_root_used_percent: 72.1
         body: JSON.stringify({
           artifact_type: "mac-diagnostics",
           filename: "mac-source-backed.txt",
-          source_type: "mac",
+          source_type: "agent",
           target_identifier: "mac:canepro-mac",
           collected_at: "2026-06-28T12:00:00.000Z",
           content: macContent("canepro-mac.local"),
@@ -575,18 +575,19 @@ disk_root_used_percent: 72.1
 
     const latest = await GET_LATEST_RUN(
       new NextRequest(
-        "http://localhost/api/runs/latest?target_identifier=mac:canepro-mac&source_type=mac&artifact_type=mac-diagnostics"
+        "http://localhost/api/runs/latest?target_identifier=mac:canepro-mac&artifact_type=mac-diagnostics"
       )
     );
     expect(latest.status).toBe(200);
     const body = await latest.json();
     expect(body.latest_by_source_target).toMatchObject({
       target_identifier: "mac:canepro-mac",
-      source_type: "mac",
+      source_type: null,
       artifact_type: "mac-diagnostics",
     });
     expect(body.run.id).toBe(newerBody.run_id);
     expect(body.run.filename).toBe("mac-source-backed.txt");
+    expect(body.run.source_type).toBe("agent");
   });
 
   it("POST JSON emits run lifecycle events after persistence", async () => {

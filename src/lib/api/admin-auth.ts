@@ -121,7 +121,7 @@ export async function requireRunsApiRequest(request: NextRequest): Promise<NextR
   return NextResponse.json(runsApiUnauthorizedBody(), { status: 401 });
 }
 
-function runsApiUnauthorizedBody() {
+export function runsApiUnauthorizedBody() {
   return {
     error: "Unauthorized",
     code: "unauthorized",

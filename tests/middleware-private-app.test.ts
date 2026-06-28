@@ -53,7 +53,12 @@ describe("private app middleware", () => {
 
     const res = await middleware(new NextRequest("http://localhost/api/runs"));
     expect(res.status).toBe(401);
-    await expect(res.json()).resolves.toMatchObject({ code: "unauthorized" });
+    await expect(res.json()).resolves.toMatchObject({
+      code: "unauthorized",
+      auth_required: {
+        login_path: "/sources/login",
+      },
+    });
   });
 
   it("lets Bearer-authenticated machine routes reach route-level auth", async () => {

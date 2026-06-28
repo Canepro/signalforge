@@ -170,7 +170,7 @@ Resolve the newest run for a source target. This is intended for source-backed v
 Query:
 
 - `target_identifier` (required), for example `mac:canepro-mac`
-- `source_type` (optional), for example `mac`
+- `source_type` (optional), filters the stored run submission source type, for example `agent` or `api`; do not pass the Source catalog type such as `mac_workstation` unless runs were actually stored with that value
 - `artifact_type` (optional), for example `mac-diagnostics`
 
 Ordering uses `collected_at` when present, then `created_at`.

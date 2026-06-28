@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
   getAdminTokenFromEnv,
+  runsApiUnauthorizedBody,
   verifyAdminSessionCookie,
 } from "@/lib/api/admin-auth";
 
@@ -81,7 +82,7 @@ export async function middleware(request: NextRequest) {
   const cookie = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   if (!(await verifyAdminSessionCookie(cookie))) {
     if (isMachineRoute(pathname)) {
-      return NextResponse.json({ error: "Unauthorized", code: "unauthorized" }, { status: 401 });
+      return NextResponse.json(runsApiUnauthorizedBody(), { status: 401 });
     }
     const url = request.nextUrl.clone();
     url.pathname = "/sources/login";
