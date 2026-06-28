@@ -32,9 +32,12 @@ CODEX_APP_SERVER_MODEL="${ACA_CODEX_APP_SERVER_MODEL:-gpt-5.4}"
 CODEX_APP_SERVER_TURN_TIMEOUT_MS="${ACA_CODEX_APP_SERVER_TURN_TIMEOUT_MS:-120000}"
 CODEX_APP_SERVER_WS_URL="${ACA_CODEX_APP_SERVER_WS_URL:-}"
 CODEX_APP_SERVER_WS_ALLOW_REMOTE="${ACA_CODEX_APP_SERVER_WS_ALLOW_REMOTE:-false}"
+RUNS_REQUIRE_AUTH="${ACA_RUNS_REQUIRE_AUTH:-true}"
+PUBLIC_LANDING_ONLY="${ACA_PUBLIC_LANDING_ONLY:-true}"
 
 ACA_DATABASE_URL_VALUE="${ACA_DATABASE_URL:-}"
 ACA_ADMIN_TOKEN_VALUE="${ACA_ADMIN_TOKEN:-}"
+ACA_RUNS_API_TOKEN_VALUE="${ACA_RUNS_API_TOKEN:-}"
 ACA_OPENAI_API_KEY_VALUE="${ACA_OPENAI_API_KEY:-}"
 ACA_AZURE_OPENAI_API_KEY_VALUE="${ACA_AZURE_OPENAI_API_KEY:-}"
 ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN_VALUE="${ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN:-}"
@@ -81,6 +84,8 @@ Optional options:
                              Codex App Server WebSocket URL
   --codex-app-server-ws-allow-remote VALUE
                              true only for authenticated private/tunnel endpoints
+  --runs-require-auth VALUE   true to require auth on direct /api/runs routes
+  --public-landing-only VALUE true to keep only / public and require auth elsewhere
   --what-if                  Run az deployment group what-if instead of create
   -h, --help                 Show this help
 
@@ -89,6 +94,7 @@ Required environment:
   ACA_ADMIN_TOKEN            SIGNALFORGE_ADMIN_TOKEN value for the app
 
 Optional secret environment:
+  ACA_RUNS_API_TOKEN         Optional narrow SIGNALFORGE_RUNS_API_TOKEN value
   ACA_OPENAI_API_KEY
   ACA_AZURE_OPENAI_API_KEY
   ACA_CODEX_APP_SERVER_WS_BEARER_TOKEN
@@ -221,6 +227,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --codex-app-server-ws-allow-remote)
       CODEX_APP_SERVER_WS_ALLOW_REMOTE="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --runs-require-auth)
+      RUNS_REQUIRE_AUTH="${2:?missing value after $1}"
+      shift 2
+      ;;
+    --public-landing-only)
+      PUBLIC_LANDING_ONLY="${2:?missing value after $1}"
       shift 2
       ;;
     --what-if)
@@ -364,6 +378,9 @@ AZ_ARGS=(
   --parameters "targetPort=${TARGET_PORT}"
   --parameters "databaseUrl=${ACA_DATABASE_URL_VALUE}"
   --parameters "signalforgeAdminToken=${ACA_ADMIN_TOKEN_VALUE}"
+  --parameters "runsRequireAuth=${RUNS_REQUIRE_AUTH}"
+  --parameters "runsApiToken=${ACA_RUNS_API_TOKEN_VALUE}"
+  --parameters "publicLandingOnly=${PUBLIC_LANDING_ONLY}"
   --parameters "llmProvider=${LLM_PROVIDER}"
   --parameters "openAiApiKey=${ACA_OPENAI_API_KEY_VALUE}"
   --parameters "openAiModel=${OPENAI_MODEL}"

@@ -9,6 +9,15 @@ import * as analyzer from "@/lib/analyzer/index";
 import * as domainEvents from "@/lib/domain-events";
 import { POST as POST_REANALYZE } from "@/app/api/runs/[id]/reanalyze/route";
 
+const ADMIN = "reanalyze-admin-token";
+
+function adminRequest(url = "http://localhost/x") {
+  return new NextRequest(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${ADMIN}` },
+  });
+}
+
 function minimalAnalysisResult(): AnalysisResult {
   const env = {
     hostname: "h",
@@ -47,6 +56,7 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
   beforeEach(async () => {
     db = await getTestDb();
     dbClient.setDbOverride(db);
+    process.env.SIGNALFORGE_ADMIN_TOKEN = ADMIN;
     vi.spyOn(dbClient, "saveDb");
     vi.spyOn(analyzer, "analyzeArtifact").mockResolvedValue(minimalAnalysisResult());
   });
@@ -54,7 +64,15 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
   afterEach(() => {
     dbClient.setDbOverride(null);
     db.close();
+    delete process.env.SIGNALFORGE_ADMIN_TOKEN;
     vi.restoreAllMocks();
+  });
+
+  it("requires admin auth", async () => {
+    const res = await POST_REANALYZE(new NextRequest("http://localhost/x", { method: "POST" }), {
+      params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
+    });
+    expect(res.status).toBe(401);
   });
 
   it("returns generic 500 when analyzeArtifact throws", async () => {
@@ -69,7 +87,7 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
       filename: "b.log",
       source_type: "api",
     });
-    const res = await POST_REANALYZE(new NextRequest("http://localhost/x"), {
+    const res = await POST_REANALYZE(adminRequest(), {
       params: Promise.resolve({ id: first.id }),
     });
     expect(res.status).toBe(500);
@@ -80,7 +98,7 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
   });
 
   it("returns 404 when run is missing", async () => {
-    const res = await POST_REANALYZE(new NextRequest("http://localhost/x"), {
+    const res = await POST_REANALYZE(adminRequest(), {
       params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000000" }),
     });
     expect(res.status).toBe(404);
@@ -102,7 +120,7 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
       collected_at: "2024-01-01T00:00:00.000Z",
     });
 
-    const res = await POST_REANALYZE(new NextRequest("http://localhost/x"), {
+    const res = await POST_REANALYZE(adminRequest(), {
       params: Promise.resolve({ id: first.id }),
     });
     expect(res.status).toBe(200);
@@ -143,7 +161,7 @@ describe("API POST /api/runs/[id]/reanalyze", () => {
       source_type: "api",
     });
 
-    const res = await POST_REANALYZE(new NextRequest("http://localhost/x"), {
+    const res = await POST_REANALYZE(adminRequest(), {
       params: Promise.resolve({ id: first.id }),
     });
     expect(res.status).toBe(200);

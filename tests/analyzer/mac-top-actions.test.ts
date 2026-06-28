@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MacDiagnosticsAdapter } from "@/lib/adapter/mac-diagnostics/index";
 import { analyzeArtifact } from "@/lib/analyzer/index";
+import { buildMacTopActions } from "@/lib/analyzer/mac-top-actions";
 
 const FIXTURES = join(__dirname, "../fixtures");
 
@@ -236,5 +237,55 @@ describe("mac top actions for Mira/Codex", () => {
       (finding) => finding.rule_id === "mac.daily_cleanup_prune_candidates"
     );
     expect(pruneIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it("uses carried mac rule ids when finding ids are not positional", () => {
+    const actions = buildMacTopActions(
+      [
+        {
+          id: "finding-custom",
+          rule_id: "mac.daily_cleanup_prune_candidates",
+          title: "Daily cleanup found one linked-worktree prune candidate",
+          severity: "low",
+          category: "configuration",
+          section_source: "daily_cleanup",
+          evidence: "repo=/Users/vincent/src/example; prunable=1",
+          why_it_matters: "mock",
+          recommended_action: "mock",
+        },
+      ],
+      [
+        {
+          rule_id: "mac.remote_access_posture",
+          title: "Remote login exposure",
+          severity_hint: "high",
+          category: "network",
+          section_source: "sharing",
+          evidence: "remote_login=on",
+        },
+        {
+          rule_id: "mac.daily_cleanup_prune_candidates",
+          title: "Daily cleanup found one linked-worktree prune candidate",
+          severity_hint: "low",
+          category: "configuration",
+          section_source: "daily_cleanup",
+          evidence: "repo=/Users/vincent/src/example; prunable=1",
+        },
+      ],
+      {
+        hostname: "operator-mac.local",
+        os: "macos",
+        kernel: "Darwin",
+        is_wsl: false,
+        is_container: false,
+        is_virtual_machine: false,
+        ran_as_root: false,
+        uptime: "unknown",
+      },
+      false
+    );
+
+    expect(actions[0]).toMatch(/^\[safe-immediate\]/);
+    expect(actions[0]).toContain("git worktree prune");
   });
 });

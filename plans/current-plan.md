@@ -5,7 +5,7 @@ This file tracks **implemented** work and **recommended next steps**.
 For the canonical long-lived roadmap, see [`roadmap.md`](./roadmap.md).
 For historical narrative, see `plans/mvp.md` and `plans/phase-2-ui.md` (marked historical at the top).
 
-This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, the merged Phase 9c frontend redesign, and the newly documented ACA migration requirement for production artifact ingestion.
+This snapshot reflects the current `main` branch state, including the shipped Phase 8 multi-artifact work, the repo-local Phase 9 collection-scope contract, the merged Phase 9c frontend redesign, and the ACA app-hosting path for production artifact ingestion.
 
 ## Implemented phases
 
@@ -44,6 +44,7 @@ This snapshot reflects the current `main` branch state, including the shipped Ph
 | Autonomous Kubernetes actions | Source-owned automation signals, source-bound diagnostic triggers, deterministic safe-fix policy gate, fix action runs, execution-agent dry-run/apply APIs, post-fix verification, and Sources UI visibility | Done |
 | 11a (auth.md slice 1) | Static agent discovery (`/auth.md`, `/.well-known/*`), scope vocabulary, `POST /agent/auth` alias for collection-agent registration | Done |
 | 12a | Large-run brain hardening: compact LLM enrichment for large deterministic runs so real Kubernetes bundles keep operator summaries without requiring the model to return every finding/evidence string | Done |
+| Mac diagnostics hardening | `mac-diagnostics` artifact family, daily-cleanup enrichment, deterministic gated workstation recommendations, upload-size guards, optional direct-runs API auth, public-landing-only hosted posture, reanalyze admin auth, and hosted drift proof via health/build metadata | Done |
 
 ## Product snapshot
 
@@ -84,6 +85,7 @@ source-local agents or wrappers rather than inside the app. Source of truth:
 - Recommendations and summaries are bounded by captured evidence and deterministic rules.
 - WSL/systemd noise suppression will need ongoing tuning as logs vary.
 - The current source and agent model is still effectively one registration per source, which may become limiting for Kubernetes or future multi-scope execution.
+- Direct `/api/runs` submit/list/read/report/compare remains open by default for local and legacy push-style collectors, but hosted/public deployments can require a narrow `SIGNALFORGE_RUNS_API_TOKEN` with `SIGNALFORGE_RUNS_REQUIRE_AUTH=true`; source-bound collection jobs remain the preferred path for registered Sources.
 - Run detail surfaces artifact-aware summary modules on the page path (`getPageDetail` / `summary_modules`). JSON `GET /api/runs/[id]` intentionally omits them for stable agent contracts.
 
 ## Recommended next work (high level)
@@ -93,7 +95,7 @@ source-local agents or wrappers rather than inside the app. Source of truth:
 - Continue removing personal-environment assumptions from docs, scripts, examples, and adjacent repos so self-hosting remains straightforward for operators outside the reference instance.
 - Close the Phase 9c stabilization gate on a real preview and pointer-capable browser before broad new UI work resumes. Source of truth: [`phase-9c-stabilization-checklist.md`](./phase-9c-stabilization-checklist.md).
 - Use the product with more real submissions and note friction before adding broad new surface area.
-- Harden large-run LLM enrichment on real Kubernetes bundles before expanding automation-agent access to more Sources. Source of truth: [`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
+- Continue validating large-run LLM enrichment and automation-agent behavior on real Kubernetes bundles before expanding access to more Sources. Source of truth: [`phase-12-fleet-diagnostic-surfaces.md`](./phase-12-fleet-diagnostic-surfaces.md).
 - Start the fleet diagnostic surface map for Mac, Linux hosts, AKS, Kubernetes clusters, and container/runtime Sources, with stable `target_identifier`, artifact family, execution form, credential store, and automation-agent scope per Source.
 - Further findings tuning on real artifacts (SSH, auth, logs) as new fixtures land.
 - Compare export is shipped on the compare UI (**Export compare JSON** / **Copy compare JSON**, PR #19); CLI remains `scripts/signalforge-read.sh compare`.

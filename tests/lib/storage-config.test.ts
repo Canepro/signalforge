@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveStorageDriver } from "@/lib/storage";
+import { getStorage, resolveStorageDriver } from "@/lib/storage";
 
 describe("resolveStorageDriver", () => {
   it("normalizes whitespace and case for postgres", () => {
@@ -15,7 +15,7 @@ describe("resolveStorageDriver", () => {
     });
   });
 
-  it("flags unsupported values while falling runtime selection back to sqlite", () => {
+  it("flags unsupported values without selecting postgres", () => {
     expect(
       resolveStorageDriver({
         ...process.env,
@@ -26,5 +26,19 @@ describe("resolveStorageDriver", () => {
       driver: "sqlite",
       supported: false,
     });
+  });
+
+  it("fails fast instead of falling back to sqlite for unsupported runtime driver values", async () => {
+    const previous = process.env.DATABASE_DRIVER;
+    process.env.DATABASE_DRIVER = "mongo";
+    try {
+      await expect(getStorage()).rejects.toThrow(/Unsupported DATABASE_DRIVER/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.DATABASE_DRIVER;
+      } else {
+        process.env.DATABASE_DRIVER = previous;
+      }
+    }
   });
 });

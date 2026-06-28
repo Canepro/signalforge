@@ -112,7 +112,7 @@ export function TopBar({
           </button>
 
           <Link
-            href="/"
+            href="/dashboard"
             className="font-headline text-sm font-bold uppercase tracking-[0.22em] text-on-surface md:hidden"
           >
             SignalForge

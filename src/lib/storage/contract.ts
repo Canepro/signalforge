@@ -490,6 +490,7 @@ export interface AutomationAgentsStore {
     sourceId: string,
     displayName?: string | null
   ): Promise<AutomationAgentRegistrationCreated>;
+  rotateRegistration(sourceId: string): Promise<AutomationAgentRegistrationCreated>;
 }
 
 export interface StorageTx {

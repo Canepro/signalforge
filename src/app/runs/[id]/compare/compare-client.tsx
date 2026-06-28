@@ -253,7 +253,7 @@ export function CompareClient({
           onCollectEvidenceClick={() => setCollectOpen(true)}
           breadcrumb={
             <>
-              <Link href="/" className="hover:text-primary transition-colors">
+              <Link href="/dashboard" className="hover:text-primary transition-colors">
                 Runs
               </Link>
               <span className="text-on-surface-muted">/</span>

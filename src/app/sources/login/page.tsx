@@ -75,7 +75,7 @@ export default async function SourcesLoginPage({
                   >
                     Sign in
                   </button>
-                  <Link href="/" className="sf-btn-ghost px-0 text-sm text-on-surface-variant hover:bg-transparent">
+                  <Link href="/dashboard" className="sf-btn-ghost px-0 text-sm text-on-surface-variant hover:bg-transparent">
                     Back to runs
                   </Link>
                 </div>

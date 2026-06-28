@@ -1612,6 +1612,42 @@ class PostgresAutomationAgentsStore implements AutomationAgentsStore {
       token_prefix,
     };
   }
+
+  async rotateRegistration(sourceId: string): Promise<AutomationAgentRegistrationCreated> {
+    const source = await one<PgSourceRow>(this.q, "SELECT * FROM sources WHERE id = $1", [sourceId]);
+    if (!source) {
+      const err = new Error("source_not_found");
+      (err as Error & { code: string }).code = "source_not_found";
+      throw err;
+    }
+    const existing = await one<PgAutomationAgentRegistrationRow>(
+      this.q,
+      "SELECT * FROM automation_agent_registrations WHERE source_id = $1",
+      [sourceId]
+    );
+    if (!existing) {
+      const err = new Error("automation_agent_registration_not_found");
+      (err as Error & { code: string }).code = "automation_agent_registration_not_found";
+      throw err;
+    }
+
+    const plainToken = generateAgentToken();
+    const tokenHash = hashAgentToken(plainToken);
+    const token_prefix = plainToken.slice(0, 8);
+    await this.q.query("UPDATE automation_agent_registrations SET token_hash = $1 WHERE id = $2", [
+      tokenHash,
+      existing.id,
+    ]);
+    return {
+      row: (await one<PgAutomationAgentRegistrationRow>(
+        this.q,
+        "SELECT * FROM automation_agent_registrations WHERE id = $1",
+        [existing.id]
+      ))!,
+      plainToken,
+      token_prefix,
+    };
+  }
 }
 
 class PostgresAutomationSignalsStore implements AutomationSignalsStore {

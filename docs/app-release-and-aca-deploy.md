@@ -128,6 +128,9 @@ Recommended secret names inside Infisical:
 
 - `DATABASE_URL`
 - `SIGNALFORGE_ADMIN_TOKEN`
+- optional `SIGNALFORGE_RUNS_REQUIRE_AUTH`
+- optional `SIGNALFORGE_RUNS_API_TOKEN`
+- optional `SIGNALFORGE_PUBLIC_LANDING_ONLY`
 - optional `OPENAI_API_KEY`
 - optional `AZURE_OPENAI_API_KEY`
 
@@ -197,6 +200,9 @@ If you want the exact same deploy path outside GitHub Actions, use the checked-i
 ```bash
 ACA_DATABASE_URL='postgres://<user>:<password>@<host>/<db>?sslmode=require' \
 ACA_ADMIN_TOKEN='<long-random-secret>' \
+ACA_RUNS_REQUIRE_AUTH=true \
+ACA_RUNS_API_TOKEN='<long-random-secret-for-direct-runs-api>' \
+ACA_PUBLIC_LANDING_ONLY=true \
 ACA_AZURE_OPENAI_API_KEY='<azure-openai-key>' \
 bash scripts/deploy-aca-app.sh \
   --resource-group <resource-group> \

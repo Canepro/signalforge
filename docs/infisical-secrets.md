@@ -86,6 +86,10 @@ Store app-runtime names in Infisical rather than GitHub-specific names:
 - optional `AZURE_OPENAI_ENDPOINT`
 - optional `AZURE_OPENAI_DEPLOYMENT`
 - optional `AZURE_OPENAI_API_VERSION` for legacy Azure endpoints only; omit it for `/openai/v1` and Foundry project endpoint URLs
+- optional `SIGNALFORGE_MAX_ARTIFACT_BYTES` when a deployment needs a non-default artifact upload cap
+- optional `SIGNALFORGE_RUNS_REQUIRE_AUTH=true` for public deployments that should protect direct runs API submit/list/read/report/compare routes
+- optional `SIGNALFORGE_RUNS_API_TOKEN` narrow Bearer for direct runs API callers when runs auth is enabled
+- optional `SIGNALFORGE_PUBLIC_LANDING_ONLY=true` for public deployments that should expose only the landing page, login, health, and static assets without auth
 - optional Codex App Server transport settings (`CODEX_APP_SERVER_*`) when using the Codex App Server analysis brain
 - optional `CODEX_APP_SERVER_WS_BEARER_TOKEN` for authenticated WebSocket Codex App Server endpoints; do not commit or print this value
 - optional `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` — source-bound automation-agent token; see [`operators/automation-agent-multi-source-enrollment.md`](./operators/automation-agent-multi-source-enrollment.md)
@@ -94,6 +98,7 @@ The workflow maps those names to the deploy helper inputs:
 
 - `ACA_DATABASE_URL`
 - `ACA_ADMIN_TOKEN`
+- `ACA_RUNS_API_TOKEN`
 - `ACA_OPENAI_API_KEY`
 - `ACA_AZURE_OPENAI_API_KEY`
 

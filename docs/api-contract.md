@@ -14,7 +14,7 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 
 **Base URL:** your deployment origin, for example `http://localhost:3000`. Paths below are relative.
 
-**Auth (runs):** none — secure your deployment and network accordingly.
+**Auth (runs):** direct submit/list/read/report/compare routes are open by default for local/backward compatibility. If `SIGNALFORGE_RUNS_REQUIRE_AUTH=true`, `SIGNALFORGE_RUNS_API_TOKEN` is set, or `SIGNALFORGE_PUBLIC_LANDING_ONLY=true`, those routes require `Authorization: Bearer <SIGNALFORGE_RUNS_API_TOKEN>`, admin Bearer, or the Sources UI admin session cookie. `POST /api/runs/[id]/reanalyze` always requires admin auth: Bearer token for API callers or the Sources UI admin session cookie for browser callers.
 
 **Auth (Phase 6c operator routes):** `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`. If the env var is unset, these routes return **503** with `code: admin_token_unconfigured`. This is bootstrap auth, not multi-user identity.
 
@@ -34,17 +34,19 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | `GET /api/runs/[id]` | Read a run and its stored report |
 | `GET /api/runs/[id]/report` | Read raw report JSON only |
 | `GET /api/runs/[id]/compare` | Read deterministic compare data between runs |
-| `POST /api/runs/[id]/reanalyze` | Re-run analysis on the same stored artifact |
+| `POST /api/runs/[id]/reanalyze` | Re-run analysis on the same stored artifact (admin) |
 | `POST /api/sources` | Register a **Source** (operator Bearer) |
 | `GET /api/sources` | List sources (`?enabled=true` optional) |
 | `GET /api/sources/[id]` | Get one source |
 | `PATCH /api/sources/[id]` | Update mutable source fields |
+| `DELETE /api/sources/[id]` | Delete a source when it has no active jobs |
 | `POST /api/sources/[id]/collection-jobs` | Create a **queued** collection job |
 | `GET /api/sources/[id]/collection-jobs` | List jobs for a source |
 | `GET /api/collection-jobs/[id]` | Get one job |
 | `POST /api/collection-jobs/[id]/cancel` | Cancel queued/claimed job |
 | `POST /api/agent/registrations` | Enroll agent for a source (returns token once) |
 | `POST /api/automation-agent/registrations` | Enroll automation agent for a source (returns token once) |
+| `POST /api/automation-agent/registrations/rotate` | Rotate an automation-agent token for a source (admin) |
 | `POST /api/agent/heartbeat` | Agent: capabilities, attributes, lease extension for active job |
 | `GET /api/agent/jobs/next` | Agent: next **queued** jobs for bound source (optional `limit`; **no** `source_id` query) |
 | `POST /api/collection-jobs/[id]/claim` | Agent: `queued` → `claimed` |
@@ -53,6 +55,14 @@ If a route changes in a breaking way, update this file and `docs/schemas/` at th
 | `POST /api/collection-jobs/[id]/artifact` | Agent: multipart artifact → same ingestion/analyzer path as `POST /api/runs`; job → **submitted** |
 | `POST /api/automation-agent/diagnostic-requests` | Automation agent: queue a source-bound diagnostic request |
 | `GET /api/automation-agent/diagnostic-requests/[id]` | Automation agent: poll job status and structured findings |
+| `GET /api/automation-agent/signals/next` | Automation agent: read source-bound safe-fix signals |
+| `POST /api/automation-agent/fix-action-runs` | Automation agent: request an allowlisted safe-fix action |
+| `GET /api/automation-agent/fix-action-runs/[id]` | Automation agent: read safe-fix action status |
+| `GET /api/agent/fix-actions/next` | Execution agent: poll queued safe-fix actions |
+| `POST /api/fix-action-runs/[id]/claim` | Execution agent: claim a queued safe-fix action |
+| `POST /api/fix-action-runs/[id]/start` | Execution agent: start dry-run state for a claimed action |
+| `POST /api/fix-action-runs/[id]/dry-run` | Execution agent: record dry-run result |
+| `POST /api/fix-action-runs/[id]/apply` | Execution agent: record apply result |
 | `GET /auth.md` | Agent discovery: prose registration guide (auth.md slice 1) |
 | `GET /.well-known/oauth-protected-resource` | Agent discovery: Protected Resource Metadata (RFC 9728 shape) |
 | `GET /.well-known/oauth-authorization-server` | Agent discovery: Authorization Server metadata with `agent_auth` block |
@@ -122,8 +132,11 @@ Submit artifact content as JSON or multipart.
 | **Common** | `filename`, `source_type`, `artifact_type` | `filename` from file name; optional `artifact_type`, `source_type` |
 | **Optional (Phase 5a)** | Same keys as multipart fields | `target_identifier`, `source_label`, `collector_type`, `collector_version`, `collected_at` |
 
-**200:** `PostRunsResponse` — `run_id`, `artifact_id`, `status`, `report` (parsed audit report).  
-**400:** `{ "error": string, "code"?: string }` (validation). Includes `code: "unsupported_artifact_type"` when the supplied or inferred artifact family is not supported by this SignalForge build.  
+**200:** `PostRunsResponse` — `run_id`, `artifact_id`, `status`, `report` (parsed audit report).
+**401/403:** when runs API auth is enabled and credentials are missing or wrong.
+**503:** `runs_api_auth_unconfigured` when `SIGNALFORGE_RUNS_REQUIRE_AUTH=true` but neither `SIGNALFORGE_RUNS_API_TOKEN` nor `SIGNALFORGE_ADMIN_TOKEN` is configured.
+**400:** `{ "error": string, "code"?: string }` (validation). Includes `code: "unsupported_artifact_type"` when the supplied or inferred artifact family is not supported by this SignalForge build.
+**413:** `{ "error": string, "code": "payload_too_large", "max_bytes": number }` when the uploaded artifact exceeds `SIGNALFORGE_MAX_ARTIFACT_BYTES` (default 50 MiB).
 **500:** `{ "error": string, "code"?: string }`
 
 Currently supported artifact families:
@@ -133,7 +146,7 @@ Currently supported artifact families:
 - `kubernetes-bundle`
 - `mac-diagnostics`
 
-TypeScript: `PostRunsResponse` in `src/types/api-contract.ts`.  
+TypeScript: `PostRunsResponse` in `src/types/api-contract.ts`.
 Schema: `docs/schemas/post-runs-response.schema.json`, `docs/schemas/ingestion-metadata.schema.json`.
 
 ---
@@ -142,7 +155,7 @@ Schema: `docs/schemas/post-runs-response.schema.json`, `docs/schemas/ingestion-m
 
 List runs for dashboard or programmatic consumers.
 
-**200:** `{ "runs": RunSummary[] }` — see `RunSummary` in `src/types/api.ts`.  
+**200:** `{ "runs": RunSummary[] }` — see `RunSummary` in `src/types/api.ts`.
 **500:** `{ "error": string }`
 
 TypeScript: `GetRunsListResponse`. Schema: `docs/schemas/get-runs-list-response.schema.json`.
@@ -153,11 +166,11 @@ TypeScript: `GetRunsListResponse`. Schema: `docs/schemas/get-runs-list-response.
 
 Full run detail including embedded report JSON and ingestion metadata.
 
-**200:** `GetRunDetailResponse` — includes `links.compare_ui` and `links.compare_api` (relative paths).  
-**404:** `{ "error": "Run not found" }`  
+**200:** `GetRunDetailResponse` — includes `links.compare_ui` and `links.compare_api` (relative paths).
+**404:** `{ "error": "Run not found" }`
 **500:** `{ "error": string }`
 
-Serialization: `toRunDetailJson()` in `src/lib/api/run-detail-json.ts`.  
+Serialization: `toRunDetailJson()` in `src/lib/api/run-detail-json.ts`.
 TypeScript: `GetRunDetailResponse`. Schema: `docs/schemas/run-detail-response.schema.json` (report object summarized; full audit report shape lives in analyzer code).
 
 **Page-only operator summary:** the `/runs/[id]` UI uses `storage.runs.getPageDetail()`, which returns the broader `RunDetail` type and may include `summary_modules` (artifact-aware stat grids, bar lists, and callouts built from persisted artifact bytes). That field is **not** part of `GET /api/runs/[id]` / `GetRunDetailResponse` so agent integrations stay stable. Module kinds and chartable-vs-callout rules live in `src/lib/run-detail-summary-contract.ts`; assembly lives in `src/lib/run-detail-summary.ts`.
@@ -168,7 +181,7 @@ TypeScript: `GetRunDetailResponse`. Schema: `docs/schemas/run-detail-response.sc
 
 Raw audit report only, with no run wrapper.
 
-**200:** Body is the `AuditReport` JSON object (not wrapped in `{ report: ... }`).  
+**200:** Body is the `AuditReport` JSON object (not wrapped in `{ report: ... }`).
 **404:** `{ "error": "..." }` if run missing or no report.
 
 TypeScript: `GetRunReportResponse` (= `AuditReport`).
@@ -185,12 +198,12 @@ Deterministic finding drift using the same logic as the UI compare page. No LLM.
 
 **200:** `CompareDriftPayload` — `current`, `baseline`, `baseline_missing`, `target_mismatch`, `baseline_selection`, `against_requested`, `drift` (`summary` + `rows`), and `evidence_delta`.
 
-The compare UI also offers **Export compare JSON** and **Copy compare JSON**, which fetch this same endpoint payload for operator handoff (filename helpers in `src/lib/compare/export-compare.ts`).  
-Each non-null run snapshot includes both `id` and `run_id` with the same UUID, so clients can use `run_id` consistently with `POST /api/runs` and `POST .../reanalyze` bodies.  
-**400:** `against` equals current id.  
+The compare UI also offers **Export compare JSON** and **Copy compare JSON**, which fetch this same endpoint payload for operator handoff (filename helpers in `src/lib/compare/export-compare.ts`).
+Each non-null run snapshot includes both `id` and `run_id` with the same UUID, so clients can use `run_id` consistently with `POST /api/runs` and `POST .../reanalyze` bodies.
+**400:** `against` equals current id.
 **404:** Run not found or explicit `against` not found.
 
-TypeScript: `GetCompareResponse` in `src/types/api-contract.ts` (alias of `CompareDriftPayload` from `src/lib/compare/build-compare.ts`).  
+TypeScript: `GetCompareResponse` in `src/types/api-contract.ts` (alias of `CompareDriftPayload` from `src/lib/compare/build-compare.ts`).
 Schema: `docs/schemas/compare-drift-response.schema.json`.
 
 ---
@@ -199,8 +212,13 @@ Schema: `docs/schemas/compare-drift-response.schema.json`.
 
 Re-run the analyzer on the stored artifact for an existing run. This creates a new run row.
 
-**200:** `PostReanalyzeResponse` — `run_id`, `artifact_id`, `parent_run_id`, `status` (no full `report` in body; use GET run/report).  
-**404:** Run or artifact missing.  
+Requires admin auth. API callers send `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`. The browser UI can use the same admin session cookie issued by `/sources/login`.
+
+**200:** `PostReanalyzeResponse` — `run_id`, `artifact_id`, `parent_run_id`, `status` (no full `report` in body; use GET run/report).
+**401:** missing Bearer token and missing/invalid admin session cookie.
+**403:** wrong Bearer token.
+**503:** `SIGNALFORGE_ADMIN_TOKEN` unset.
+**404:** Run or artifact missing.
 **500:** `{ "error": string }`
 
 TypeScript: `PostReanalyzeResponse`. Schema: `docs/schemas/post-reanalyze-response.schema.json`.
@@ -268,7 +286,7 @@ When no baseline exists, `baseline_missing` is `true` and `evidence_delta` is `n
 
 All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
 
-**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `mac_workstation` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics`, `kubernetes-bundle`, and `mac-diagnostics`), `default_collector_type`, optional typed `default_collection_scope` (`linux_host` / `mac_host` / `container_target` / `kubernetes_scope`) validated against `expected_artifact_type`, `capabilities`, `labels`, `enabled`.
+**`POST /api/sources`** — JSON body: `display_name`, `target_identifier`, `source_type` (`linux_host` \| `mac_workstation` \| `wsl`), optional `expected_artifact_type` (default `linux-audit-log`; currently also supports `container-diagnostics`, `kubernetes-bundle`, and `mac-diagnostics`), `default_collector_type`, optional typed `default_collection_scope` (`linux_host` / `mac_host` / `container_target` / `kubernetes_scope`) validated against `expected_artifact_type`, `capabilities`, `labels`, `enabled`, optional `automation_enabled`, `auto_fix_enabled`, and `allowed_fix_policy_ids`.
 **201:** source object. **400** validation, including `code: "unsupported_artifact_type"` when `expected_artifact_type` is not supported. **409** `duplicate_target_identifier`.
 
 `source_type` is the execution host kind in v1, not a full evidence-target taxonomy. For container and Kubernetes sources, operators should read `expected_artifact_type` plus `default_collection_scope` as the durable description of what evidence the agent will collect.
@@ -277,7 +295,9 @@ All routes below require header `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>
 
 **`GET /api/sources/[id]`** — **200** source. **404** if missing.
 
-**`PATCH /api/sources/[id]`** — partial JSON; **cannot** change `target_identifier`, `source_type`, `expected_artifact_type` in v1. Accepts `default_collection_scope` (or `null` to clear) with the same artifact-family validation as create. **200** source.
+**`PATCH /api/sources/[id]`** — partial JSON; **cannot** change `target_identifier`, `source_type`, `expected_artifact_type` in v1. Accepts `display_name`, `default_collector_type`, `default_collector_version`, `capabilities`, `labels`, `enabled`, `automation_enabled`, `auto_fix_enabled`, `allowed_fix_policy_ids`, and `default_collection_scope` (or `null` to clear) with the same artifact-family validation as create. **200** source.
+
+**`DELETE /api/sources/[id]`** — deletes the source and its registrations when no non-terminal jobs remain. **200:** `{ "ok": true }`. **404** if missing. **409** `active_jobs` when queued, claimed, or running work still references the source.
 
 **`POST /api/sources/[id]/collection-jobs`** — optional JSON: `request_reason`, `priority`, `idempotency_key` (24h dedupe per source), and typed `collection_scope` (`linux_host` / `mac_host` / `container_target` / `kubernetes_scope`). Scope shape must match `source.expected_artifact_type`; mismatch returns **400** `invalid_collection_scope`. **201** new job, **200** same job on idempotent replay. **409** `source_disabled`.
 
@@ -301,6 +321,8 @@ Optional env: `SIGNALFORGE_PUBLIC_BASE_URL` overrides absolute URLs in discovery
 
 **`POST /api/automation-agent/registrations`** — JSON `{ "source_id", "display_name?" }`. **201:** `{ automation_agent_id, source_id, token, token_prefix }` (plaintext `token` once). **409** if source already has an automation-agent registration.
 
+**`POST /api/automation-agent/registrations/rotate`** — JSON `{ "source_id" }`. Admin Bearer only. **200:** `{ automation_agent_id, source_id, token, token_prefix }` (new plaintext token once). The previous automation-agent token is revoked immediately because the stored token hash is replaced. **404** if the source or automation-agent registration is missing.
+
 Errors are JSON `{ "error": string, "code"?: string }` unless noted.
 
 ### Phase 6d: agent execution (source-bound Bearer)
@@ -313,13 +335,13 @@ All routes below require `Authorization: Bearer <agent_token>` (from registratio
 
 **`GET /api/agent/jobs/next`** — optional `?limit=` (default small) and optional `?wait_seconds=` (bounded long-poll; max 20s). **200:** `{ "jobs": JobSummary[], "gate": string | null }`. `JobSummary` always includes `collection_scope`; it is `null` when no scope was set at queue time. **Reject** `source_id` query with **400**. **Strict capability gating:** no successful heartbeat yet → `jobs: []`, `gate: "heartbeat_required"`. After heartbeat, **empty** capability list → `gate: "capabilities_empty"`. Otherwise each job requires `collect:<job.artifact_type>` in the intersection of (last heartbeated agent capabilities ∩ source `capabilities`). If queued jobs exist but none qualify → `gate: "capability_mismatch"`. When there are no queued rows, `gate` is **null**. Disabled source → `gate: "source_disabled"`. Long-poll waiting only applies when the initial result is `jobs: []` and `gate: null`; gate failures still return immediately.
 
-**`POST /api/collection-jobs/{id}/claim`** — JSON `instance_id`, `lease_ttl_seconds` (clamped). Atomic **queued** → **claimed** (establishes lease instance). **403** wrong source. **409** if not queued / already claimed.
+**`POST /api/collection-jobs/{id}/claim`** — JSON `instance_id`, `lease_ttl_seconds` (clamped). Atomic **queued** → **claimed** (establishes lease instance). Claim enforces the same source-enabled, heartbeat, and capability gates as `GET /api/agent/jobs/next`. **403** wrong source. **409** if not queued / already claimed, or with `code` `source_disabled`, `heartbeat_required`, `capabilities_empty`, or `capability_mismatch` when the agent is not eligible for this job.
 
 **`POST /api/collection-jobs/{id}/start`** — JSON **`instance_id` (required)** must match the job’s `lease_owner_instance_id`. **claimed** → **running**; refreshes run lease (~5m). **400** `instance_id_required`. **403** `instance_mismatch` or another agent holds the claim. **409** `lease_expired` / `invalid_transition` as before.
 
 **`POST /api/collection-jobs/{id}/fail`** — JSON **`instance_id` (required)**, `code`, `message`. **claimed** or **running** → **failed** when lease and instance match. **400** `instance_id_required`. **403** `instance_mismatch`. **409** on lease/expiry or bad state.
 
-**`POST /api/collection-jobs/{id}/artifact`** — `multipart/form-data` like `POST /api/runs` (file + optional ingestion fields). **`instance_id` is required:** form field `instance_id` **or** header `X-SignalForge-Agent-Instance-Id` (must match job lease). **400** `instance_id_required` / `file_required` / `unsupported_artifact_type`. **403** `instance_mismatch`. Target and collector defaults are **forced from the source**; `source_label` is `agent:<registration_id>`, `source_type` `agent`. Only from **running** with a matching lease. **409** `job_already_submitted` on duplicate completion and **409** `artifact_type_mismatch` when the upload family does not match the queued job’s `artifact_type`.
+**`POST /api/collection-jobs/{id}/artifact`** — `multipart/form-data` like `POST /api/runs` (file + optional ingestion fields). **`instance_id` is required:** form field `instance_id` **or** header `X-SignalForge-Agent-Instance-Id` (must match job lease). **400** `instance_id_required` / `file_required` / `unsupported_artifact_type`. **403** `instance_mismatch`. **413** `payload_too_large` if the file exceeds `SIGNALFORGE_MAX_ARTIFACT_BYTES` (default 50 MiB). Target and collector defaults are **forced from the source**; `source_label` is `agent:<registration_id>`, `source_type` `agent`. Only from **running** with a matching lease. **409** `job_already_submitted` on duplicate completion and **409** `artifact_type_mismatch` when the upload family does not match the queued job’s `artifact_type`.
 
 **Job vs run outcome:** The collection job **`status` stays `submitted`** once the artifact is stored and the run is created (ingest + analyze pipeline ran). **`result_analysis_status`** on the job (and **`run_status`** in the **200** JSON body) copies the linked run’s `status` (e.g. **`complete`** or **`error`**). Operators and agents should treat **`submitted` + `result_analysis_status: "error"`** as “delivered but analysis failed,” not a fully successful outcome.
 

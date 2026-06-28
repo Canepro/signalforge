@@ -949,6 +949,147 @@ describe("Phase 6d agent routes", () => {
     expect(getArtifactById(db, artifactId)).toBeNull();
   });
 
+  it("claim refuses a queued job before the agent heartbeats capabilities", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-claim-no-heartbeat");
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const jobs = await GET_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const jobId = (await jobs.json()).jobs[0].id as string;
+
+    const claim = await POST_CLAIM(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/claim`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "no-heartbeat" }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    expect(claim.status).toBe(409);
+    await expect(claim.json()).resolves.toMatchObject({ code: "heartbeat_required" });
+  });
+
+  it("claim refuses a queued job when last heartbeat lacks the required collect capability", async () => {
+    const { sourceId, token } = await createSourceAndAgent(db, "tid-claim-cap-mismatch");
+    await POST_HEARTBEAT(
+      new NextRequest("http://localhost/api/agent/heartbeat", {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({
+          capabilities: ["collect:container-diagnostics"],
+          attributes: {},
+          agent_version: "1",
+          active_job_id: null,
+        }),
+      })
+    );
+    await POST_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        method: "POST",
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const jobs = await GET_SOURCE_JOBS(
+      new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+        headers: adminAuth,
+      }),
+      { params: Promise.resolve({ id: sourceId }) }
+    );
+    const jobId = (await jobs.json()).jobs[0].id as string;
+
+    const claim = await POST_CLAIM(
+      new NextRequest(`http://localhost/api/collection-jobs/${jobId}/claim`, {
+        method: "POST",
+        headers: { ...agentAuth(token), "content-type": "application/json" },
+        body: JSON.stringify({ instance_id: "cap-mismatch" }),
+      }),
+      { params: Promise.resolve({ id: jobId }) }
+    );
+
+    expect(claim.status).toBe(409);
+    await expect(claim.json()).resolves.toMatchObject({ code: "capability_mismatch" });
+  });
+
+  it("artifact upload returns 413 when multipart file exceeds the artifact limit", async () => {
+    const previous = process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+    process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = "2";
+    try {
+      const { sourceId, token } = await createSourceAndAgent(db, "tid-art-too-large");
+      await POST_HEARTBEAT(
+        new NextRequest("http://localhost/api/agent/heartbeat", {
+          method: "POST",
+          headers: { ...agentAuth(token), "content-type": "application/json" },
+          body: JSON.stringify({
+            capabilities: ["collect:linux-audit-log"],
+            attributes: {},
+            agent_version: "1",
+            active_job_id: null,
+          }),
+        })
+      );
+      await POST_SOURCE_JOBS(
+        new NextRequest(`http://localhost/api/sources/${sourceId}/collection-jobs`, {
+          method: "POST",
+          headers: adminAuth,
+        }),
+        { params: Promise.resolve({ id: sourceId }) }
+      );
+      const next = await GET_NEXT(
+        new NextRequest("http://localhost/api/agent/jobs/next", { headers: agentAuth(token) })
+      );
+      const jobId = (await next.json()).jobs[0].id as string;
+
+      await POST_CLAIM(
+        new NextRequest(`http://localhost/api/collection-jobs/${jobId}/claim`, {
+          method: "POST",
+          headers: { ...agentAuth(token), "content-type": "application/json" },
+          body: JSON.stringify({ instance_id: "too-large" }),
+        }),
+        { params: Promise.resolve({ id: jobId }) }
+      );
+      await POST_START(
+        new NextRequest(`http://localhost/api/collection-jobs/${jobId}/start`, {
+          method: "POST",
+          headers: { ...agentAuth(token), "content-type": "application/json" },
+          body: JSON.stringify({ instance_id: "too-large" }),
+        }),
+        { params: Promise.resolve({ id: jobId }) }
+      );
+
+      const form = new FormData();
+      form.append("instance_id", "too-large");
+      form.append("file", new Blob(["abc"], { type: "text/plain" }), "too-large.log");
+      const res = await POST_ARTIFACT(
+        new NextRequest(`http://localhost/api/collection-jobs/${jobId}/artifact`, {
+          method: "POST",
+          headers: agentAuth(token),
+          body: form,
+        }),
+        { params: Promise.resolve({ id: jobId }) }
+      );
+
+      expect(res.status).toBe(413);
+      await expect(res.json()).resolves.toMatchObject({ code: "payload_too_large" });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+      } else {
+        process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = previous;
+      }
+    }
+  });
+
   it("artifact upload infers collected_at from collector filename metadata when omitted", async () => {
     const { sourceId, token } = await createSourceAndAgent(db, "tid-art-collected-at");
     await POST_HEARTBEAT(

@@ -1128,6 +1128,38 @@ export function createAutomationAgentRegistration(
   return { row, plainToken, token_prefix };
 }
 
+export function rotateAutomationAgentRegistrationToken(
+  db: Database,
+  sourceId: string
+): AutomationAgentRegistrationCreated {
+  const source = getSourceById(db, sourceId);
+  if (!source) {
+    const err = new Error("source_not_found");
+    (err as Error & { code: string }).code = "source_not_found";
+    throw err;
+  }
+  const existing = getAutomationAgentRegistrationBySourceId(db, sourceId);
+  if (!existing) {
+    const err = new Error("automation_agent_registration_not_found");
+    (err as Error & { code: string }).code = "automation_agent_registration_not_found";
+    throw err;
+  }
+
+  const { plainToken, tokenHash, token_prefix } = issueAgentToken();
+  db.run(`UPDATE automation_agent_registrations SET token_hash = ? WHERE id = ?`, [
+    tokenHash,
+    existing.id,
+  ]);
+
+  const row = getOne<AutomationAgentRegistrationRow>(
+    db,
+    "SELECT * FROM automation_agent_registrations WHERE id = ?",
+    [existing.id]
+  )!;
+
+  return { row, plainToken, token_prefix };
+}
+
 /** Reap expired leases: `claimed` → `queued`, `running` → `expired`. Returns number of rows updated. */
 export function reapExpiredCollectionJobLeases(db: Database): number {
   const now = new Date().toISOString();

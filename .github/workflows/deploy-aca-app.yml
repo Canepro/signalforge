@@ -87,6 +87,7 @@ jobs:
           SECRET_SOURCE: ${{ inputs.secret_source }}
           GH_DATABASE_URL: ${{ secrets.ACA_APP_DATABASE_URL }}
           GH_ADMIN_TOKEN: ${{ secrets.ACA_APP_ADMIN_TOKEN }}
+          GH_RUNS_API_TOKEN: ${{ secrets.ACA_APP_RUNS_API_TOKEN }}
           GH_OPENAI_API_KEY: ${{ secrets.ACA_APP_OPENAI_API_KEY }}
           GH_AZURE_OPENAI_API_KEY: ${{ secrets.ACA_APP_AZURE_OPENAI_API_KEY }}
           GH_CODEX_APP_SERVER_WS_BEARER_TOKEN: ${{ secrets.ACA_APP_CODEX_APP_SERVER_WS_BEARER_TOKEN }}
@@ -96,6 +97,9 @@ jobs:
 
           database_url="${DATABASE_URL:-${GH_DATABASE_URL:-}}"
           admin_token="${SIGNALFORGE_ADMIN_TOKEN:-${GH_ADMIN_TOKEN:-}}"
+          runs_api_token="${SIGNALFORGE_RUNS_API_TOKEN:-${GH_RUNS_API_TOKEN:-}}"
+          runs_require_auth="${SIGNALFORGE_RUNS_REQUIRE_AUTH:-${ACA_RUNS_REQUIRE_AUTH:-true}}"
+          public_landing_only="${SIGNALFORGE_PUBLIC_LANDING_ONLY:-${ACA_PUBLIC_LANDING_ONLY:-true}}"
           openai_api_key="${OPENAI_API_KEY:-${GH_OPENAI_API_KEY:-}}"
           azure_openai_api_key="${AZURE_OPENAI_API_KEY:-${GH_AZURE_OPENAI_API_KEY:-}}"
           codex_app_server_ws_bearer_token="${CODEX_APP_SERVER_WS_BEARER_TOKEN:-${GH_CODEX_APP_SERVER_WS_BEARER_TOKEN:-}}"
@@ -113,7 +117,13 @@ jobs:
           {
             printf 'ACA_DATABASE_URL=%s\n' "$database_url"
             printf 'ACA_ADMIN_TOKEN=%s\n' "$admin_token"
+            printf 'ACA_RUNS_REQUIRE_AUTH=%s\n' "$runs_require_auth"
+            printf 'ACA_PUBLIC_LANDING_ONLY=%s\n' "$public_landing_only"
           } >> "$GITHUB_ENV"
+
+          if [[ -n "$runs_api_token" ]]; then
+            printf 'ACA_RUNS_API_TOKEN=%s\n' "$runs_api_token" >> "$GITHUB_ENV"
+          fi
 
           if [[ -n "$openai_api_key" ]]; then
             printf 'ACA_OPENAI_API_KEY=%s\n' "$openai_api_key" >> "$GITHUB_ENV"

@@ -21,6 +21,10 @@ This document describes the current `POST /api/runs` submission contract.
 - **URL:** `{BASE_URL}/api/runs`
 - **Method:** `POST`
 - **Body:** JSON **or** `multipart/form-data`
+- **Auth:** open by default for local/backward compatibility. If the deployment
+  sets `SIGNALFORGE_RUNS_REQUIRE_AUTH=true` or `SIGNALFORGE_RUNS_API_TOKEN`,
+  send `Authorization: Bearer <SIGNALFORGE_RUNS_API_TOKEN>` (admin Bearer also
+  works for operators).
 
 ## When To Use Which Submission Style
 
@@ -40,6 +44,11 @@ This document describes the current `POST /api/runs` submission contract.
 If `artifact_type` is omitted, the server infers a type from content.
 Today, the shipped artifact families are `linux-audit-log`, `container-diagnostics`, `kubernetes-bundle`, and `mac-diagnostics`.
 If the supplied or inferred `artifact_type` is unsupported, the route returns **400** with `code: "unsupported_artifact_type"`.
+
+Artifact content is capped by `SIGNALFORGE_MAX_ARTIFACT_BYTES`, defaulting to
+50 MiB. The cap applies to both direct `POST /api/runs` submissions and
+`POST /api/collection-jobs/{id}/artifact`. Oversized uploads return **413**
+with `code: "payload_too_large"` and the configured `max_bytes`.
 
 For `kubernetes-bundle`, `content` should be a UTF-8 JSON manifest with `schema_version: "kubernetes-bundle.v1"` and a `documents` array of named text documents. Raw archives are not accepted in this v1 contract.
 
@@ -184,7 +193,7 @@ SIGNALFORGE_BASE_URL=https://example.com SIGNALFORGE_COLLECTED_AT="$(date -u +%Y
 ## What SignalForge Does Not Do
 
 - No in-product **collection** (no SSH, no remote execution, no scheduler in this contract).
-- No **auth** on this route in the current product (secure your deployment and network as needed).
+- Direct `POST /api/runs` is open by default for compatibility, but hosted deployments can require `SIGNALFORGE_RUNS_API_TOKEN` with `SIGNALFORGE_RUNS_REQUIRE_AUTH=true`. Prefer source-bound collection jobs when submissions should be tied to a registered Source.
 - **Source registration** exists via `/sources` (Phase 6c) for operator-managed targets and collection jobs. The `POST /api/runs` path described here remains available for direct submissions without source context.
 
 For product boundary and future collector direction, see [../plans/phase-5-collector-architecture.md](../plans/phase-5-collector-architecture.md).

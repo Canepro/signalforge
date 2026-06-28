@@ -25,6 +25,11 @@ export function resolveStorageDriver(
 
 export async function getStorage(): Promise<Storage> {
   const storageDriver = resolveStorageDriver(process.env);
+  if (!storageDriver.supported) {
+    throw new Error(
+      `Unsupported DATABASE_DRIVER "${storageDriver.raw}". Use sqlite or postgres.`
+    );
+  }
   if (storageDriver.driver === "postgres") {
     return getPostgresStorage();
   }

@@ -45,6 +45,10 @@ SignalForge still boots without LLM credentials and falls back to deterministic 
 | `SIGNALFORGE_BUILD_SHA` | image build arg | Source commit baked into the app image for hosted drift checks |
 | `SIGNALFORGE_IMAGE` | ACA deploy env | Container image currently assigned to the ACA app |
 | `SIGNALFORGE_REVISION_SUFFIX` | ACA deploy env | ACA revision suffix for the deployed app image |
+| `SIGNALFORGE_MAX_ARTIFACT_BYTES` | `52428800` | Optional upload limit for direct run submissions and collection-job artifact uploads |
+| `SIGNALFORGE_RUNS_REQUIRE_AUTH` | unset / false locally, `true` in ACA template | Set `true` to require auth on direct `/api/runs` submit/list/read/report/compare routes. Also forced by `SIGNALFORGE_PUBLIC_LANDING_ONLY=true` |
+| `SIGNALFORGE_RUNS_API_TOKEN` | unset | Optional narrow Bearer token for direct runs API callers when runs auth is enabled |
+| `SIGNALFORGE_PUBLIC_LANDING_ONLY` | unset / false locally, `true` in ACA template | Keeps only `/`, `/sources/login`, `/api/health`, and static assets public; operational pages and machine routes require an admin session or route-specific Bearer |
 
 ## Health endpoint
 

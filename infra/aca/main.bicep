@@ -53,6 +53,24 @@ param databaseUrl string
 @secure()
 param signalforgeAdminToken string
 
+@description('Require auth on direct runs API submit/list/read/report/compare routes.')
+@allowed([
+  'false'
+  'true'
+])
+param runsRequireAuth string = 'true'
+
+@description('Optional narrow Bearer token for direct runs API callers.')
+@secure()
+param runsApiToken string = ''
+
+@description('Expose only the public landing page without auth; operational pages and machine routes require session or Bearer auth.')
+@allowed([
+  'false'
+  'true'
+])
+param publicLandingOnly string = 'true'
+
 @description('LLM provider to enable. Leave empty for deterministic-only fallback.')
 @allowed([
   ''
@@ -134,6 +152,14 @@ var containerEnv = concat(
       secretRef: 'signalforge-admin-token'
     }
     {
+      name: 'SIGNALFORGE_RUNS_REQUIRE_AUTH'
+      value: runsRequireAuth
+    }
+    {
+      name: 'SIGNALFORGE_PUBLIC_LANDING_ONLY'
+      value: publicLandingOnly
+    }
+    {
       name: 'SIGNALFORGE_IMAGE'
       value: image
     }
@@ -142,6 +168,12 @@ var containerEnv = concat(
       value: revisionSuffix
     }
   ],
+  runsApiToken != '' ? [
+    {
+      name: 'SIGNALFORGE_RUNS_API_TOKEN'
+      secretRef: 'signalforge-runs-api-token'
+    }
+  ] : [],
   llmProvider != '' ? [
     {
       name: 'LLM_PROVIDER'
@@ -233,6 +265,12 @@ var containerSecrets = concat(
       value: signalforgeAdminToken
     }
   ],
+  runsApiToken != '' ? [
+    {
+      name: 'signalforge-runs-api-token'
+      value: runsApiToken
+    }
+  ] : [],
   llmProvider == 'openai' ? [
     {
       name: 'openai-api-key'

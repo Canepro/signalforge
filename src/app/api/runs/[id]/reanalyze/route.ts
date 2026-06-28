@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeArtifact } from "@/lib/analyzer/index";
 import { emitRunLifecycleEvents } from "@/lib/domain-events";
+import { requireAdminRequest } from "@/lib/api/admin-auth";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const denied = await requireAdminRequest(request);
+    if (denied) return denied;
+
     const { id: parentRunId } = await params;
     const storage = await getStorage();
     const reanalyze = await storage.runs.getReanalyzeSource(parentRunId);

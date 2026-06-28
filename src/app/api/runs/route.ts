@@ -9,11 +9,23 @@ import {
   ingestionRecordFromFormData,
 } from "@/lib/ingestion/meta";
 import { emitRunLifecycleEvents } from "@/lib/domain-events";
+import { requireRunsApiRequest } from "@/lib/api/admin-auth";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import {
+  rejectOversizeContentLength,
+  rejectOversizeFile,
+  rejectOversizeText,
+} from "@/lib/api/request-limits";
 import { getStorage } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = await requireRunsApiRequest(request);
+    if (denied) return denied;
+
+    const sizeDenied = rejectOversizeContentLength(request);
+    if (sizeDenied) return sizeDenied;
+
     const contentType = request.headers.get("content-type") ?? "";
     let content: string;
     let filename: string;
@@ -27,6 +39,8 @@ export async function POST(request: NextRequest) {
       if (!file) {
         return NextResponse.json({ error: "No file provided" }, { status: 400 });
       }
+      const fileDenied = rejectOversizeFile(file);
+      if (fileDenied) return fileDenied;
       content = await file.text();
       filename = file.name;
       artifactType = (formData.get("artifact_type") as string) ?? undefined;
@@ -46,6 +60,8 @@ export async function POST(request: NextRequest) {
       if (!content) {
         return NextResponse.json({ error: "content is required" }, { status: 400 });
       }
+      const contentDenied = rejectOversizeText(content);
+      if (contentDenied) return contentDenied;
       ingestionInput = body;
     }
 
@@ -95,8 +111,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const denied = await requireRunsApiRequest(request);
+    if (denied) return denied;
+
     const storage = await getStorage();
     const runs = await storage.runs.listSummaries();
     return NextResponse.json({ runs });

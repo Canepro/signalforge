@@ -98,7 +98,13 @@ jobs:
           {
             printf 'ACA_DATABASE_URL=%s\n' "$DATABASE_URL"
             printf 'ACA_ADMIN_TOKEN=%s\n' "$SIGNALFORGE_ADMIN_TOKEN"
+            printf 'ACA_RUNS_REQUIRE_AUTH=%s\n' "${SIGNALFORGE_RUNS_REQUIRE_AUTH:-true}"
+            printf 'ACA_PUBLIC_LANDING_ONLY=%s\n' "${SIGNALFORGE_PUBLIC_LANDING_ONLY:-true}"
           } >> "$GITHUB_ENV"
+
+          if [[ -n "${SIGNALFORGE_RUNS_API_TOKEN:-}" ]]; then
+            printf 'ACA_RUNS_API_TOKEN=%s\n' "$SIGNALFORGE_RUNS_API_TOKEN" >> "$GITHUB_ENV"
+          fi
 
           if [[ -n "${OPENAI_API_KEY:-}" ]]; then
             printf 'ACA_OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY" >> "$GITHUB_ENV"

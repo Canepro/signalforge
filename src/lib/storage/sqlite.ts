@@ -64,6 +64,7 @@ import {
   listSources,
   markCollectionJobSubmittedForAgent,
   reapExpiredCollectionJobLeases,
+  rotateAutomationAgentRegistrationToken,
   rotateAgentRegistrationToken,
   startCollectionJobForAgent,
   sourceToJson,
@@ -682,6 +683,10 @@ class SqliteAutomationAgentsStore implements AutomationAgentsStore {
 
   async createRegistration(sourceId: string, displayName?: string | null) {
     return createAutomationAgentRegistration(this.db, sourceId, displayName);
+  }
+
+  async rotateRegistration(sourceId: string) {
+    return rotateAutomationAgentRegistrationToken(this.db, sourceId);
   }
 }
 

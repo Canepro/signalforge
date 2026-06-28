@@ -131,9 +131,10 @@ explicitly.
 
 To rotate an existing automation-agent token:
 
-1. Use the approved rotation path once available. The current registration
-   command is create-only and returns `409 automation_agent_already_registered`
-   for duplicates.
+1. Call the admin rotation endpoint:
+   `POST /api/automation-agent/registrations/rotate` with JSON
+   `{ "source_id": "<source-id>" }` and
+   `Authorization: Bearer <SIGNALFORGE_ADMIN_TOKEN>`.
 2. Store the new token in the secret manager under the same per-source name.
 3. Update the host token file with restrictive permissions.
 4. Run `--health-check`, then one real diagnostic request, before closing the

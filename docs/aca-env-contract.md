@@ -28,12 +28,16 @@ These values must be present on the ACA app before treating the deployment as va
 | `SIGNALFORGE_BUILD_SHA` | No | No | image build SHA | Baked into the image by the publish workflow |
 | `SIGNALFORGE_IMAGE` | No | No | deployed GHCR image ref | Injected by the ACA template for hosted drift checks |
 | `SIGNALFORGE_REVISION_SUFFIX` | No | No | ACA revision suffix | Injected by the ACA template when a suffix is supplied |
+| `SIGNALFORGE_MAX_ARTIFACT_BYTES` | No | No | `52428800` | Optional cap for direct evidence and collection-job artifact uploads |
+| `SIGNALFORGE_RUNS_REQUIRE_AUTH` | No | No | `true` | Requires auth on direct `/api/runs` submit/list/read/report/compare routes |
+| `SIGNALFORGE_PUBLIC_LANDING_ONLY` | No | No | `true` | Keeps only landing, login, health, and static assets public |
 
 ## Operator and agent-facing environment
 
 | Variable | Required | Secret in ACA | Recommended value | Notes |
 |---|---|---:|---|---|
 | `SIGNALFORGE_ADMIN_TOKEN` | Yes for `/sources`, agent enrollment, and collection-job APIs | Yes | long random secret | Required for the operator flows already shipped in the app |
+| `SIGNALFORGE_RUNS_API_TOKEN` | No | Yes | long random secret | Optional narrow Bearer for direct `/api/runs` callers when runs auth is enabled |
 
 ## Optional OpenAI direct environment
 
@@ -77,6 +81,7 @@ Store these as ACA secrets rather than plain environment values:
 
 - `DATABASE_URL`
 - `SIGNALFORGE_ADMIN_TOKEN`
+- `SIGNALFORGE_RUNS_API_TOKEN`
 - `OPENAI_API_KEY`
 - `AZURE_OPENAI_API_KEY`
 
@@ -86,6 +91,9 @@ Keep these as plain environment values:
 - `SIGNALFORGE_BUILD_SHA`
 - `SIGNALFORGE_IMAGE`
 - `SIGNALFORGE_REVISION_SUFFIX`
+- `SIGNALFORGE_MAX_ARTIFACT_BYTES`
+- `SIGNALFORGE_RUNS_REQUIRE_AUTH`
+- `SIGNALFORGE_PUBLIC_LANDING_ONLY`
 - `LLM_PROVIDER`
 - `OPENAI_MODEL`
 - `AZURE_OPENAI_ENDPOINT`

@@ -12,6 +12,7 @@ import { inferCollectedAtFromUploadedFile } from "@/lib/ingestion/collected-at";
 import { resolveAgentRequest } from "@/lib/api/agent-auth";
 import { emitRunLifecycleEvents } from "@/lib/domain-events";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
+import { rejectOversizeContentLength, rejectOversizeFile } from "@/lib/api/request-limits";
 import { getStorage } from "@/lib/storage";
 
 export async function POST(
@@ -20,6 +21,9 @@ export async function POST(
 ) {
   const ctx = await resolveAgentRequest(request);
   if (!ctx.ok) return ctx.response;
+
+  const sizeDenied = rejectOversizeContentLength(request);
+  if (sizeDenied) return sizeDenied;
 
   const { id: jobId } = await params;
 
@@ -52,6 +56,8 @@ export async function POST(
   if (!file) {
     return NextResponse.json({ error: "No file provided", code: "file_required" }, { status: 400 });
   }
+  const fileDenied = rejectOversizeFile(file);
+  if (fileDenied) return fileDenied;
 
   const content = await file.text();
   const filename = file.name;

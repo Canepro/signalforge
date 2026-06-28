@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireRunsApiRequest } from "@/lib/api/admin-auth";
 import { internalServerErrorResponse } from "@/lib/api/route-errors";
 import { getStorage } from "@/lib/storage";
 
@@ -12,6 +13,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const denied = await requireRunsApiRequest(request);
+    if (denied) return denied;
+
     const { id } = await params;
     const against = request.nextUrl.searchParams.get("against");
     const storage = await getStorage();

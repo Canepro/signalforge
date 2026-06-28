@@ -56,6 +56,36 @@ export function buildListNextQueuedJobsResult(input: {
   return { jobs: eligibleJobs.slice(0, limit), gate: null };
 }
 
+export function validateAgentJobClaimGate(input: {
+  sourceEnabled: boolean;
+  lastHeartbeatAt: string | null | undefined;
+  agentCapabilities: string[];
+  sourceCapabilities: string[];
+  jobArtifactType: string;
+}): { ok: true } | { ok: false; gate: JobsNextGate } {
+  if (!input.sourceEnabled) {
+    return { ok: false, gate: "source_disabled" };
+  }
+
+  if (!input.lastHeartbeatAt) {
+    return { ok: false, gate: "heartbeat_required" };
+  }
+
+  if (input.agentCapabilities.length === 0) {
+    return { ok: false, gate: "capabilities_empty" };
+  }
+
+  const required = collectCapabilityForArtifactType(input.jobArtifactType);
+  const hasRequired =
+    input.agentCapabilities.includes(required) && input.sourceCapabilities.includes(required);
+
+  if (!hasRequired) {
+    return { ok: false, gate: "capability_mismatch" };
+  }
+
+  return { ok: true };
+}
+
 export type HeartbeatActiveJobState = {
   source_id: string;
   status: string;

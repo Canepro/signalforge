@@ -7,6 +7,7 @@ import {
   ADMIN_SESSION_COOKIE,
   getAdminTokenFromEnv,
   hashAdminSessionCookie,
+  isAdminTokenCandidate,
   verifyAdminSessionCookie,
 } from "@/lib/api/admin-auth";
 import {
@@ -38,7 +39,7 @@ export async function loginAdminAction(formData: FormData): Promise<void> {
     redirect("/sources/login?unconfigured=1");
   }
   const token = formData.get("token");
-  if (typeof token !== "string" || token !== env) {
+  if (typeof token !== "string" || !isAdminTokenCandidate(token)) {
     redirect("/sources/login?error=1");
   }
   const jar = await cookies();

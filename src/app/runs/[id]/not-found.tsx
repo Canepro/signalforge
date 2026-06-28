@@ -10,7 +10,7 @@ export default function RunNotFound() {
         The requested analysis run could not be found.
       </p>
       <Link
-        href="/"
+        href="/dashboard"
         className="mt-4 rounded-md bg-gradient-to-b from-primary to-primary-dim px-4 py-2 text-sm font-semibold text-on-primary hover:opacity-90 transition-all"
       >
         Back to Dashboard

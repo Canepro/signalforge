@@ -8,6 +8,7 @@ import * as analyzer from "@/lib/analyzer/index";
 import { POST as POST_SOURCES } from "@/app/api/sources/route";
 import { POST as POST_AGENT_REG } from "@/app/api/agent/registrations/route";
 import { POST as POST_AUTOMATION_REG } from "@/app/api/automation-agent/registrations/route";
+import { POST as POST_AUTOMATION_ROTATE } from "@/app/api/automation-agent/registrations/rotate/route";
 import { POST as POST_AUTOMATION_REQUEST } from "@/app/api/automation-agent/diagnostic-requests/route";
 import { GET as GET_AUTOMATION_REQUEST } from "@/app/api/automation-agent/diagnostic-requests/[id]/route";
 import { POST as POST_HEARTBEAT } from "@/app/api/agent/heartbeat/route";
@@ -192,6 +193,30 @@ describe("automation-agent routes", () => {
       })
     );
     expect(second.status).toBe(409);
+  });
+
+  it("rotates an automation-agent token and revokes the old bearer", async () => {
+    const { sourceId } = await createSource("automation-rotate", db);
+    const oldToken = await enrollAutomationAgent(sourceId);
+
+    const rotate = await POST_AUTOMATION_ROTATE(
+      new NextRequest("http://localhost/api/automation-agent/registrations/rotate", {
+        method: "POST",
+        headers: { ...adminAuth, "content-type": "application/json" },
+        body: JSON.stringify({ source_id: sourceId }),
+      })
+    );
+    expect(rotate.status).toBe(200);
+    const rotated = await rotate.json();
+    expect(rotated.token).toBeTruthy();
+    expect(rotated.token).not.toBe(oldToken);
+    expect(rotated.token_prefix).toBe(rotated.token.slice(0, 8));
+
+    const oldRequest = await queueAutomationRequest(oldToken);
+    expect(oldRequest.status).toBe(401);
+
+    const newRequest = await queueAutomationRequest(rotated.token);
+    expect(newRequest.status).toBe(201);
   });
 
   it("queues a diagnostic request and replays by idempotency key", async () => {

@@ -22,6 +22,8 @@ describe("API /api/runs", () => {
     dbClient.setDbOverride(null);
     db.close();
     vi.restoreAllMocks();
+    delete process.env.SIGNALFORGE_RUNS_API_TOKEN;
+    delete process.env.SIGNALFORGE_RUNS_REQUIRE_AUTH;
   });
 
   it("POST returns generic 500 without leaking exception details", async () => {
@@ -54,6 +56,27 @@ describe("API /api/runs", () => {
     expect(body.error).toMatch(/content/i);
   });
 
+  it("POST requires a runs bearer when runs API auth is enabled", async () => {
+    process.env.SIGNALFORGE_RUNS_API_TOKEN = "runs-route-token";
+    const req = new NextRequest("http://localhost/api/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "x", filename: "x.log" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("GET list accepts the configured runs bearer when runs API auth is enabled", async () => {
+    process.env.SIGNALFORGE_RUNS_API_TOKEN = "runs-route-token";
+    const req = new NextRequest("http://localhost/api/runs", {
+      headers: { authorization: "Bearer runs-route-token" },
+    });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toHaveProperty("runs");
+  });
+
   it("POST JSON returns 400 for invalid JSON", async () => {
     const req = new NextRequest("http://localhost/api/runs", {
       method: "POST",
@@ -66,6 +89,48 @@ describe("API /api/runs", () => {
     expect(body.error).toMatch(/invalid json/i);
   });
 
+  it("POST JSON returns 413 when content-length exceeds the artifact limit", async () => {
+    const previous = process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+    process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = "10";
+    try {
+      const req = new NextRequest("http://localhost/api/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": "11" },
+        body: JSON.stringify({ content: "x", filename: "x.log" }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(413);
+      await expect(res.json()).resolves.toMatchObject({ code: "payload_too_large" });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+      } else {
+        process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = previous;
+      }
+    }
+  });
+
+  it("POST JSON returns 413 when parsed content exceeds the artifact limit", async () => {
+    const previous = process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+    process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = "2";
+    try {
+      const req = new NextRequest("http://localhost/api/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content: "abc", filename: "x.log" }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(413);
+      await expect(res.json()).resolves.toMatchObject({ code: "payload_too_large" });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+      } else {
+        process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = previous;
+      }
+    }
+  });
+
   it("POST multipart returns 400 when file is missing", async () => {
     const form = new FormData();
     form.append("note", "no file");
@@ -75,6 +140,28 @@ describe("API /api/runs", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("POST multipart returns 413 when file exceeds the artifact limit", async () => {
+    const previous = process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+    process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = "2";
+    try {
+      const form = new FormData();
+      form.append("file", new Blob(["abc"], { type: "text/plain" }), "big.log");
+      const req = new NextRequest("http://localhost/api/runs", {
+        method: "POST",
+        body: form,
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(413);
+      await expect(res.json()).resolves.toMatchObject({ code: "payload_too_large" });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES;
+      } else {
+        process.env.SIGNALFORGE_MAX_ARTIFACT_BYTES = previous;
+      }
+    }
   });
 
   it("POST JSON happy path persists and calls saveDb", async () => {
@@ -101,7 +188,7 @@ Linux test 5.0 x86_64
     expect(body.artifact_id).toBeTruthy();
     expect(body.status).toBeTruthy();
 
-    const listRes = await GET();
+    const listRes = await GET(new NextRequest("http://localhost/api/runs"));
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list.runs.length).toBe(1);
@@ -148,7 +235,7 @@ Linux dup 5.0 x86_64
     const mpRes = await POST(mpReq);
     expect(mpRes.status).toBe(200);
 
-    const listRes = await GET();
+    const listRes = await GET(new NextRequest("http://localhost/api/runs"));
     const list = (await listRes.json()).runs as { filename: string; source_type: string }[];
     expect(list).toHaveLength(2);
     const byFile = Object.fromEntries(list.map((r) => [r.filename, r]));
@@ -204,7 +291,7 @@ Linux meta 5.0 x86_64
     expect(detail.collector_version).toBe("1.2.3");
     expect(detail.collected_at).toBe("2025-03-01T08:30:00.000Z");
 
-    const listRes = await GET();
+    const listRes = await GET(new NextRequest("http://localhost/api/runs"));
     const list = (await listRes.json()).runs as {
       target_identifier: string | null;
       collector_type: string | null;

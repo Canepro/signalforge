@@ -1,6 +1,7 @@
 import type { EnvironmentContext, Finding, PreFinding, Severity } from "./schema";
 
 export type MacActionGate = "safe-immediate" | "review-required" | "authority-gated";
+export type RuleScopedFinding = Finding & { rule_id?: string };
 
 const GATE_LABEL: Record<MacActionGate, string> = {
   "safe-immediate": "safe-immediate",
@@ -20,7 +21,11 @@ export function formatMacTopAction(gate: MacActionGate, action: string): string 
 }
 
 function ruleIdForFinding(finding: Finding, preFindings: PreFinding[]): string | undefined {
-  const index = parseInt(finding.id.replace(/\D/g, ""), 10) - 1;
+  const directRuleId = (finding as RuleScopedFinding).rule_id;
+  if (directRuleId) return directRuleId;
+  const match = finding.id.match(/^F(\d+)$/);
+  if (!match) return undefined;
+  const index = Number(match[1]) - 1;
   return preFindings[index]?.rule_id;
 }
 
@@ -241,9 +246,10 @@ export function isMacDiagnosticsRun(preFindings: PreFinding[]): boolean {
   return preFindings.some((finding) => finding.rule_id.startsWith("mac."));
 }
 
-function preFindingToScoringFinding(pf: PreFinding): Finding {
+function preFindingToScoringFinding(pf: PreFinding): RuleScopedFinding {
   return {
     id: "",
+    rule_id: pf.rule_id,
     title: pf.title,
     severity: pf.severity_hint,
     category: pf.category,
@@ -265,12 +271,13 @@ export function compareMacPreFindingsByActionPriority(a: PreFinding, b: PreFindi
 export function findingsForMacActionResolution(
   preFindings: PreFinding[],
   reconciledFindings?: Finding[]
-): Finding[] {
+): RuleScopedFinding[] {
   return preFindings.map((pf, index) => {
     const id = `F${String(index + 1).padStart(3, "0")}`;
     const reconciled = reconciledFindings?.find((finding) => finding.id === id);
     return {
       id,
+      rule_id: pf.rule_id,
       title: pf.title,
       severity: pf.severity_hint,
       category: pf.category,
@@ -283,7 +290,7 @@ export function findingsForMacActionResolution(
 }
 
 export function buildMacTopActions(
-  findings: Finding[],
+  findings: RuleScopedFinding[],
   preFindings: PreFinding[],
   env: EnvironmentContext,
   incomplete: boolean

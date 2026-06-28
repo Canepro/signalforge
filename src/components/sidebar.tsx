@@ -17,7 +17,7 @@ type NavItem = {
 };
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/", label: "Runs", icon: "M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" },
+  { href: "/dashboard", label: "Runs", icon: "M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" },
   { href: "/sources", label: "Sources", icon: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" },
 ];
 
@@ -28,7 +28,7 @@ export function Sidebar({ onUploadClick, onCollectEvidenceClick }: SidebarProps)
     <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-outline-variant/15 bg-surface-container-low md:flex">
       {/* Logo */}
       <div className="border-b border-outline-variant/10 px-4 pb-5 pt-5">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/dashboard" className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm">
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
@@ -49,7 +49,7 @@ export function Sidebar({ onUploadClick, onCollectEvidenceClick }: SidebarProps)
       {/* Navigation */}
       <nav className="flex-1 space-y-1.5 px-3 py-4">
         {NAV_ITEMS.map((item) => {
-          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.label}
