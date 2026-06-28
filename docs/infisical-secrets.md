@@ -46,6 +46,11 @@ Recommended defaults:
 - `INFISICAL_DOMAIN=https://app.infisical.com`
 - `INFISICAL_SECRET_PATH=/`
 
+For the shared `canepro-secrets` project, use a project folder such as
+`/signalforge` and set `INFISICAL_SECRET_PATH=/signalforge`. That keeps
+SignalForge out of a dedicated Infisical project slot while preserving a narrow
+folder boundary for the GitHub OIDC machine identity.
+
 The deploy workflow still needs the non-secret ACA and Azure variables already documented in [`app-release-and-aca-deploy.md`](./app-release-and-aca-deploy.md), such as:
 
 - `AZURE_CLIENT_ID`
@@ -74,9 +79,14 @@ Store app-runtime names in Infisical rather than GitHub-specific names:
 
 - `DATABASE_URL`
 - `SIGNALFORGE_ADMIN_TOKEN`
+- optional `LLM_PROVIDER`
 - optional `OPENAI_API_KEY`
+- optional `OPENAI_MODEL`
 - optional `AZURE_OPENAI_API_KEY`
-- optional `LLM_PROVIDER` and Codex App Server transport settings (`CODEX_APP_SERVER_*`) when using the Codex App Server analysis brain
+- optional `AZURE_OPENAI_ENDPOINT`
+- optional `AZURE_OPENAI_DEPLOYMENT`
+- optional `AZURE_OPENAI_API_VERSION` for legacy Azure endpoints only
+- optional Codex App Server transport settings (`CODEX_APP_SERVER_*`) when using the Codex App Server analysis brain
 - optional `CODEX_APP_SERVER_WS_BEARER_TOKEN` for authenticated WebSocket Codex App Server endpoints; do not commit or print this value
 - optional `SIGNALFORGE_AUTOMATION_AGENT_TOKEN_<SOURCE_SLUG>` — source-bound automation-agent token; see [`operators/automation-agent-multi-source-enrollment.md`](./operators/automation-agent-multi-source-enrollment.md)
 
