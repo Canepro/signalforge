@@ -13,7 +13,7 @@ import {
   extractAuditEnrichmentFromCodexTurnPayload,
   extractAuditReportFromCodexTurnPayload,
 } from "@/lib/analyzer/codex-app-server/extract-report";
-import type { AuditReport } from "@/lib/analyzer/schema";
+import type { AuditEnrichment, AuditReport } from "@/lib/analyzer/schema";
 
 const FIXTURES = join(__dirname, "../fixtures");
 
@@ -43,6 +43,18 @@ const sampleReport: AuditReport = {
   },
   noise_or_expected: [],
   top_actions_now: ["Free space on /.", "Review auth failures.", "Patch packages."],
+};
+
+const sampleEnrichment: AuditEnrichment = {
+  summary: ["Host posture needs attention."],
+  top_actions_now: ["Free space on /.", "Review auth failures.", "Patch packages."],
+  finding_notes: [
+    {
+      id: "F001",
+      why_it_matters: "Low free space can cause outages.",
+      recommended_action: "Free space on /.",
+    },
+  ],
 };
 
 describe("codex app-server config", () => {
@@ -193,28 +205,37 @@ describe("extractAuditReportFromCodexTurnPayload", () => {
     });
     expect(extracted).toEqual(sampleReport);
   });
+
+  it("parses JSON embedded in final text", () => {
+    const extracted = extractAuditReportFromCodexTurnPayload({
+      method: "turn/completed",
+      params: {
+        message: `Here is the report:\n\n\`\`\`json\n${JSON.stringify(sampleReport)}\n\`\`\``,
+      },
+    });
+    expect(extracted).toEqual(sampleReport);
+  });
 });
 
 describe("extractAuditEnrichmentFromCodexTurnPayload", () => {
   it("parses compact enrichment embedded in turn/completed notifications", () => {
-    const enrichment = {
-      summary: ["Large cluster run needs exposure review."],
-      top_actions_now: ["Action A", "Action B", "Action C"],
-      finding_notes: [
-        {
-          id: "F001",
-          why_it_matters: "Public exposure expands the cluster attack surface.",
-          recommended_action: "Make the Service internal unless public access is required.",
-        },
-      ],
-    };
-
     const extracted = extractAuditEnrichmentFromCodexTurnPayload({
       method: "turn/completed",
-      params: { structuredOutput: enrichment },
+      params: { structuredOutput: sampleEnrichment },
     });
 
-    expect(extracted).toEqual(enrichment);
+    expect(extracted).toEqual(sampleEnrichment);
+  });
+
+  it("parses compact enrichment from fenced final text", () => {
+    const extracted = extractAuditEnrichmentFromCodexTurnPayload({
+      method: "turn/completed",
+      params: {
+        finalOutput: `\`\`\`json\n${JSON.stringify(sampleEnrichment)}\n\`\`\``,
+      },
+    });
+
+    expect(extracted).toEqual(sampleEnrichment);
   });
 });
 
@@ -238,14 +259,14 @@ describe("analyzeArtifact with codex_app_server", () => {
     process.env = { ...baseEnv };
   });
 
-  it("parses a successful Codex brain response", async () => {
+  it("uses Codex App Server enrichment without letting it replace deterministic findings", async () => {
     const { analyzeArtifact } = await import("@/lib/analyzer/index");
     process.env.LLM_PROVIDER = "codex_app_server";
     const raw = readFileSync(join(FIXTURES, "wsl-nov2025-full.log"), "utf-8");
 
     const result = await analyzeArtifact(raw, {
-      _codexBrainFactory: async () => ({
-        report: sampleReport,
+      _codexEnrichmentBrainFactory: async () => ({
+        enrichment: sampleEnrichment,
         tokensUsed: 42,
         modelLabel: "codex-app-server:gpt-5.4",
       }),
@@ -254,24 +275,48 @@ describe("analyzeArtifact with codex_app_server", () => {
     expect(result.meta.llm_succeeded).toBe(true);
     expect(result.meta.model_used).toBe("codex-app-server:gpt-5.4");
     expect(result.meta.tokens_used).toBe(42);
-    expect(result.report?.summary).toEqual(sampleReport.summary);
+    expect(result.report?.summary).toEqual(sampleEnrichment.summary);
+    expect(result.report?.findings.map((finding) => finding.title)).not.toEqual(
+      sampleReport.findings.map((finding) => finding.title)
+    );
+    expect(result.report?.findings[0]?.why_it_matters).toBe(sampleEnrichment.finding_notes[0]?.why_it_matters);
   });
 
-  it("falls back when Codex returns invalid JSON output", async () => {
+  it("falls back when Codex returns invalid enrichment output", async () => {
     const { analyzeArtifact } = await import("@/lib/analyzer/index");
     process.env.LLM_PROVIDER = "codex_app_server";
     const raw = readFileSync(join(FIXTURES, "wsl-nov2025-truncated.log"), "utf-8");
 
     const result = await analyzeArtifact(raw, {
-      _codexBrainFactory: async () => {
-        throw new Error("Codex App Server turn completed without a valid audit report payload");
+      _codexEnrichmentBrainFactory: async () => {
+        throw new Error("Codex App Server turn completed without a valid audit enrichment payload");
       },
     });
 
     expect(result.meta.llm_succeeded).toBe(false);
     expect(result.meta.model_used).toBe("codex-app-server:gpt-5.4");
-    expect(result.analysis_error).toMatch(/valid audit report/i);
+    expect(result.analysis_error).toMatch(/valid audit enrichment/i);
     expect(result.report).not.toBeNull();
+  });
+
+  it("preserves mac daily cleanup findings when Codex enrichment fails", async () => {
+    const { analyzeArtifact } = await import("@/lib/analyzer/index");
+    process.env.LLM_PROVIDER = "codex_app_server";
+    const raw = readFileSync(join(FIXTURES, "mac-workstation-diagnostics-cleanup-enriched.txt"), "utf-8");
+
+    const result = await analyzeArtifact(raw, {
+      _codexEnrichmentBrainFactory: async () => {
+        throw new Error("Codex App Server turn completed without a valid audit enrichment payload");
+      },
+    });
+
+    const titles = result.report?.findings.map((finding) => finding.title) ?? [];
+    const ruleIds = result.pre_findings.map((finding) => finding.rule_id);
+    expect(result.meta.llm_succeeded).toBe(false);
+    expect(ruleIds).toContain("mac.daily_cleanup_stale_review_candidates");
+    expect(ruleIds).toContain("mac.daily_cleanup_prune_candidates");
+    expect(titles).toContain("Daily cleanup retained 2 stale manual review candidates");
+    expect(titles).toContain("Daily cleanup found one linked-worktree prune candidate");
   });
 
   it("falls back when Codex App Server is unavailable", async () => {

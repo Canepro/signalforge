@@ -17,10 +17,13 @@ RUN bun run build
 FROM docker.io/library/node:22-alpine AS runner
 WORKDIR /app
 
+ARG SIGNALFORGE_BUILD_SHA=unknown
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV SIGNALFORGE_BUILD_SHA=${SIGNALFORGE_BUILD_SHA}
 
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 

@@ -20,9 +20,8 @@ import {
   buildUserPrompt,
 } from "./prompts";
 import {
-  callCodexAppServerBrain,
   callCodexAppServerEnrichmentBrain,
-  type CodexBrainCallOptions,
+  type CodexEnrichmentBrainCallOptions,
 } from "./codex-app-server/brain";
 import { createOpenAIClient, resolveBrainProvider } from "./brain-provider";
 import { auditEnrichmentResponseFormat, auditReportResponseFormat } from "./response-format";
@@ -33,8 +32,8 @@ export interface AnalyzeOptions {
   artifactType?: string;
   /** @internal test-only: inject an OpenAI SDK–compatible client (OpenAI or Azure-shaped base URL). */
   _openaiClient?: OpenAI;
-  /** @internal test-only: bypass stdio spawn for Codex App Server brain calls. */
-  _codexBrainFactory?: CodexBrainCallOptions["_sessionFactory"];
+  /** @internal test-only: bypass stdio spawn for Codex App Server enrichment brain calls. */
+  _codexEnrichmentBrainFactory?: CodexEnrichmentBrainCallOptions["_sessionFactory"];
 }
 
 const COMPACT_LLM_FINDING_THRESHOLD = 80;
@@ -100,39 +99,30 @@ export async function analyzeArtifact(
 
     if (resolved.provider === "codex_app_server") {
       try {
-        const useCompactLlm = shouldUseCompactLlm(preFindings);
-        const codex = useCompactLlm
-          ? await callCodexAppServerEnrichmentBrain(
-              {
-                system: buildSystemPrompt(),
-                user: buildCompactUserPrompt(
-                  env,
-                  noise,
-                  selectCompactFindings(preFindings, env),
-                  preFindings.length,
-                  incomplete,
-                  reason
-                ),
-              },
-              { model: options.model }
-            )
-          : await callCodexAppServerBrain(
-              {
-                system: buildSystemPrompt(),
-                user: buildUserPrompt(env, noise, preFindings, sections, incomplete, reason),
-              },
-              { model: options.model, _sessionFactory: options._codexBrainFactory }
-            );
+        const codex = await callCodexAppServerEnrichmentBrain(
+          {
+            system: buildSystemPrompt(),
+            user: buildCompactUserPrompt(
+              env,
+              noise,
+              selectCompactFindings(preFindings, env),
+              preFindings.length,
+              incomplete,
+              reason
+            ),
+          },
+          { model: options.model, _sessionFactory: options._codexEnrichmentBrainFactory }
+        );
         const duration = Date.now() - startMs;
-        const codexReport = "enrichment" in codex
-          ? buildReportFromEnrichment(codex.enrichment, env, noise, preFindings)
-          : codex.report;
-        const reconciledFindings = useCompactLlm
-          ? codexReport.findings
-          : reconcileSeverity(codexReport.findings, preFindings);
+        const codexReport = buildReportFromEnrichment(
+          codex.enrichment,
+          env,
+          noise,
+          preFindings
+        );
         const mergedReport: AuditReport = {
           summary: codexReport.summary,
-          findings: reconciledFindings,
+          findings: codexReport.findings,
           environment_context: env,
           noise_or_expected: noise,
           top_actions_now: codexReport.top_actions_now,
@@ -364,6 +354,7 @@ function severityWeight(severity: Finding["severity"]): number {
 /** When severities tie, prefer categories that usually need action first (disk/auth before loopback listeners). */
 const CATEGORY_TIE_BREAK: Record<string, number> = {
   disk: 6,
+  resource: 6,
   auth: 5,
   kubernetes: 5,
   packages: 4,
@@ -459,6 +450,25 @@ function compareFindingsForFallback(a: Finding, b: Finding): number {
 function summarizeFallbackFinding(finding: Finding): string {
   if (finding.category === "disk") {
     return `${finding.title}, which leaves limited headroom for writes or package operations.`;
+  }
+  if (finding.category === "resource") {
+    const title = finding.title.toLowerCase();
+    if (title.includes("daily cleanup retained")) {
+      return `${finding.title}, leaving manual review work queued in the local cleanup lane.`;
+    }
+    if (title.includes("linked-worktree prune candidate")) {
+      return `${finding.title}, so stale Git worktree metadata may still be retained after paths disappear.`;
+    }
+    if (title.includes("daily cleanup metadata")) {
+      return `${finding.title}, which weakens confidence in the current workstation disk-cleanup baseline.`;
+    }
+    if (title.includes("protected retained stores")) {
+      return `${finding.title}, leaving large protected local stores as intentional retained disk consumers.`;
+    }
+    if (title.includes("root volume usage")) {
+      return `${finding.title}, which leaves limited headroom for writes or package operations.`;
+    }
+    return `${finding.title}.`;
   }
   if (finding.category === "packages") {
     return `${finding.title}, so operating system updates remain unapplied.`;
@@ -703,6 +713,25 @@ function buildActionForFinding(
   if (finding.category === "disk") {
     const mount = finding.title.match(/: (.+?) at \d+%/)?.[1] ?? "the affected volume";
     return `Free space on ${mount} or expand the backing volume so usage drops below the warning threshold before writes start failing.`;
+  }
+
+  if (finding.category === "resource") {
+    const tl = finding.title.toLowerCase();
+    if (tl.includes("daily cleanup retained")) {
+      return "Review the stale daily-cleanup manual candidates, confirm branch or worktree fate, and remove only the entries that are clearly obsolete.";
+    }
+    if (tl.includes("linked-worktree prune candidate")) {
+      return "Run `git worktree prune` in the owning repo after confirming the missing path is not an active worktree reference.";
+    }
+    if (tl.includes("daily cleanup metadata")) {
+      return "Rerun the local daily cleanup script and validate the newest report and manifest JSON before trusting cleanup posture.";
+    }
+    if (tl.includes("protected retained stores")) {
+      return "Review the protected retained stores as metadata-only disk consumers and keep them out of automatic cleanup unless the owner widens the deletion scope.";
+    }
+    if (tl.includes("root volume usage")) {
+      return "Free space on the Mac root volume or move rebuildable local artifacts so usage drops below the warning threshold.";
+    }
   }
 
   if (finding.category === "packages") {

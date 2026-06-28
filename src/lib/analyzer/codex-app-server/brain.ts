@@ -24,6 +24,15 @@ export type CodexBrainCallOptions = {
   ) => Promise<CodexBrainCallResult>;
 };
 
+export type CodexEnrichmentBrainCallOptions = {
+  model?: string;
+  /** @internal test-only */
+  _sessionFactory?: (
+    config: CodexAppServerResolvedConfig,
+    prompts: CodexBrainPrompt
+  ) => Promise<CodexEnrichmentBrainCallResult>;
+};
+
 export function modelLabelForCodexConfig(config: CodexAppServerResolvedConfig): string {
   return `codex-app-server:${config.model}`;
 }
@@ -62,11 +71,15 @@ export async function callCodexAppServerBrain(
 
 export async function callCodexAppServerEnrichmentBrain(
   prompts: CodexBrainPrompt,
-  options: CodexBrainCallOptions = {}
+  options: CodexEnrichmentBrainCallOptions = {}
 ): Promise<CodexEnrichmentBrainCallResult> {
   const resolved = resolveCodexAppServerConfig(process.env, { model: options.model });
   if (!resolved.ready) {
     throw new Error(resolved.reason);
+  }
+
+  if (options._sessionFactory) {
+    return options._sessionFactory(resolved.config, prompts);
   }
 
   const session =

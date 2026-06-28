@@ -25,6 +25,9 @@ These values must be present on the ACA app before treating the deployment as va
 |---|---|---:|---|---|
 | `DATABASE_DRIVER` | Yes | No | `postgres` | Lock ACA onto the durable backend |
 | `DATABASE_URL` | Yes | Yes | Neon connection string | Use the Neon TLS-enabled URL as issued |
+| `SIGNALFORGE_BUILD_SHA` | No | No | image build SHA | Baked into the image by the publish workflow |
+| `SIGNALFORGE_IMAGE` | No | No | deployed GHCR image ref | Injected by the ACA template for hosted drift checks |
+| `SIGNALFORGE_REVISION_SUFFIX` | No | No | ACA revision suffix | Injected by the ACA template when a suffix is supplied |
 
 ## Operator and agent-facing environment
 
@@ -80,6 +83,9 @@ Store these as ACA secrets rather than plain environment values:
 Keep these as plain environment values:
 
 - `DATABASE_DRIVER`
+- `SIGNALFORGE_BUILD_SHA`
+- `SIGNALFORGE_IMAGE`
+- `SIGNALFORGE_REVISION_SUFFIX`
 - `LLM_PROVIDER`
 - `OPENAI_MODEL`
 - `AZURE_OPENAI_ENDPOINT`

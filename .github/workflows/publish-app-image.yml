@@ -125,6 +125,7 @@ jobs:
             if docker buildx build \
               --file ./Dockerfile \
               --push \
+              --build-arg "SIGNALFORGE_BUILD_SHA=${{ steps.tags.outputs.full_sha }}" \
               --cache-from type=gha \
               --cache-to type=gha,mode=max \
               "${tag_args[@]}" \

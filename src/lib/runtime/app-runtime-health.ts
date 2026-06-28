@@ -22,12 +22,19 @@ type AdminApiHealth = {
   status: "enabled" | "disabled";
 };
 
+type BuildHealth = {
+  revision: string | null;
+  image: string | null;
+  revision_suffix: string | null;
+};
+
 export type AppRuntimeHealthReport = {
   ok: boolean;
   service: "signalforge";
   storage: StorageHealth;
   llm: LlmHealth;
   admin_api: AdminApiHealth;
+  build: BuildHealth;
 };
 
 function resolveStorageHealth(env: NodeJS.ProcessEnv): StorageHealth {
@@ -99,12 +106,30 @@ function resolveAdminApiHealth(env: NodeJS.ProcessEnv): AdminApiHealth {
   };
 }
 
+function presentEnvValue(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === "unknown") return null;
+  return trimmed;
+}
+
+function resolveBuildHealth(env: NodeJS.ProcessEnv): BuildHealth {
+  return {
+    revision:
+      presentEnvValue(env.SIGNALFORGE_BUILD_SHA) ??
+      presentEnvValue(env.VERCEL_GIT_COMMIT_SHA) ??
+      null,
+    image: presentEnvValue(env.SIGNALFORGE_IMAGE),
+    revision_suffix: presentEnvValue(env.SIGNALFORGE_REVISION_SUFFIX),
+  };
+}
+
 export function getAppRuntimeHealthReport(
   env: NodeJS.ProcessEnv = process.env
 ): AppRuntimeHealthReport {
   const storage = resolveStorageHealth(env);
   const llm = resolveLlmHealth(env);
   const admin_api = resolveAdminApiHealth(env);
+  const build = resolveBuildHealth(env);
 
   return {
     ok: storage.status === "ok",
@@ -112,5 +137,6 @@ export function getAppRuntimeHealthReport(
     storage,
     llm,
     admin_api,
+    build,
   };
 }

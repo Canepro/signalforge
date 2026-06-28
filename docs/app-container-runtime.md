@@ -41,6 +41,9 @@ SignalForge still boots without LLM credentials and falls back to deterministic 
 |---|---|---|
 | `PORT` | `3000` | Container listen port |
 | `HOSTNAME` | `0.0.0.0` in the committed image | Required so the container is reachable from outside the process |
+| `SIGNALFORGE_BUILD_SHA` | image build arg | Source commit baked into the app image for hosted drift checks |
+| `SIGNALFORGE_IMAGE` | ACA deploy env | Container image currently assigned to the ACA app |
+| `SIGNALFORGE_REVISION_SUFFIX` | ACA deploy env | ACA revision suffix for the deployed app image |
 
 ## Health endpoint
 
@@ -51,6 +54,7 @@ Behavior:
 - returns `200` when the storage runtime contract is valid for the selected driver
 - returns `503` when required storage env is missing or `DATABASE_DRIVER` is invalid
 - reports LLM configuration and admin API enablement without failing the app, because both already have valid fallback or opt-in behavior
+- reports build/image metadata so operators can compare the hosted revision against the commit that contains a fix
 
 This endpoint is intentionally config-focused. It does **not** prove live database reachability or outbound LLM connectivity.
 

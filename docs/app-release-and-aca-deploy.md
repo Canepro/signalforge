@@ -174,6 +174,22 @@ That script checks:
 - `GET /api/runs`
 - `GET /api/sources` when an admin token is available
 
+### 5. Optional auto-deploy after image publish
+
+`.github/workflows/auto-deploy-aca-app.yml` can deploy the just-published
+full-SHA image after `Publish App Image` succeeds for `main`.
+
+This is opt-in. Set the `aca-app` GitHub environment variable:
+
+```text
+ACA_APP_AUTO_DEPLOY=true
+```
+
+The auto-deploy path uses the same checked-in deploy helper, the same
+Infisical-over-OIDC secret source, the same `aca-app` environment vars, and the
+same post-deploy smoke check. Leave the variable unset or set to anything other
+than `true` to keep deploys manual.
+
 ## Local operator fallback
 
 If you want the exact same deploy path outside GitHub Actions, use the checked-in helper directly:
@@ -200,7 +216,8 @@ Then remove `--what-if` for the real deploy.
 2. Let `CI` pass.
 3. Let `Publish App Image` publish the GHCR image.
 4. Confirm the package is public and copy the immutable full SHA tag.
-5. Run `Deploy ACA App` with that full SHA tag.
-6. Start with `what_if=true`.
-7. Rerun with `what_if=false` once the plan looks correct.
-8. Run the deeper migration steps from [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) only if your operator instance still carries a legacy ACA app name.
+5. If `ACA_APP_AUTO_DEPLOY=true`, let `Auto Deploy ACA App` deploy and smoke-check that full SHA.
+6. If auto-deploy is disabled, run `Deploy ACA App` with that full SHA tag.
+7. Start manual deploys with `what_if=true`.
+8. Rerun manual deploys with `what_if=false` once the plan looks correct.
+9. Run the deeper migration steps from [`aca-cutover-runbook.md`](./aca-cutover-runbook.md) only if your operator instance still carries a legacy ACA app name.

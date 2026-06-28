@@ -133,6 +133,14 @@ var containerEnv = concat(
       name: 'SIGNALFORGE_ADMIN_TOKEN'
       secretRef: 'signalforge-admin-token'
     }
+    {
+      name: 'SIGNALFORGE_IMAGE'
+      value: image
+    }
+    {
+      name: 'SIGNALFORGE_REVISION_SUFFIX'
+      value: revisionSuffix
+    }
   ],
   llmProvider != '' ? [
     {

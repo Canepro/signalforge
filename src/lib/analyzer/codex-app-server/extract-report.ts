@@ -16,23 +16,88 @@ function tryParseAuditEnrichment(value: unknown): AuditEnrichment | null {
 }
 
 function tryParseAuditReportJson(text: string): AuditReport | null {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("{")) return null;
-  try {
-    return tryParseAuditReport(JSON.parse(trimmed));
-  } catch {
-    return null;
+  for (const candidate of jsonObjectCandidates(text)) {
+    try {
+      const parsed = tryParseAuditReport(JSON.parse(candidate));
+      if (parsed) return parsed;
+    } catch {
+      // Keep scanning later candidates; app-server text may contain prose before JSON.
+    }
   }
+  return null;
 }
 
 function tryParseAuditEnrichmentJson(text: string): AuditEnrichment | null {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("{")) return null;
-  try {
-    return tryParseAuditEnrichment(JSON.parse(trimmed));
-  } catch {
-    return null;
+  for (const candidate of jsonObjectCandidates(text)) {
+    try {
+      const parsed = tryParseAuditEnrichment(JSON.parse(candidate));
+      if (parsed) return parsed;
+    } catch {
+      // Keep scanning later candidates; app-server text may contain prose before JSON.
+    }
   }
+  return null;
+}
+
+function jsonObjectCandidates(text: string): string[] {
+  const trimmed = text.trim();
+  const candidates: string[] = [];
+  if (trimmed.startsWith("{")) candidates.push(trimmed);
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]?.trim().startsWith("{")) {
+    candidates.push(fenced[1].trim());
+  }
+
+  for (const objectText of balancedJsonObjects(trimmed)) {
+    if (!candidates.includes(objectText)) candidates.push(objectText);
+  }
+
+  return candidates;
+}
+
+function balancedJsonObjects(text: string): string[] {
+  const out: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        out.push(text.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+
+  return out;
 }
 
 function collectStrings(value: unknown, out: string[], depth = 0): void {

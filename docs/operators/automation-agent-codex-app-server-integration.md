@@ -18,8 +18,13 @@ When `LLM_PROVIDER=codex_app_server`, SignalForge:
 
 1. Runs the deterministic adapter pipeline first (pre-findings, noise, incomplete detection).
 2. Starts an **ephemeral** Codex thread per analysis over stdio (`codex app-server` by default) or an authenticated WebSocket transport.
-3. Sends a single `turn/start` with `outputSchema` matching `AuditReportSchema`, `sandboxPolicy: { type: "readOnly", networkAccess: false }`, and `approvalPolicy: "never"`.
-4. Parses strict JSON from the turn result; on failure, uses the same deterministic fallback as OpenAI/Azure misconfiguration.
+3. Sends a single `turn/start` with `outputSchema` matching the audit-enrichment schema, `sandboxPolicy: { type: "readOnly", networkAccess: false }`, and `approvalPolicy: "never"`.
+4. Builds the final finding list from deterministic pre-findings, then applies Codex summary, action, and per-finding note enrichment when valid.
+5. Parses strict JSON from structured output or final text; on failure, uses the same deterministic fallback as OpenAI/Azure misconfiguration.
+
+Codex App Server does not author or replace findings. New adapter rules, such
+as Mac daily-cleanup enrichment, must surface in the report even if the Codex
+turn fails or the remote WebSocket bridge returns an unusable payload.
 
 SignalForge does **not** expose Codex shell/file tools for analysis. If your app-server build cannot honor read-only turns, do not enable this provider until it can.
 
@@ -64,8 +69,8 @@ use `LLM_PROVIDER=codex_app_server` only with:
 - `CODEX_APP_SERVER_WS_ALLOW_REMOTE=true`
 - `CODEX_APP_SERVER_WS_BEARER_TOKEN=<from Infisical or ACA secret>`
 
-The deployed app health endpoint reports the selected provider, transport, and
-model, but never prints the bearer token.
+The deployed app health endpoint reports the selected provider, transport,
+model, and build/image metadata, but never prints the bearer token.
 
 ## Automation Agent
 

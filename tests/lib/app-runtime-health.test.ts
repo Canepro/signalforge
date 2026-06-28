@@ -34,4 +34,22 @@ describe("getAppRuntimeHealthReport", () => {
       turn_timeout_ms: 45000,
     });
   });
+
+  it("reports build metadata when the deployment stamps it", () => {
+    const report = getAppRuntimeHealthReport(
+      {
+        ...process.env,
+        DATABASE_DRIVER: "sqlite",
+        SIGNALFORGE_BUILD_SHA: "0123456789abcdef",
+        SIGNALFORGE_IMAGE: "ghcr.io/canepro/signalforge:0123456789abcdef",
+        SIGNALFORGE_REVISION_SUFFIX: "sha0123456789ab",
+      } satisfies NodeJS.ProcessEnv
+    );
+
+    expect(report.build).toEqual({
+      revision: "0123456789abcdef",
+      image: "ghcr.io/canepro/signalforge:0123456789abcdef",
+      revision_suffix: "sha0123456789ab",
+    });
+  });
 });
