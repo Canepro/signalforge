@@ -1,5 +1,10 @@
 import type { PreFinding } from "../../analyzer/schema";
 import {
+  classifyDiskPressureBand,
+  severityForDiskPressureBand,
+  type DiskPressureBand,
+} from "./disk-pressure";
+import {
   macValueFor,
   parseMacFloat,
   parseMacInteger,
@@ -82,8 +87,8 @@ function parseRetainedLargeStores(raw: string): RetainedLargeStore[] {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-function severityForDiskPressure(diskUsedPercent: number): "medium" | "high" {
-  return diskUsedPercent >= 95 ? "high" : "medium";
+function pressureBandLabel(band: DiskPressureBand): string {
+  return band;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -125,7 +130,7 @@ function reclaimedSummary(reclaimedByCategory: Record<string, number>): string {
     .join(", ");
 }
 
-function readDailyCleanupInfo(sections: Record<string, string>): DailyCleanupInfo | null {
+export function readDailyCleanupInfo(sections: Record<string, string>): DailyCleanupInfo | null {
   const status = parseCleanupStatus(macValueFor(sections, "daily_cleanup_report_status"));
   if (!status) return null;
 
@@ -157,12 +162,10 @@ export function extractDailyCleanupFindings(
   if (!cleanup) return [];
 
   const findings: PreFinding[] = [];
-  const underPressure =
-    typeof diskUsedPercent === "number" && Number.isFinite(diskUsedPercent) && diskUsedPercent >= 85;
-  const pressureSeverity =
-    underPressure && diskUsedPercent !== null ? severityForDiskPressure(diskUsedPercent) : null;
+  const pressureBand = classifyDiskPressureBand(diskUsedPercent);
+  const pressureSeverity = pressureBand ? severityForDiskPressureBand(pressureBand) : null;
 
-  if (pressureSeverity && cleanup.status !== "present") {
+  if (pressureBand && cleanup.status !== "present") {
     const statusDetail =
       cleanup.status === "stale" && cleanup.ageHours !== null ?
         `latest cleanup report is ${cleanup.ageHours.toFixed(1)} hours old`
@@ -172,11 +175,13 @@ export function extractDailyCleanupFindings(
       : `cleanup report status is ${cleanup.status}`;
 
     findings.push({
-      title: `Daily cleanup metadata is ${cleanup.status} while root volume usage is elevated`,
-      severity_hint: pressureSeverity,
+      title: `Daily cleanup metadata is ${cleanup.status} while root volume disk pressure is ${pressureBandLabel(pressureBand)}`,
+      severity_hint: pressureSeverity!,
       category: "resource",
       section_source: "daily_cleanup_report_status",
-      evidence: `${statusDetail}; disk_root_used_percent=${sections.disk_root_used_percent ?? "unknown"}`,
+      evidence:
+        `${statusDetail}; pressure_band=${pressureBand}; ` +
+        `disk_root_used_percent=${sections.disk_root_used_percent ?? "unknown"}`,
       rule_id: `mac.daily_cleanup_report_${cleanup.status}`,
     });
   }
@@ -185,7 +190,8 @@ export function extractDailyCleanupFindings(
     cleanup.needsReviewSummary?.review_buckets?.stale_candidate ?? 0;
   if (staleCandidates > 0) {
     const severity =
-      pressureSeverity === "high" ? "medium"
+      pressureBand === "urgent" ? "medium"
+      : pressureBand === "warning" ? "low"
       : "low";
     const candidates = cleanup.needsReviewSummary?.priority_review_candidates ?? [];
     findings.push({
@@ -222,18 +228,124 @@ export function extractDailyCleanupFindings(
     });
   }
 
-  if (pressureSeverity && cleanup.retainedLargeStores.length > 0) {
+  if (pressureBand && cleanup.retainedLargeStores.length > 0) {
     const topStores = cleanup.retainedLargeStores
       .slice(0, 3)
       .map((store) => `${store.path ?? "unknown store"} (${formatBytes(store.size_bytes)})`)
       .join("; ");
     findings.push({
-      title: "Protected retained stores remain large while root volume usage is elevated",
-      severity_hint: pressureSeverity,
+      title: `Protected retained stores remain large while root volume disk pressure is ${pressureBandLabel(pressureBand)}`,
+      severity_hint: pressureSeverity!,
       category: "resource",
       section_source: "daily_cleanup_retained_large_stores_json",
-      evidence: `${topStores}; reclaimed=${reclaimedSummary(cleanup.reclaimedByCategory)}`,
+      evidence:
+        `${topStores}; reclaimed=${reclaimedSummary(cleanup.reclaimedByCategory)}; ` +
+        `pressure_band=${pressureBand}`,
       rule_id: "mac.daily_cleanup_large_protected_stores",
+    });
+  }
+
+  if (pressureBand) {
+    findings.push(...extractCleanupPressureCorrelationFindings(cleanup, pressureBand, diskUsedPercent));
+  }
+
+  return findings;
+}
+
+function signedFormatBytes(bytes: number | null | undefined): string {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes)) {
+    return "unknown";
+  }
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let value = Math.abs(bytes);
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
+  const sign = bytes < 0 ? "-" : "";
+  return `${sign}${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function cleanupEffectivenessLabel(deltaBytes: number | null): string {
+  if (deltaBytes === null) return "unknown";
+  if (deltaBytes < 0) return "negative";
+  if (deltaBytes === 0) return "flat";
+  return "positive";
+}
+
+function retainedStoreBytes(stores: RetainedLargeStore[]): number {
+  return stores.reduce((total, store) => {
+    const size = store.size_bytes;
+    return typeof size === "number" && Number.isFinite(size) ? total + size : total;
+  }, 0);
+}
+
+function extractCleanupPressureCorrelationFindings(
+  cleanup: DailyCleanupInfo,
+  pressureBand: DiskPressureBand,
+  diskUsedPercent: number | null
+): PreFinding[] {
+  const findings: PreFinding[] = [];
+  const usedLabel =
+    typeof diskUsedPercent === "number" && Number.isFinite(diskUsedPercent) ?
+      diskUsedPercent.toFixed(1)
+    : "unknown";
+  const deltaBytes = cleanup.deltaBytes;
+  const staleCandidates = cleanup.needsReviewSummary?.review_buckets?.stale_candidate ?? 0;
+  const retainedStoreCount = cleanup.retainedLargeStores.length;
+  const retainedBytes = retainedStoreBytes(cleanup.retainedLargeStores);
+  const effectiveness = cleanupEffectivenessLabel(deltaBytes);
+  const hasCleanupDrift =
+    cleanup.status !== "present" ||
+    effectiveness !== "positive" ||
+    staleCandidates > 0 ||
+    retainedStoreCount > 0;
+
+  if (!hasCleanupDrift) {
+    return findings;
+  }
+
+  const bandSeverity = severityForDiskPressureBand(pressureBand);
+  const correlationSeverity =
+    pressureBand === "urgent" &&
+    (cleanup.status !== "present" || effectiveness === "negative" || staleCandidates > 0) ?
+      "high"
+    : bandSeverity;
+
+  findings.push({
+    title: `Mac ${pressureBand} disk pressure correlates with cleanup posture drift`,
+    severity_hint: correlationSeverity,
+    category: "resource",
+    section_source: "daily_cleanup_report_status",
+    evidence: [
+      `pressure_band=${pressureBand}`,
+      `disk_root_used_percent=${usedLabel}`,
+      `cleanup_report_status=${cleanup.status}`,
+      cleanup.ageHours !== null ? `cleanup_report_age_hours=${cleanup.ageHours.toFixed(1)}` : null,
+      deltaBytes !== null ? `cleanup_free_space_delta_bytes=${deltaBytes}` : null,
+      `cleanup_effectiveness=${effectiveness}`,
+      `retained_large_store_count=${retainedStoreCount}`,
+      retainedBytes > 0 ? `retained_large_store_bytes=${retainedBytes}` : null,
+      `stale_review_candidates=${staleCandidates}`,
+      cleanup.needsReviewCount !== null ? `needs_review_count=${cleanup.needsReviewCount}` : null,
+    ]
+      .filter(Boolean)
+      .join("; "),
+    rule_id: "mac.disk_pressure_operational_posture",
+  });
+
+  if (deltaBytes !== null && deltaBytes <= 0) {
+    findings.push({
+      title: `Latest daily cleanup did not increase free space while disk pressure is ${pressureBand}`,
+      severity_hint: pressureBand === "urgent" ? "high" : "medium",
+      category: "resource",
+      section_source: "daily_cleanup_free_space_delta_bytes",
+      evidence:
+        `cleanup_free_space_delta_bytes=${deltaBytes} (${signedFormatBytes(deltaBytes)}); ` +
+        `cleanup_report_status=${cleanup.status}; disk_root_used_percent=${usedLabel}`,
+      rule_id: "mac.daily_cleanup_ineffective_under_pressure",
     });
   }
 

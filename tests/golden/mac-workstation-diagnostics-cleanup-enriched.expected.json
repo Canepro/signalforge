@@ -29,12 +29,22 @@
       "category": "network"
     },
     {
-      "title_contains": "root volume usage is elevated",
+      "title_contains": "disk pressure is warning",
       "severity": "medium",
       "category": "resource"
     },
     {
       "title_contains": "Daily cleanup metadata is stale",
+      "severity": "medium",
+      "category": "resource"
+    },
+    {
+      "title_contains": "warning disk pressure correlates with cleanup posture drift",
+      "severity": "medium",
+      "category": "resource"
+    },
+    {
+      "title_contains": "did not increase free space",
       "severity": "medium",
       "category": "resource"
     },
@@ -55,6 +65,6 @@
     }
   ],
   "is_incomplete": false,
-  "min_findings": 10,
-  "max_findings": 12
+  "min_findings": 12,
+  "max_findings": 14
 }

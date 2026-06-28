@@ -23,6 +23,8 @@ export function buildSystemPrompt(): string {
 - When pre_findings include Kubernetes operational signals (warning events, rollout state, node pressure, or ResourceQuota pressure), prioritize the highest-impact cluster actions in top_actions_now instead of listing every finding category.
 - For WSL environments, do not elevate known WSL/systemd noise into the summary or top actions if it already appears in noise_or_expected.
 - top_actions_now must be operator-ready, concrete, and ranked by impact (prefer actionable steps over generic review language). When several finding types exist, prefer disk pressure, repeated authentication failures, and pending upgrades ahead of low-severity loopback listeners unless the evidence shows a higher-risk listener exposure.
+- SignalForge is the diagnostics, scoring, and recommendation surface only. Write actions for execution on the target workstation or cluster via Mira/Codex (or another operator agent), not as if SignalForge will run fixes itself. Prefer "On <hostname>: ... then resubmit diagnostics" over vague "fix this" language.
+- When environment_context.os indicates macOS and pre_findings include mac.daily_cleanup_* or mac.disk_pressure* rule_ids, prefix each top_actions_now item with an action gate in square brackets: [safe-immediate], [review-required], or [authority-gated]. Use safe-immediate for low-risk reversible steps (for example git worktree prune after confirmation), review-required for policy or owner decisions, and authority-gated for cleanup reruns, privileged host changes, or actions that need workstation-owner approval.
 - Finding IDs must match the pre_findings list (F001, F002, etc. in order).
 - top_actions_now must have exactly 3 items. No more, no fewer.`;
 }
@@ -73,6 +75,14 @@ State limited visibility prominently in the summary (first or second bullet). Do
 - Frame findings and actions around the container or workload, not the host as a whole.
 - Prioritize isolation and runtime controls such as privileged mode, host networking, host-path mounts, runtime socket access, root execution, and mounted secrets when they appear in pre_findings.
 - Avoid generic VM-hardening language unless the deterministic finding explicitly points to host-level evidence.`;
+  }
+
+  if (env.os.toLowerCase().includes("macos")) {
+    prompt += `\n\n## macOS Guidance
+- Frame disk pressure using warning (>=85% used) and urgent (>=95% used) bands when those findings appear.
+- Correlate disk pressure with daily cleanup freshness, cleanup effectiveness (free-space delta), retained protected stores, and stale manual-review candidates when mac.daily_cleanup_* findings are present.
+- SignalForge recommends; Mira/Codex executes on the workstation and resubmits mac-diagnostics for verification. Do not imply SignalForge deletes files or reruns cleanup itself.
+- Prefix each top_actions_now item with [safe-immediate], [review-required], or [authority-gated] as appropriate.`;
   }
 
   if (env.os.toLowerCase().includes("kubernetes")) {
@@ -144,6 +154,14 @@ State limited visibility prominently in the summary and include re-running or co
     prompt += `\n\n## Container Guidance
 - Frame findings and actions around the container or workload, not the host as a whole.
 - Prioritize isolation and runtime controls such as privileged mode, host networking, host-path mounts, runtime socket access, root execution, and mounted secrets when they appear.`;
+  }
+
+  if (env.os.toLowerCase().includes("macos")) {
+    prompt += `\n\n## macOS Guidance
+- Frame disk pressure using warning (>=85% used) and urgent (>=95% used) bands when those findings appear.
+- Correlate disk pressure with daily cleanup freshness, cleanup effectiveness, retained protected stores, and stale manual-review candidates when mac.daily_cleanup_* findings are present.
+- SignalForge recommends; Mira/Codex executes on the workstation and resubmits mac-diagnostics for verification.
+- Prefix each top_actions_now item with [safe-immediate], [review-required], or [authority-gated] as appropriate.`;
   }
 
   if (env.os.toLowerCase().includes("kubernetes")) {

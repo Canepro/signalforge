@@ -40,6 +40,7 @@ disk_root_used_percent: 91.2
 listening_tcp_json: []
 daily_cleanup_report_status: stale
 daily_cleanup_report_age_hours: 52.4
+daily_cleanup_free_space_delta_bytes: -1388544
 daily_cleanup_needs_review_count: 3
 daily_cleanup_needs_review_summary_json: {"total":3,"by_reason":{"not clearly merged, upstream-gone temp, or stale temp work":2,"path missing; git worktree prune may be enough":1},"by_repo":{"\/Users\/canepro\/src\/support-ai":2,"\/Users\/canepro\/src\/codex-skills":1},"review_buckets":{"protected_outside_home":0,"recent_or_unknown_age":0,"missing_path_prune_candidate":1,"stale_candidate":2,"other":0},"priority_review_candidates":[{"path":"\/Users\/canepro\/src\/support-ai\/.claude\/worktrees\/exciting-heisenberg-6743e7","reason":"not clearly merged, upstream-gone temp, or stale temp work","age_days":53.0},{"path":"\/Users\/canepro\/src\/support-ai\/.claude\/worktrees\/mystifying-kare-228fe8","reason":"not clearly merged, upstream-gone temp, or stale temp work","age_days":52.9},{"path":"\/Users\/canepro\/src\/codex-skills\/.claude\/worktrees\/condescending-poincare-73ad42","reason":"path missing; git worktree prune may be enough"}]}
 daily_cleanup_retained_large_stores_json: [{"path":"\/Users\/canepro\/.codex","size_bytes":6648254464,"reason":"large store measured but protected from automatic deletion"}]
@@ -57,14 +58,23 @@ daily_cleanup_reclaimed_by_category_json: {"npm":221184}
       (finding) => finding.rule_id === "mac.daily_cleanup_large_protected_stores"
     );
 
+    expect(staleReport?.title).toContain("disk pressure is warning");
     expect(staleReport?.severity_hint).toBe("medium");
     expect(staleReport?.evidence).toContain("52.4 hours old");
+    expect(staleReport?.evidence).toContain("pressure_band=warning");
     expect(staleCandidates?.severity_hint).toBe("low");
     expect(staleCandidates?.evidence).toContain("exciting-heisenberg-6743e7");
     expect(pruneCandidates?.severity_hint).toBe("low");
     expect(pruneCandidates?.title).toContain("prune candidate");
+    expect(retainedStores?.title).toContain("disk pressure is warning");
     expect(retainedStores?.severity_hint).toBe("medium");
     expect(retainedStores?.evidence).toContain("/Users/canepro/.codex");
+
+    const correlation = findings.find(
+      (finding) => finding.rule_id === "mac.disk_pressure_operational_posture"
+    );
+    expect(correlation?.evidence).toContain("cleanup_effectiveness=negative");
+    expect(correlation?.evidence).toContain("stale_review_candidates=2");
   });
 
   it("treats invalid cleanup metadata as a pressure issue, not a generic security finding", () => {

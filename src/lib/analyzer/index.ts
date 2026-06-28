@@ -25,6 +25,7 @@ import {
 } from "./codex-app-server/brain";
 import { createOpenAIClient, resolveBrainProvider } from "./brain-provider";
 import { auditEnrichmentResponseFormat, auditReportResponseFormat } from "./response-format";
+import { buildMacTopActions, resolveMacTopActions } from "./mac-top-actions";
 
 export interface AnalyzeOptions {
   apiKey?: string;
@@ -125,7 +126,9 @@ export async function analyzeArtifact(
           findings: codexReport.findings,
           environment_context: env,
           noise_or_expected: noise,
-          top_actions_now: codexReport.top_actions_now,
+          top_actions_now:
+            resolveMacTopActions(codexReport.findings, preFindings, env, incomplete) ??
+            codexReport.top_actions_now,
         };
         return {
           report: mergedReport,
@@ -176,7 +179,9 @@ export async function analyzeArtifact(
       findings: reconciledFindings,
       environment_context: env,
       noise_or_expected: noise,
-      top_actions_now: llmReport.top_actions_now,
+      top_actions_now:
+        resolveMacTopActions(reconciledFindings, preFindings, env, incomplete) ??
+        llmReport.top_actions_now,
     };
 
     return {
@@ -299,7 +304,7 @@ function buildFallbackResult(
     incompleteReason,
     error
   );
-  const topActions = buildFallbackActions(fallbackFindings, env, incomplete);
+  const topActions = buildFallbackActions(fallbackFindings, preFindings, env, incomplete);
 
   return {
     report: {
@@ -464,6 +469,15 @@ function summarizeFallbackFinding(finding: Finding): string {
     }
     if (title.includes("protected retained stores")) {
       return `${finding.title}, leaving large protected local stores as intentional retained disk consumers.`;
+    }
+    if (title.includes("disk pressure")) {
+      return `${finding.title}, which leaves limited headroom for writes, builds, and local cleanup automation.`;
+    }
+    if (title.includes("correlates with cleanup posture drift")) {
+      return `${finding.title}, tying elevated disk use to stale cleanup metadata, manual-review backlog, or low cleanup yield.`;
+    }
+    if (title.includes("did not increase free space")) {
+      return `${finding.title}, so the latest cleanup pass did not improve root volume headroom.`;
     }
     if (title.includes("root volume usage")) {
       return `${finding.title}, which leaves limited headroom for writes or package operations.`;
@@ -729,8 +743,14 @@ function buildActionForFinding(
     if (tl.includes("protected retained stores")) {
       return "Review the protected retained stores as metadata-only disk consumers and keep them out of automatic cleanup unless the owner widens the deletion scope.";
     }
-    if (tl.includes("root volume usage")) {
-      return "Free space on the Mac root volume or move rebuildable local artifacts so usage drops below the warning threshold.";
+    if (tl.includes("disk pressure") || tl.includes("root volume usage")) {
+      return "On the workstation: reduce root volume usage below the warning threshold by moving rebuildable artifacts or deleting confirmed-obsolete local stores, then resubmit mac-diagnostics for verification.";
+    }
+    if (tl.includes("correlates with cleanup posture drift")) {
+      return "On the workstation: address correlated cleanup drift (freshness, manual-review backlog, retained stores) via Mira/Codex, then resubmit mac-diagnostics — SignalForge scores evidence only.";
+    }
+    if (tl.includes("did not increase free space")) {
+      return "On the workstation: rerun daily cleanup and inspect protected retained stores plus manual-review backlog, then resubmit mac-diagnostics for proof.";
     }
   }
 
@@ -952,9 +972,15 @@ function buildActionForFinding(
 
 function buildFallbackActions(
   findings: Finding[],
+  preFindings: PreFinding[],
   env: EnvironmentContext,
   incomplete: boolean
 ): [string, string, string] {
+  const macActions = resolveMacTopActions(findings, preFindings, env, incomplete);
+  if (macActions) {
+    return macActions;
+  }
+
   const fromFindings: string[] = [];
   for (const finding of findings.slice().sort(compareFindingsForFallback)) {
     const action = buildActionForFinding(finding, env);

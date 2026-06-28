@@ -49,7 +49,7 @@ export function TopActionsPanel({
               </div>
               {showGrid ? (
                 <div className="text-[11px] text-on-surface-variant">
-                  {actions.length} ranked action{actions.length === 1 ? "" : "s"}
+                  {actions.length} ranked recommendation{actions.length === 1 ? "" : "s"} · execute outside SignalForge
                 </div>
               ) : null}
             </div>

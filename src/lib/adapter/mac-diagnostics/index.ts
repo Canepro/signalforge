@@ -6,6 +6,7 @@ import {
   type MacListeningSocket,
 } from "./listeners";
 import { extractDailyCleanupFindings } from "./cleanup";
+import { extractDiskPressureFindings } from "./disk-pressure";
 import { extractRemoteAccessFindings } from "./remote-access";
 import { extractFileSharingFindings } from "./sharing";
 import {
@@ -142,17 +143,7 @@ export class MacDiagnosticsAdapter implements ArtifactAdapter {
     findings.push(...extractRemoteAccessFindings(sections, sockets));
     findings.push(...extractFileSharingFindings(sections));
     findings.push(...extractDailyCleanupFindings(sections, diskUsedPercent));
-
-    if (diskUsedPercent !== null && diskUsedPercent >= 85) {
-      findings.push({
-        title: `Mac root volume usage is elevated (${diskUsedPercent.toFixed(1)}%)`,
-        severity_hint: diskUsedPercent >= 95 ? "high" : "medium",
-        category: "resource",
-        section_source: "disk_root_used_percent",
-        evidence: sections.disk_root_used_percent ?? String(diskUsedPercent),
-        rule_id: "mac.disk_pressure",
-      });
-    }
+    findings.push(...extractDiskPressureFindings(sections, diskUsedPercent));
 
     if (brewOutdated !== null && brewOutdated > 0) {
       findings.push({

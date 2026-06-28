@@ -488,12 +488,17 @@ mdm_enrollment: unknown
       ).toBe(true);
       expect(
         result.report!.top_actions_now.some((action) =>
-          action.includes("Enable FileVault")
+          action.toLowerCase().includes("filevault")
         )
       ).toBe(true);
       expect(
         result.report!.top_actions_now.some((action) =>
-          action.includes("Re-enable System Integrity Protection")
+          action.toLowerCase().includes("system integrity protection")
+        )
+      ).toBe(true);
+      expect(
+        result.report!.top_actions_now.every((action) =>
+          /^\[(safe-immediate|review-required|authority-gated)\] /.test(action)
         )
       ).toBe(true);
     } finally {

@@ -29,7 +29,7 @@
       "category": "network"
     },
     {
-      "title_contains": "root volume usage is elevated",
+      "title_contains": "disk pressure is warning",
       "severity": "medium",
       "category": "resource"
     }

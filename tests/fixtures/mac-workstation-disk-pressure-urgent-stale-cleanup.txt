@@ -1,0 +1,36 @@
+=== mac-diagnostics ===
+hostname: operator-mac.local
+os_name: macOS
+os_version: 26.5
+build_version: 25F71
+kernel: 25.5.0
+architecture: arm64
+uptime: up 6 days, 4:02
+current_user: operator
+ran_as_root: false
+sip_status: System Integrity Protection status: enabled.
+filevault_status: On
+firewall_state: On
+remote_login: Off
+remote_management: Off
+stealth_mode: On
+listening_tcp_json: []
+disk_root_used_percent: 96.4
+memory_pressure: System-wide memory free percentage: 18%
+brew_outdated_count: 0
+mdm_enrollment: unknown
+daily_cleanup_report_status: stale
+daily_cleanup_report_run_id: daily-cleanup-20260626T110210Z
+daily_cleanup_report_finished_at: 2026-06-26T11:02:10Z
+daily_cleanup_report_age_hours: 72.0
+daily_cleanup_initial_free_bytes: 11874304000
+daily_cleanup_final_free_bytes: 11869061120
+daily_cleanup_free_space_delta_bytes: -5242880
+daily_cleanup_cache_paths_removed_count: 0
+daily_cleanup_worktrees_removed_count: 0
+daily_cleanup_active_cache_skips_count: 1
+daily_cleanup_needs_review_count: 4
+daily_cleanup_reclaimed_by_category_json: {}
+daily_cleanup_needs_review_summary_json: {"total":4,"review_buckets":{"stale_candidate":2,"missing_path_prune_candidate":1,"recent_or_unknown_age":1},"priority_review_candidates":[{"age_days":41.0,"path":"/Users/operator/src/support-ai/.claude/worktrees/stale-alpha","reason":"not clearly merged, upstream-gone temp, or stale temp work"},{"path":"/Users/operator/src/codex-skills/.claude/worktrees/prune-me","reason":"path missing; git worktree prune may be enough"}]}
+daily_cleanup_retained_large_stores_json: [{"path":"/Users/operator/.codex","reason":"large store measured but protected from automatic deletion","size_bytes":7100000000}]
+collected_at: 2026-06-28T12:03:49Z

@@ -65,7 +65,7 @@ describe("MacDiagnosticsAdapter", () => {
           rule_id: "mac.loopback_local_dev_listeners",
         }),
         expect.objectContaining({
-          title: "Mac root volume usage is elevated (91.2%)",
+          title: "Mac root volume disk pressure is warning (91.2% used)",
           severity_hint: "medium",
           rule_id: "mac.disk_pressure",
         }),
