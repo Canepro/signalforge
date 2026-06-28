@@ -125,11 +125,6 @@ const COOKIE_SALT = "signalforge_admin_cookie_v1";
 
 async function subtleCrypto() {
   if (globalThis.crypto?.subtle) return globalThis.crypto.subtle;
-  const loadNodeCrypto = Function("return import('node:crypto')") as () => Promise<{
-    webcrypto?: Crypto;
-  }>;
-  const { webcrypto } = await loadNodeCrypto();
-  if (webcrypto?.subtle) return webcrypto.subtle as unknown as SubtleCrypto;
   throw new Error("Web Crypto API is unavailable");
 }
 

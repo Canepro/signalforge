@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, hashAdminSessionCookie } from "@/lib/api/admin-auth";
-import { middleware } from "../middleware";
+import { middleware } from "@/middleware";
 
 describe("private app middleware", () => {
   afterEach(() => {
