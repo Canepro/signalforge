@@ -27,7 +27,7 @@ cp .env.example .env.local
 bun run dev                 # http://localhost:3000
 ```
 
-Preferred local secrets path once Infisical is linked for this checkout:
+Preferred local secrets path once Infisical is linked:
 
 ```bash
 infisical login
