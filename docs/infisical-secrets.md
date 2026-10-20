@@ -119,7 +119,7 @@ Use `secret_source=github-environment` only for short-lived debugging.
 
 This checkout links to Infisical project `canepro-secrets` (`70ae1697-055c-4fc1-ba90-85b25f6bf138`) through `.infisical.json`.
 
-Local app secrets for this Mac live in:
+Local development secrets live in:
 
 - project: `canepro-secrets`
 - environment: `dev`
@@ -136,7 +136,9 @@ Useful variations:
 
 ```bash
 infisical run --env=dev --path=/signalforge -- bun run typecheck
-infisical run --env=dev --path=/signalforge -- bash scripts/run-postgres-parity-local.sh
+# Parity must use a disposable local Postgres URL. Unset Infisical DATABASE_URL*
+# so the helper cannot migrate a shared database from the secret path.
+infisical run --env=dev --path=/signalforge -- env -u DATABASE_URL -u DATABASE_URL_TEST   bash scripts/run-postgres-parity-local.sh --url postgres://signalforge:signalforge@127.0.0.1:5432/signalforge
 ```
 
 The repo does not require Infisical for local development. `.env.local` remains valid. Prefer `bun run dev:infisical` once the CLI is logged in so a moved checkout can pull the same secrets without copying the env file.
