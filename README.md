@@ -27,6 +27,15 @@ cp .env.example .env.local
 bun run dev                 # http://localhost:3000
 ```
 
+Preferred local secrets path once Infisical is linked for this checkout:
+
+```bash
+infisical login
+bun run dev:infisical       # injects canepro-secrets / dev / /signalforge
+```
+
+See [docs/infisical-secrets.md](docs/infisical-secrets.md). Keep `.env.local` in place while you validate the Infisical route.
+
 Submit a sample artifact and read the result:
 
 ```bash
